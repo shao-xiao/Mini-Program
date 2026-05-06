@@ -1,0 +1,16 @@
+# frontend
+dehui-property-admin/node_modules
+dehui-property-admin/dist
+
+# backend
+dehui-property-management/target
+
+# IDE
+.idea
+.vscode
+
+# logs
+*.log
+
+# linux
+.DS_Store
