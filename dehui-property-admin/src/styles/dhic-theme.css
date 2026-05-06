@@ -1,0 +1,101 @@
+:root {
+  --el-color-primary: #d93025;
+  --el-color-primary-light-3: #e66a61;
+  --el-color-primary-light-5: #ee9993;
+  --el-color-primary-light-7: #f5c5c1;
+  --el-color-primary-light-8: #f8d8d6;
+  --el-color-primary-light-9: #fdecea;
+  --el-color-primary-dark-2: #a9231b;
+
+  --el-color-success: #555555;
+  --el-color-success-light-9: #f2f2f2;
+  --el-color-warning: #8a6d3b;
+  --el-color-danger: #d93025;
+  --el-color-info: #666666;
+
+  --el-border-color: #e5e7eb;
+  --el-fill-color-light: #f7f7f7;
+  --el-text-color-primary: #1f1b1b;
+  --el-text-color-regular: #303133;
+}
+
+.el-button--primary {
+  background-color: #d93025 !important;
+  border-color: #d93025 !important;
+}
+
+.el-button--primary:hover {
+  background-color: #b9261e !important;
+  border-color: #b9261e !important;
+}
+
+.el-button--primary.is-plain {
+  color: #d93025 !important;
+  background: #fdecea !important;
+  border-color: #f3b6b1 !important;
+}
+
+.el-button--success,
+.el-button--warning,
+.el-button--info {
+  background-color: #4a4a4a !important;
+  border-color: #4a4a4a !important;
+  color: #fff !important;
+}
+
+.el-button--danger {
+  background-color: #d93025 !important;
+  border-color: #d93025 !important;
+}
+
+.el-tag--success,
+.el-tag--primary,
+.el-tag--warning,
+.el-tag--info {
+  background: #f2f2f2 !important;
+  border-color: #d9d9d9 !important;
+  color: #303133 !important;
+}
+
+.el-tag--danger {
+  background: #fdecea !important;
+  border-color: #f3b6b1 !important;
+  color: #d93025 !important;
+}
+
+.el-card {
+  border: none !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important;
+}
+
+.el-card__header {
+  border-bottom: 1px solid #eeeeee !important;
+}
+
+.el-table {
+  color: #303133 !important;
+}
+
+.el-table th.el-table__cell {
+  background: #f7f7f7 !important;
+  color: #606266 !important;
+  font-weight: 600 !important;
+}
+
+.el-table .el-table__cell {
+  border-color: #eeeeee !important;
+}
+
+.el-menu {
+  font-weight: 600;
+}
+
+.el-menu-item.is-active {
+  color: #d93025 !important;
+}
+
+.el-sub-menu__title:hover,
+.el-menu-item:hover {
+  background-color: rgba(217, 48, 37, 0.08) !important;
+}

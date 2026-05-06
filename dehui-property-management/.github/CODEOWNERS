@@ -1,0 +1,8 @@
+# 默认代码审查人
+*       @your-github-username
+
+# 各模块审查人分配
+/src/main/java/com/dehui/property/modules/user/     @senior-dev
+/src/main/java/com/dehui/property/modules/building/  @arch-dev
+/src/main/java/com/dehui/property/modules/contract/  @legal-team
+/src/main/java/com/dehui/property/modules/security/  @security-team
