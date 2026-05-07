@@ -4,11 +4,29 @@
       <template #header>
         <div class="card-header">
           <span>账单管理</span>
-          <el-button type="primary" @click="openCreateDialog">新增账单</el-button>
+
+          <el-button
+            v-if="hasPermission('bill:add')"
+            type="primary"
+            @click="openCreateDialog"
+          >
+            新增账单
+          </el-button>
         </div>
       </template>
 
-      <el-table v-loading="loading" :data="bills" border style="width: 100%">
+      <el-empty
+        v-if="!hasPermission('bill:view')"
+        description="当前角色无权查看账单"
+      />
+
+      <el-table
+        v-else
+        v-loading="loading"
+        :data="bills"
+        border
+        style="width: 100%"
+      >
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="billNumber" label="账单编号" min-width="170" />
         <el-table-column prop="tenantId" label="租户ID" width="90" />
@@ -22,24 +40,49 @@
 
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
-            <el-tag v-if="row.status === 'PAID'" type="success">已支付</el-tag>
-            <el-tag v-else-if="isOverdue(row)" type="danger">已逾期</el-tag>
-            <el-tag v-else-if="row.status === 'UNPAID'" type="warning">未支付</el-tag>
-            <el-tag v-else type="info">{{ row.status }}</el-tag>
+            <el-tag v-if="row.status === 'PAID'" type="success">
+              已支付
+            </el-tag>
+
+            <el-tag
+              v-else-if="isOverdue(row)"
+              type="danger"
+            >
+              已逾期
+            </el-tag>
+
+            <el-tag
+              v-else-if="row.status === 'UNPAID'"
+              type="warning"
+            >
+              未支付
+            </el-tag>
+
+            <el-tag v-else type="info">
+              {{ row.status }}
+            </el-tag>
           </template>
         </el-table-column>
 
         <el-table-column label="操作" width="130" fixed="right">
           <template #default="{ row }">
             <el-button
-              v-if="row.status !== 'PAID'"
+              v-if="
+                row.status !== 'PAID' &&
+                hasPermission('bill:pay')
+              "
               size="small"
               type="success"
               @click="payBill(row)"
             >
               收款
             </el-button>
-            <el-button v-else size="small" disabled>
+
+            <el-button
+              v-else
+              size="small"
+              disabled
+            >
               已结清
             </el-button>
           </template>
@@ -47,22 +90,45 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" title="新增账单" width="560px">
-      <el-form ref="formRef" :model="form" :rules="formRules" label-width="110px">
+    <el-dialog
+      v-model="dialogVisible"
+      title="新增账单"
+      width="560px"
+    >
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="formRules"
+        label-width="110px"
+      >
         <el-form-item label="账单编号" prop="billNumber">
-          <el-input v-model="form.billNumber" placeholder="请输入账单编号" />
+          <el-input
+            v-model="form.billNumber"
+            placeholder="请输入账单编号"
+          />
         </el-form-item>
 
         <el-form-item label="租户ID" prop="tenantId">
-          <el-input-number v-model="form.tenantId" :min="1" style="width: 100%" />
+          <el-input-number
+            v-model="form.tenantId"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
 
         <el-form-item label="合同ID" prop="contractId">
-          <el-input-number v-model="form.contractId" :min="1" style="width: 100%" />
+          <el-input-number
+            v-model="form.contractId"
+            :min="1"
+            style="width: 100%"
+          />
         </el-form-item>
 
         <el-form-item label="账单类型" prop="billType">
-          <el-select v-model="form.billType" style="width: 100%">
+          <el-select
+            v-model="form.billType"
+            style="width: 100%"
+          >
             <el-option label="租金 RENT" value="RENT" />
             <el-option label="物业费 PROPERTY" value="PROPERTY" />
             <el-option label="水费 WATER" value="WATER" />
@@ -90,7 +156,12 @@
         </el-form-item>
 
         <el-form-item label="金额" prop="amount">
-          <el-input-number v-model="form.amount" :min="0.01" :precision="2" style="width: 100%" />
+          <el-input-number
+            v-model="form.amount"
+            :min="0.01"
+            :precision="2"
+            style="width: 100%"
+          />
         </el-form-item>
 
         <el-form-item label="到期日" prop="dueDate">
@@ -104,8 +175,17 @@
       </el-form>
 
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="createBill">保存</el-button>
+        <el-button @click="dialogVisible = false">
+          取消
+        </el-button>
+
+        <el-button
+          type="primary"
+          :loading="saving"
+          @click="createBill"
+        >
+          保存
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -115,6 +195,7 @@
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
+import { hasPermission } from '../../utils/permission'
 
 const bills = ref([])
 const loading = ref(false)
@@ -136,23 +217,79 @@ const defaultForm = () => ({
 const form = reactive(defaultForm())
 
 const formRules = {
-  billNumber: [{ required: true, message: '请输入账单编号', trigger: 'blur' }],
-  tenantId: [{ required: true, message: '请输入租户ID', trigger: 'change' }],
-  contractId: [{ required: true, message: '请输入合同ID', trigger: 'change' }],
-  billType: [{ required: true, message: '请选择账单类型', trigger: 'change' }],
-  periodStart: [{ required: true, message: '请选择账期开始日期', trigger: 'change' }],
-  periodEnd: [{ required: true, message: '请选择账期结束日期', trigger: 'change' }],
+  billNumber: [
+    {
+      required: true,
+      message: '请输入账单编号',
+      trigger: 'blur'
+    }
+  ],
+
+  tenantId: [
+    {
+      required: true,
+      message: '请输入租户ID',
+      trigger: 'change'
+    }
+  ],
+
+  contractId: [
+    {
+      required: true,
+      message: '请输入合同ID',
+      trigger: 'change'
+    }
+  ],
+
+  billType: [
+    {
+      required: true,
+      message: '请选择账单类型',
+      trigger: 'change'
+    }
+  ],
+
+  periodStart: [
+    {
+      required: true,
+      message: '请选择账期开始日期',
+      trigger: 'change'
+    }
+  ],
+
+  periodEnd: [
+    {
+      required: true,
+      message: '请选择账期结束日期',
+      trigger: 'change'
+    }
+  ],
+
   amount: [
-    { required: true, message: '请输入金额', trigger: 'change' },
+    {
+      required: true,
+      message: '请输入金额',
+      trigger: 'change'
+    },
     {
       validator: (_rule, value, callback) => {
-        if (!value || value <= 0) callback(new Error('金额必须大于0'))
-        else callback()
+        if (!value || value <= 0) {
+          callback(new Error('金额必须大于0'))
+        } else {
+          callback()
+        }
       },
       trigger: 'change'
     }
   ],
-  dueDate: [{ required: true, message: '请选择到期日', trigger: 'change' }]
+
+  dueDate: [
+    {
+      required: true,
+      message: '请选择到期日',
+      trigger: 'change'
+    }
+  ]
 }
 
 function resetForm() {
@@ -161,26 +298,44 @@ function resetForm() {
 }
 
 async function loadBills() {
+  if (!hasPermission('bill:view')) {
+    return
+  }
+
   loading.value = true
+
   try {
     const data = await request.get('/bills')
     bills.value = Array.isArray(data) ? data : []
   } catch (error) {
-    ElMessage.error(error?.response?.data?.message || '账单加载失败')
+    ElMessage.error(
+      error?.response?.data?.message || '账单加载失败'
+    )
   } finally {
     loading.value = false
   }
 }
 
 function openCreateDialog() {
+  if (!hasPermission('bill:add')) {
+    ElMessage.warning('无新增账单权限')
+    return
+  }
+
   resetForm()
   dialogVisible.value = true
 }
 
 async function createBill() {
+  if (!hasPermission('bill:add')) {
+    ElMessage.warning('无新增账单权限')
+    return
+  }
+
   await formRef.value.validate()
 
   saving.value = true
+
   try {
     await request.post('/bills', {
       billNumber: form.billNumber,
@@ -194,11 +349,16 @@ async function createBill() {
     })
 
     ElMessage.success('账单创建成功')
+
     dialogVisible.value = false
+
     resetForm()
+
     await loadBills()
   } catch (error) {
-    ElMessage.error(error?.response?.data?.message || '账单创建失败')
+    ElMessage.error(
+      error?.response?.data?.message || '账单创建失败'
+    )
   } finally {
     saving.value = false
   }
@@ -210,10 +370,16 @@ function isOverdue(row) {
   }
 
   const today = new Date().toISOString().slice(0, 10)
+
   return String(row.dueDate) < today
 }
 
 async function payBill(row) {
+  if (!hasPermission('bill:pay')) {
+    ElMessage.warning('无账单收款权限')
+    return
+  }
+
   try {
     await ElMessageBox.confirm(
       `确定收取账单「${row.billNumber}」的全额款项 ${row.amount} 元吗？`,
@@ -222,11 +388,15 @@ async function payBill(row) {
     )
 
     await request.post(`/bills/${row.id}/pay`)
+
     ElMessage.success('收款成功')
+
     await loadBills()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error(error?.response?.data?.message || '收款失败')
+      ElMessage.error(
+        error?.response?.data?.message || '收款失败'
+      )
     }
   }
 }
