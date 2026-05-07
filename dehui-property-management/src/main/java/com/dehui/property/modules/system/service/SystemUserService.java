@@ -34,17 +34,14 @@ public class SystemUserService {
             throw new RuntimeException("密码错误");
         }
 
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new RuntimeException("用户已被禁用，禁止登录");
+        }
+
         String token = UUID.randomUUID().toString();
         tokenStore.put(token, user);
 
-        List<String> roles = userRoleRepository.findByUserId(user.getId())
-                .stream()
-                .map(UserRole::getRoleId)
-                .map(sysRoleRepository::findById)
-                .filter(java.util.Optional::isPresent)
-                .map(java.util.Optional::get)
-                .map(SysRole::getRoleCode)
-                .collect(Collectors.toList());
+        List<String> roles = getRoleCodesByUserId(user.getId());
 
         return new LoginResponse(
                 token,
@@ -64,7 +61,11 @@ public class SystemUserService {
             return List.of();
         }
 
-        return userRoleRepository.findByUserId(user.getId())
+        return getRoleCodesByUserId(user.getId());
+    }
+
+    private List<String> getRoleCodesByUserId(Long userId) {
+        return userRoleRepository.findByUserId(userId)
                 .stream()
                 .map(UserRole::getRoleId)
                 .map(sysRoleRepository::findById)
@@ -83,15 +84,73 @@ public class SystemUserService {
         return roleCodes.stream().anyMatch(userRoles::contains);
     }
 
+    public boolean hasPermission(String token, String permission) {
+        List<String> roles = getRoleCodesByToken(token);
+
+        if (roles.contains("ADMIN")) {
+            return true;
+        }
+
+        return switch (permission) {
+            case "bill:view" ->
+                    roles.stream().anyMatch(r -> List.of("MANAGER", "FINANCE").contains(r));
+            case "bill:add" ->
+                    roles.stream().anyMatch(r -> List.of("MANAGER", "FINANCE").contains(r));
+            case "bill:pay" ->
+                    roles.stream().anyMatch(r -> List.of("FINANCE").contains(r));
+
+            case "feerule:view" ->
+                    roles.stream().anyMatch(r -> List.of("MANAGER", "FINANCE").contains(r));
+            case "feerule:add" ->
+                    roles.stream().anyMatch(r -> List.of("FINANCE").contains(r));
+            case "feerule:generate" ->
+                    roles.stream().anyMatch(r -> List.of("FINANCE").contains(r));
+
+            case "parking-bill:view" ->
+                    roles.stream().anyMatch(r -> List.of("MANAGER", "FINANCE").contains(r));
+            case "parking-bill:add" ->
+                    roles.stream().anyMatch(r -> List.of("FINANCE").contains(r));
+            case "parking-bill:pay" ->
+                    roles.stream().anyMatch(r -> List.of("FINANCE").contains(r));
+
+            default -> false;
+        };
+    }
+
     public SysUser createUser(SysUser user) {
+        if (user.getUsername() == null || user.getUsername().isBlank()) {
+            throw new RuntimeException("用户名不能为空");
+        }
+
+        if (user.getPassword() == null || user.getPassword().isBlank()) {
+            throw new RuntimeException("密码不能为空");
+        }
+
+        if (sysUserRepository.findByUsername(user.getUsername()).isPresent()) {
+            throw new RuntimeException("用户名已存在，请勿重复创建");
+        }
+
         if (user.getStatus() == null || user.getStatus().isBlank()) {
             user.setStatus("ACTIVE");
         }
+
         return sysUserRepository.save(user);
     }
 
     public List<SysUser> listUsers() {
         return sysUserRepository.findAll();
+    }
+
+    public SysUser updateUserStatus(Long id, String status) {
+        SysUser user = sysUserRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
+
+        if (!List.of("ACTIVE", "DISABLED").contains(status)) {
+            throw new RuntimeException("非法状态");
+        }
+
+        user.setStatus(status);
+        return sysUserRepository.save(user);
     }
 
     public SysRole createRole(SysRole role) {
@@ -106,9 +165,14 @@ public class SystemUserService {
     }
 
     public UserRole assignRole(Long userId, Long roleId) {
+        if (userRoleRepository.existsByUserIdAndRoleId(userId, roleId)) {
+            throw new RuntimeException("该用户已分配此角色，请勿重复分配");
+        }
+
         UserRole userRole = new UserRole();
         userRole.setUserId(userId);
         userRole.setRoleId(roleId);
+
         return userRoleRepository.save(userRole);
     }
 

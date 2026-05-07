@@ -1,14 +1,14 @@
 package com.dehui.property.modules.system.controller;
 
 import com.dehui.property.common.Result;
+import com.dehui.property.modules.system.dto.LoginRequest;
+import com.dehui.property.modules.system.dto.LoginResponse;
 import com.dehui.property.modules.system.entity.SysRole;
 import com.dehui.property.modules.system.entity.SysUser;
 import com.dehui.property.modules.system.entity.UserRole;
 import com.dehui.property.modules.system.service.SystemUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-import com.dehui.property.modules.system.dto.LoginRequest;
-import com.dehui.property.modules.system.dto.LoginResponse;
 
 import java.util.List;
 
@@ -27,6 +27,13 @@ public class SystemUserController {
     @GetMapping("/users")
     public Result<List<SysUser>> listUsers() {
         return Result.success(systemUserService.listUsers());
+    }
+
+    @PatchMapping("/users/{id}/status")
+    public Result<SysUser> updateUserStatus(
+            @PathVariable Long id,
+            @RequestParam String status) {
+        return Result.success(systemUserService.updateUserStatus(id, status));
     }
 
     @PostMapping("/roles")

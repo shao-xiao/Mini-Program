@@ -23,12 +23,12 @@ public class AuthInterceptor implements HandlerInterceptor {
                              Object handler) throws Exception {
 
         String uri = request.getRequestURI();
-        System.out.println(">>> AuthInterceptor URI = " + uri);
+        String method = request.getMethod();
 
-        // ===== 放行认证接口 + 基础数据 =====
+        System.out.println(">>> AuthInterceptor URI = " + uri + ", METHOD = " + method);
+
         if (uri.contains("/login")
                 || uri.startsWith("/api/system/login")
-                || uri.startsWith("/api/buildings")
                 || uri.startsWith("/api/error")) {
             return true;
         }
@@ -40,7 +40,6 @@ public class AuthInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        // 兼容 Authorization: Bearer xxx
         if (token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
@@ -52,15 +51,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        // 基础资产：ADMIN / MANAGER / STAFF
-        if (uri.startsWith("/api/buildings")) {
-            if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "STAFF"))) {
-                writeForbidden(response, "无权限访问基础资产接口");
-                return false;
-            }
-        }
-
-        // 系统管理：仅 ADMIN
+        // ===== 系统管理：仅 ADMIN =====
         if (uri.startsWith("/api/system")) {
             if (!systemUserService.hasRole(token, "ADMIN")) {
                 writeForbidden(response, "无权限访问系统管理接口");
@@ -68,7 +59,15 @@ public class AuthInterceptor implements HandlerInterceptor {
             }
         }
 
-        // 租户：ADMIN / MANAGER / STAFF / FINANCE
+        // ===== 基础资产：ADMIN / MANAGER / STAFF =====
+        if (uri.startsWith("/api/buildings")) {
+            if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "STAFF"))) {
+                writeForbidden(response, "无权限访问基础资产接口");
+                return false;
+            }
+        }
+
+        // ===== 租户：ADMIN / MANAGER / STAFF / FINANCE =====
         if (uri.startsWith("/api/tenants") || uri.startsWith("/api/tenant")) {
             if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "STAFF", "FINANCE"))) {
                 writeForbidden(response, "无权限访问租户接口");
@@ -76,7 +75,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             }
         }
 
-        // 合同：ADMIN / MANAGER / FINANCE
+        // ===== 合同：ADMIN / MANAGER / FINANCE =====
         if (uri.startsWith("/api/contracts")) {
             if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "FINANCE"))) {
                 writeForbidden(response, "无权限访问合同接口");
@@ -84,31 +83,84 @@ public class AuthInterceptor implements HandlerInterceptor {
             }
         }
 
-        // 账单：ADMIN / MANAGER / FINANCE
+        // ===== 账单：动作级权限 =====
         if (uri.startsWith("/api/bills")) {
-            if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "FINANCE"))) {
-                writeForbidden(response, "无权限访问账单接口");
+            if ("GET".equalsIgnoreCase(method)) {
+                if (!systemUserService.hasPermission(token, "bill:view")) {
+                    writeForbidden(response, "无账单查看权限");
+                    return false;
+                }
+            } else if ("POST".equalsIgnoreCase(method) && uri.contains("/pay")) {
+                if (!systemUserService.hasPermission(token, "bill:pay")) {
+                    writeForbidden(response, "无账单收款权限");
+                    return false;
+                }
+            } else if ("POST".equalsIgnoreCase(method)) {
+                if (!systemUserService.hasPermission(token, "bill:add")) {
+                    writeForbidden(response, "无新增账单权限");
+                    return false;
+                }
+            } else {
+                writeForbidden(response, "无账单接口权限");
                 return false;
             }
         }
 
-        // 收费规则：ADMIN / MANAGER / FINANCE
+        // ===== 收费规则：动作级权限 =====
         if (uri.startsWith("/api/feerules")) {
-            if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "FINANCE"))) {
-                writeForbidden(response, "无权限访问收费规则接口");
+            if ("GET".equalsIgnoreCase(method)) {
+                if (!systemUserService.hasPermission(token, "feerule:view")) {
+                    writeForbidden(response, "无收费规则查看权限");
+                    return false;
+                }
+            } else if ("POST".equalsIgnoreCase(method) && uri.contains("/generate-bill")) {
+                if (!systemUserService.hasPermission(token, "feerule:generate")) {
+                    writeForbidden(response, "无生成账单权限");
+                    return false;
+                }
+            } else if ("POST".equalsIgnoreCase(method)) {
+                if (!systemUserService.hasPermission(token, "feerule:add")) {
+                    writeForbidden(response, "无新增收费规则权限");
+                    return false;
+                }
+            } else {
+                writeForbidden(response, "无收费规则接口权限");
                 return false;
             }
         }
 
-        // 停车：ADMIN / MANAGER / FINANCE
-        if (uri.startsWith("/api/parking")) {
-            if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "FINANCE"))) {
-                writeForbidden(response, "无权限访问停车接口");
+        // ===== 停车账单：动作级权限 =====
+        if (uri.startsWith("/api/parking/bills")) {
+            if ("GET".equalsIgnoreCase(method)) {
+                if (!systemUserService.hasPermission(token, "parking-bill:view")) {
+                    writeForbidden(response, "无停车账单查看权限");
+                    return false;
+                }
+            } else if ("POST".equalsIgnoreCase(method) && uri.contains("/pay")) {
+                if (!systemUserService.hasPermission(token, "parking-bill:pay")) {
+                    writeForbidden(response, "无停车账单收款权限");
+                    return false;
+                }
+            } else if ("POST".equalsIgnoreCase(method)) {
+                if (!systemUserService.hasPermission(token, "parking-bill:add")) {
+                    writeForbidden(response, "无新增停车账单权限");
+                    return false;
+                }
+            } else {
+                writeForbidden(response, "无停车账单接口权限");
                 return false;
             }
         }
 
-        // 访客：ADMIN / MANAGER / SECURITY
+        // ===== 车位管理：ADMIN / MANAGER / FINANCE =====
+        if (uri.startsWith("/api/parking/spaces")) {
+            if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "FINANCE"))) {
+                writeForbidden(response, "无权限访问车位接口");
+                return false;
+            }
+        }
+
+        // ===== 访客：ADMIN / MANAGER / SECURITY =====
         if (uri.startsWith("/api/visitors")) {
             if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "SECURITY"))) {
                 writeForbidden(response, "无权限访问访客接口");
@@ -116,7 +168,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             }
         }
 
-        // 工单：ADMIN / MANAGER / STAFF / SECURITY / CLEANER
+        // ===== 工单：ADMIN / MANAGER / STAFF / SECURITY / CLEANER =====
         if (uri.startsWith("/api/workorders")) {
             if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "STAFF", "SECURITY", "CLEANER"))) {
                 writeForbidden(response, "无权限访问工单接口");
@@ -124,7 +176,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             }
         }
 
-        // 公告：ADMIN / MANAGER
+        // ===== 公告：ADMIN / MANAGER =====
         if (uri.startsWith("/api/announcements")) {
             if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER"))) {
                 writeForbidden(response, "无权限访问公告接口");
@@ -132,7 +184,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             }
         }
 
-        // AI：ADMIN / MANAGER
+        // ===== AI：ADMIN / MANAGER =====
         if (uri.startsWith("/api/ai")) {
             if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER"))) {
                 writeForbidden(response, "无权限访问AI分析接口");

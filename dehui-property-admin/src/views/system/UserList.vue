@@ -45,9 +45,29 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="140" fixed="right" align="center">
+        <el-table-column label="操作" width="240" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openAssignRole(row)">分配角色</el-button>
+            <el-button link type="primary" @click="openAssignRole(row)">
+              分配角色
+            </el-button>
+
+            <el-button
+              v-if="row.status === 'ACTIVE'"
+              link
+              type="danger"
+              @click="changeUserStatus(row, 'DISABLED')"
+            >
+              禁用
+            </el-button>
+
+            <el-button
+              v-else
+              link
+              type="success"
+              @click="changeUserStatus(row, 'ACTIVE')"
+            >
+              启用
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -98,6 +118,7 @@
               :key="role.id"
               :label="`${role.roleName}（${role.roleCode}）`"
               :value="role.id"
+              :disabled="hasUserRole(currentUserId, role.id)"
             />
           </el-select>
         </el-form-item>
@@ -113,7 +134,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 
 const loading = ref(false)
@@ -201,6 +222,11 @@ function getUserRoleNames(userId) {
     .filter(Boolean)
 }
 
+function hasUserRole(userId, roleId) {
+  const userRoles = userRolesMap.value[userId] || []
+  return userRoles.some(item => item.roleId === roleId)
+}
+
 function resetForm() {
   form.username = ''
   form.password = ''
@@ -254,6 +280,11 @@ async function assignRole() {
     return
   }
 
+  if (hasUserRole(currentUserId.value, selectedRoleId.value)) {
+    ElMessage.warning('该用户已分配此角色，请勿重复分配')
+    return
+  }
+
   assigning.value = true
   try {
     await request.post(`/system/users/${currentUserId.value}/roles/${selectedRoleId.value}`)
@@ -264,6 +295,33 @@ async function assignRole() {
     ElMessage.error(e.message || '分配角色失败')
   } finally {
     assigning.value = false
+  }
+}
+
+async function changeUserStatus(row, status) {
+  try {
+    const actionText = status === 'ACTIVE' ? '启用' : '禁用'
+
+    await ElMessageBox.confirm(
+      `确定要${actionText}用户「${row.realName || row.username}」吗？`,
+      `${actionText}确认`,
+      { type: 'warning' }
+    )
+
+    await request.patch(
+      `/system/users/${row.id}/status`,
+      null,
+      {
+        params: { status }
+      }
+    )
+
+    ElMessage.success(status === 'ACTIVE' ? '用户已启用' : '用户已禁用')
+    await loadUsers()
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.message || '状态修改失败')
+    }
   }
 }
 

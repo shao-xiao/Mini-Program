@@ -172,7 +172,6 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import request from '../../utils/request'
 
 const loading = ref(false)
@@ -197,6 +196,7 @@ function formatMoney(value) {
 const expiringContracts = computed(() => {
   const today = new Date()
   const todayText = today.toISOString().slice(0, 10)
+
   const limit = new Date(today)
   limit.setDate(limit.getDate() + 30)
   const limitText = limit.toISOString().slice(0, 10)
@@ -237,6 +237,7 @@ const tenantFinanceList = computed(() => {
 
   bills.value.forEach(item => {
     const tenantId = item.tenantId || '未知'
+
     if (!map.has(tenantId)) {
       map.set(tenantId, {
         tenantId,
@@ -267,8 +268,7 @@ const tenantFinanceList = computed(() => {
     }
   })
 
-  return Array.from(map.values())
-    .sort((a, b) => b.unpaidAmount - a.unpaidAmount)
+  return Array.from(map.values()).sort((a, b) => b.unpaidAmount - a.unpaidAmount)
 })
 
 const finance = computed(() => {
@@ -279,12 +279,8 @@ const finance = computed(() => {
   const monthBillCount = monthBills.value.length
   const paidBillCount = monthBills.value.filter(item => item.status === 'PAID').length
   const unpaidBillCount = monthBills.value.filter(item => item.status !== 'PAID').length
-  const totalUnpaidBillCount = bills.value.filter(item => item.status !== 'PAID').length
   const overdueBills = bills.value.filter(item => isOverdue(item))
   const overdueBillCount = overdueBills.length
-  const overdueAmount = overdueBills.reduce((sum, item) => {
-    return sum + Math.max(money(item.amount) - money(item.paidAmount), 0)
-  }, 0)
 
   const collectionRate = monthReceivable > 0
     ? Math.round((monthReceived / monthReceivable) * 100)
@@ -298,41 +294,46 @@ const finance = computed(() => {
     monthBillCount,
     paidBillCount,
     unpaidBillCount,
-    totalUnpaidBillCount,
-    overdueBillCount,
-    overdueAmount
+    overdueBillCount
   }
 })
 
 async function loadReport() {
   try {
-    const data = await request.get('/ai/daily-report')
+    const data = await request.get('/ai/daily-report', { silent: true })
     report.value = data || {}
-  } catch (error) {
+  } catch {
     report.value = {}
   }
 }
 
 async function loadBills() {
-  const data = await request.get('/bills')
-  bills.value = Array.isArray(data) ? data : []
+  try {
+    const data = await request.get('/bills', { silent: true })
+    bills.value = Array.isArray(data) ? data : []
+  } catch {
+    bills.value = []
+  }
 }
 
 async function loadContracts() {
-  const data = await request.get('/contracts')
-  contracts.value = Array.isArray(data) ? data : []
+  try {
+    const data = await request.get('/contracts', { silent: true })
+    contracts.value = Array.isArray(data) ? data : []
+  } catch {
+    contracts.value = []
+  }
 }
 
 async function loadDashboard() {
   loading.value = true
+
   try {
-    await Promise.all([
+    await Promise.allSettled([
       loadReport(),
       loadBills(),
       loadContracts()
     ])
-  } catch (error) {
-    ElMessage.error(error?.response?.data?.message || '驾驶舱数据加载失败')
   } finally {
     loading.value = false
   }
