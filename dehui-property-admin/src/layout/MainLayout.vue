@@ -19,7 +19,7 @@
       >
         <el-menu-item index="/dashboard">驾驶舱</el-menu-item>
 
-        <el-sub-menu v-if="hasRole(['ADMIN','MANAGER'])" index="asset">
+        <el-sub-menu v-if="hasRole(['ADMIN', 'MANAGER'])" index="asset">
           <template #title>资产管理</template>
           <el-menu-item index="/buildings">楼宇管理</el-menu-item>
           <el-menu-item index="/floors">楼层管理</el-menu-item>
@@ -27,41 +27,41 @@
           <el-menu-item index="/equipment">设备台账</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu v-if="hasRole(['ADMIN','MANAGER'])" index="tenant">
+        <el-sub-menu v-if="hasRole(['ADMIN', 'MANAGER'])" index="tenant">
           <template #title>租赁管理</template>
           <el-menu-item index="/tenants">租户管理</el-menu-item>
           <el-menu-item index="/leases">租户入驻</el-menu-item>
           <el-menu-item index="/contracts">合同台账</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu v-if="hasRole(['ADMIN','MANAGER','STAFF','SECURITY'])" index="ops">
+        <el-sub-menu v-if="hasRole(['ADMIN', 'MANAGER', 'STAFF', 'SECURITY', 'CLEANER'])" index="ops">
           <template #title>运营管理</template>
-          <el-menu-item index="/workorders">工单管理</el-menu-item>
+          <el-menu-item v-if="hasRole(['ADMIN', 'MANAGER', 'STAFF', 'CLEANER'])" index="/workorders">工单管理</el-menu-item>
           <el-menu-item index="/inspections">巡检管理</el-menu-item>
-          <el-menu-item v-if="hasRole(['ADMIN','MANAGER','SECURITY'])" index="/visitors">访客管理</el-menu-item>
-          <el-menu-item v-if="hasRole(['ADMIN','MANAGER'])" index="/announcements">公告管理</el-menu-item>
+          <el-menu-item v-if="hasRole(['ADMIN', 'MANAGER', 'SECURITY'])" index="/visitors">访客管理</el-menu-item>
+          <el-menu-item v-if="hasRole(['ADMIN', 'MANAGER', 'STAFF', 'SECURITY', 'CLEANER'])" index="/announcements">公告管理</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu v-if="hasRole(['ADMIN','FINANCE','MANAGER'])" index="finance">
+        <el-sub-menu v-if="hasRole(['ADMIN', 'FINANCE', 'MANAGER'])" index="finance">
           <template #title>财务管理</template>
           <el-menu-item index="/bills">账单管理</el-menu-item>
           <el-menu-item index="/feerules">收费规则</el-menu-item>
           <el-menu-item index="/finance/dashboard">财务看板</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu v-if="hasRole(['ADMIN','MANAGER','FINANCE'])" index="parking">
+        <el-sub-menu v-if="hasRole(['ADMIN', 'MANAGER', 'FINANCE'])" index="parking">
           <template #title>停车管理</template>
-          <el-menu-item index="/parking/spaces">停车管理</el-menu-item>
+          <el-menu-item index="/parking/spaces">车位管理</el-menu-item>
           <el-menu-item index="/parking/bills">停车账单</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu v-if="hasRole(['ADMIN','MANAGER'])" index="energy">
+        <el-sub-menu v-if="hasRole(['ADMIN', 'MANAGER'])" index="energy">
           <template #title>能耗管理</template>
           <el-menu-item index="/energy/records">抄表管理</el-menu-item>
           <el-menu-item index="/energy/stats">能耗统计</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu v-if="hasRole(['ADMIN','MANAGER'])" index="ai">
+        <el-sub-menu v-if="hasRole(['ADMIN', 'MANAGER'])" index="ai">
           <template #title>AI分析</template>
           <el-menu-item index="/ai/daily-report">运营日报</el-menu-item>
         </el-sub-menu>
@@ -79,7 +79,7 @@
         <div class="system-title">德汇创新中心物业管理平台</div>
 
         <div class="right">
-          <span class="user-role">{{ role }}</span>
+          <span class="user-role">{{ roleText }}</span>
           <span class="username">{{ username }}</span>
           <el-button class="logout-btn" size="small" @click="logout">退出</el-button>
         </div>
@@ -93,15 +93,39 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
 const username = localStorage.getItem('username') || '用户'
-const role = localStorage.getItem('role') || 'ADMIN'
 
-function hasRole(roles) {
-  return roles.includes(role)
+function getCurrentRoles() {
+  try {
+    const roles = JSON.parse(localStorage.getItem('roles') || '[]')
+    if (Array.isArray(roles) && roles.length > 0) {
+      return roles
+    }
+  } catch (error) {
+    console.warn('roles 解析失败：', error)
+  }
+
+  const legacyRole = localStorage.getItem('role')
+  return legacyRole ? [legacyRole] : []
+}
+
+const currentRoles = getCurrentRoles()
+
+const roleText = computed(() => {
+  return currentRoles.length > 0 ? currentRoles.join(' / ') : '未分配角色'
+})
+
+function hasRole(allowedRoles) {
+  if (!Array.isArray(allowedRoles) || allowedRoles.length === 0) {
+    return false
+  }
+
+  return currentRoles.some(role => allowedRoles.includes(role))
 }
 
 function logout() {

@@ -40,6 +40,10 @@ const form = reactive({
   password: '123456'
 })
 
+const unwrap = (res) => {
+  return res?.data || res || {}
+}
+
 const handleLogin = async () => {
   if (!form.username || !form.password) {
     ElMessage.warning('请输入用户名和密码')
@@ -50,8 +54,10 @@ const handleLogin = async () => {
 
   try {
     const res = await request.post('/system/login', form)
+    const data = unwrap(res)
 
-    const token = res.token || res?.data?.token
+    const token = data.token
+    const roles = Array.isArray(data.roles) ? data.roles : []
 
     if (!token) {
       ElMessage.error('登录成功但未返回 token')
@@ -60,12 +66,20 @@ const handleLogin = async () => {
     }
 
     localStorage.setItem('token', token)
-    localStorage.setItem('username', res.username || res?.data?.username || form.username)
+    localStorage.setItem('userId', data.userId || '')
+    localStorage.setItem('username', data.username || form.username)
+
+    // 新版 RBAC：保存真实角色列表
+    localStorage.setItem('roles', JSON.stringify(roles))
+
+    // 兼容旧版单角色逻辑，后续动态菜单升级完成后再移除
+    localStorage.setItem('role', roles[0] || '')
 
     ElMessage.success('登录成功')
     router.push('/dashboard')
   } catch (error) {
     console.error('登录失败：', error)
+    ElMessage.error(error?.message || '登录失败，请检查用户名和密码')
   } finally {
     loading.value = false
   }

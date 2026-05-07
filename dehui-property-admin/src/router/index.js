@@ -21,7 +21,6 @@ const routes = [
         meta: { title: '首页驾驶舱' }
       },
 
-      // 基础资产
       {
         path: '/buildings',
         name: 'BuildingList',
@@ -47,7 +46,6 @@ const routes = [
         meta: { title: '设备台账' }
       },
 
-      // 租赁财务
       {
         path: '/tenants',
         name: 'TenantList',
@@ -72,15 +70,12 @@ const routes = [
         component: () => import('../views/tenant/BillList.vue'),
         meta: { title: '账单管理' }
       },
-
-      // ✅ 新增：收费规则
       {
         path: '/feerules',
         name: 'FeeRuleList',
         component: () => import('../views/tenant/FeeRuleList.vue'),
         meta: { title: '收费规则管理' }
       },
-
       {
         path: '/finance/dashboard',
         name: 'FinanceDashboard',
@@ -88,7 +83,6 @@ const routes = [
         meta: { title: '财务看板' }
       },
 
-      // 停车管理
       {
         path: '/parking/spaces',
         name: 'ParkingSpaceList',
@@ -102,7 +96,6 @@ const routes = [
         meta: { title: '停车账单' }
       },
 
-      // 运营管理
       {
         path: '/workorders',
         name: 'WorkOrderList',
@@ -128,7 +121,6 @@ const routes = [
         meta: { title: '公告管理' }
       },
 
-      // 能耗管理
       {
         path: '/energy/records',
         name: 'EnergyRecordList',
@@ -142,7 +134,6 @@ const routes = [
         meta: { title: '能耗统计' }
       },
 
-      // 系统管理
       {
         path: '/system/users',
         name: 'SystemUserList',
@@ -164,8 +155,6 @@ const router = createRouter({
   routes
 })
 
-
-
 const roleAccessMap = {
   ADMIN: ['*'],
   MANAGER: [
@@ -173,6 +162,7 @@ const roleAccessMap = {
     '/buildings',
     '/floors',
     '/rooms',
+    '/equipment',
     '/tenants',
     '/leases',
     '/contracts',
@@ -206,16 +196,38 @@ const roleAccessMap = {
     '/dashboard',
     '/bills',
     '/feerules',
-    '/finance',
-    '/parking',
-    '/parking-bills'
+    '/finance/dashboard',
+    '/parking/spaces',
+    '/parking/bills'
   ]
 }
 
-function canAccessPath(role, path) {
+function getCurrentRoles() {
+  try {
+    const roles = JSON.parse(localStorage.getItem('roles') || '[]')
+    if (Array.isArray(roles) && roles.length > 0) {
+      return roles
+    }
+  } catch (error) {
+    console.warn('roles 解析失败：', error)
+  }
+
+  const legacyRole = localStorage.getItem('role')
+  return legacyRole ? [legacyRole] : []
+}
+
+function canAccessPathByRole(role, path) {
   const allowed = roleAccessMap[role] || ['/dashboard']
   if (allowed.includes('*')) return true
   return allowed.some(item => path === item || path.startsWith(item + '/'))
+}
+
+function canAccessPath(roles, path) {
+  if (!Array.isArray(roles) || roles.length === 0) {
+    return path === '/dashboard'
+  }
+
+  return roles.some(role => canAccessPathByRole(role, path))
 }
 
 router.beforeEach((to, from, next) => {
@@ -230,14 +242,14 @@ router.beforeEach((to, from, next) => {
     return
   }
 
-  const role = localStorage.getItem('role') || 'ADMIN'
-  if (!canAccessPath(role, to.path)) {
+  const roles = getCurrentRoles()
+
+  if (!canAccessPath(roles, to.path)) {
     next('/dashboard')
     return
   }
 
   next()
 })
-
 
 export default router

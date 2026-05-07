@@ -37,7 +37,21 @@ public class SystemUserService {
         String token = UUID.randomUUID().toString();
         tokenStore.put(token, user);
 
-        return new LoginResponse(token, user.getId(), user.getUsername());
+        List<String> roles = userRoleRepository.findByUserId(user.getId())
+                .stream()
+                .map(UserRole::getRoleId)
+                .map(sysRoleRepository::findById)
+                .filter(java.util.Optional::isPresent)
+                .map(java.util.Optional::get)
+                .map(SysRole::getRoleCode)
+                .collect(Collectors.toList());
+
+        return new LoginResponse(
+                token,
+                user.getId(),
+                user.getUsername(),
+                roles
+        );
     }
 
     public SysUser getByToken(String token) {
