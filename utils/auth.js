@@ -6,8 +6,10 @@ function setSession(session) {
   if (session.token) {
     wx.setStorageSync('token', session.token)
   }
-  if (session.userInfo) {
-    wx.setStorageSync('userInfo', session.userInfo)
+  const profile = session.profile || session.userInfo
+  if (profile) {
+    wx.setStorageSync('userInfo', profile)
+    wx.setStorageSync('identity', profile.userType || 'PUBLIC')
   }
   if (session.identity) {
     wx.setStorageSync('identity', session.identity)
