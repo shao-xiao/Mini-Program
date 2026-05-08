@@ -2,6 +2,7 @@ package com.dehui.property.config;
 
 import com.dehui.property.common.Result;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.dehui.property.modules.mobile.service.MobileAuthService;
 import com.dehui.property.modules.system.entity.SysUser;
 import com.dehui.property.modules.system.service.SystemUserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,6 +19,7 @@ import java.util.List;
 public class AuthInterceptor implements HandlerInterceptor {
 
     private final SystemUserService systemUserService;
+    private final MobileAuthService mobileAuthService;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -32,6 +34,7 @@ public class AuthInterceptor implements HandlerInterceptor {
 
         if (uri.contains("/login")
                 || uri.startsWith("/api/system/login")
+                || uri.startsWith("/api/mobile/auth/dev-login")
                 || uri.startsWith("/api/error")) {
             return true;
         }
@@ -45,6 +48,14 @@ public class AuthInterceptor implements HandlerInterceptor {
 
         if (token.startsWith("Bearer ")) {
             token = token.substring(7);
+        }
+
+        if (uri.startsWith("/api/mobile")) {
+            if (mobileAuthService.getByToken(token) == null) {
+                writeUnauthorized(response, "移动端登录已过期");
+                return false;
+            }
+            return true;
         }
 
         SysUser user = systemUserService.getByToken(token);
