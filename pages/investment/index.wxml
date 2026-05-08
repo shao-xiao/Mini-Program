@@ -1,0 +1,7 @@
+<view class="page">
+  <view class="section card">
+    <view class="title">招商中心</view>
+    <view class="subtitle">园区介绍、可租房源、招商政策和预约看房。</view>
+  </view>
+  <view class="card muted">移动端接口规划：GET /mobile/investment/rooms，POST /mobile/investment/leads</view>
+</view>

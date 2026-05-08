@@ -1,0 +1,7 @@
+<view class="page">
+  <view class="section card">
+    <view class="title">账单中心</view>
+    <view class="subtitle">租金、水电煤、停车、会议室等账单查询与支付入口。</view>
+  </view>
+  <view class="card muted">移动端接口规划：GET /mobile/bills</view>
+</view>

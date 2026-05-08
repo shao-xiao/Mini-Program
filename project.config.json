@@ -1,0 +1,14 @@
+{
+  "description": "德汇创新中心微信小程序",
+  "appid": "touristappid",
+  "projectname": "dehui-property-miniprogram",
+  "miniprogramRoot": "./",
+  "compileType": "miniprogram",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true
+  }
+}

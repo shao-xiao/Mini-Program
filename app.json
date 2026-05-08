@@ -1,0 +1,44 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/me/index",
+    "pages/announcements/index",
+    "pages/bills/index",
+    "pages/meeting/index",
+    "pages/workorders/index",
+    "pages/investment/index",
+    "pages/checkin/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "德汇创新中心",
+    "navigationBarBackgroundColor": "#d93025",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f5f6f8"
+  },
+  "tabBar": {
+    "color": "#606266",
+    "selectedColor": "#d93025",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/bills/index",
+        "text": "账单"
+      },
+      {
+        "pagePath": "pages/meeting/index",
+        "text": "会议"
+      },
+      {
+        "pagePath": "pages/me/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}
