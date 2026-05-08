@@ -11,9 +11,21 @@
       <el-table :data="list" border>
         <el-table-column prop="orderNumber" label="工单号" width="150"/>
         <el-table-column prop="title" label="标题"/>
-        <el-table-column prop="orderType" label="类型"/>
-        <el-table-column prop="category" label="类别"/>
-        <el-table-column prop="priority" label="优先级"/>
+        <el-table-column label="类型">
+          <template #default="{row}">
+            {{ orderTypeText(row.orderType) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="问题类别">
+          <template #default="{row}">
+            {{ categoryText(row.category) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="优先级">
+          <template #default="{row}">
+            {{ priorityText(row.priority) }}
+          </template>
+        </el-table-column>
 
         <el-table-column label="状态">
           <template #default="{row}">
@@ -25,7 +37,11 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="reporterId" label="报修人"/>
+        <el-table-column label="报修人">
+          <template #default="{row}">
+            {{ row.reporterId === currentUserId ? currentUsername : row.reporterId }}
+          </template>
+        </el-table-column>
         <el-table-column prop="handlerId" label="处理人"/>
 
         <el-table-column label="操作" width="260">
@@ -39,43 +55,60 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="visible" title="新增工单">
-      <el-form :model="form">
+    <el-dialog v-model="visible" title="新增工单" width="560px">
+      <el-form :model="form" label-width="92px">
+        <el-form-item label="报修人">
+          <el-input :model-value="currentUsername" disabled/>
+        </el-form-item>
+
         <el-form-item label="标题">
-          <el-input v-model="form.title"/>
+          <el-input v-model="form.title" placeholder="例如：三楼空调不制冷"/>
         </el-form-item>
 
         <el-form-item label="描述">
-          <el-input v-model="form.description"/>
+          <el-input
+            v-model="form.description"
+            type="textarea"
+            :rows="3"
+            placeholder="请描述现象、影响范围、出现时间等"
+          />
         </el-form-item>
 
         <el-form-item label="位置">
-          <el-input v-model="form.location"/>
+          <el-input v-model="form.location" placeholder="例如：三楼 308 / B1 车库入口"/>
         </el-form-item>
 
-        <el-form-item label="类型">
-          <el-select v-model="form.orderType">
-            <el-option label="维修" value="REPAIR"/>
-            <el-option label="巡检" value="PATROL"/>
-            <el-option label="保洁" value="CLEAN"/>
-            <el-option label="安保" value="SECURITY"/>
+        <el-form-item label="工单类型">
+          <el-select v-model="form.orderType" class="form-select" @change="resetCategory">
+            <el-option
+              v-for="item in orderTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
           </el-select>
         </el-form-item>
 
-        <el-form-item label="类别">
-          <el-input v-model="form.category"/>
+        <el-form-item label="问题类别">
+          <el-select v-model="form.category" class="form-select" placeholder="请选择问题类别">
+            <el-option
+              v-for="item in currentCategoryOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item label="优先级">
-          <el-select v-model="form.priority">
-            <el-option label="低" value="LOW"/>
-            <el-option label="中" value="MEDIUM"/>
-            <el-option label="高" value="HIGH"/>
+          <el-select v-model="form.priority" class="form-select">
+            <el-option
+              v-for="item in priorityOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
           </el-select>
-        </el-form-item>
-
-        <el-form-item label="报修人ID">
-          <el-input v-model="form.reporterId"/>
         </el-form-item>
       </el-form>
 
@@ -89,47 +122,114 @@
 </template>
 
 <script setup>
-import {ref, reactive, onMounted} from 'vue'
+import {ref, reactive, onMounted, computed} from 'vue'
 import {ElMessage} from 'element-plus'
 import request from '../../utils/request'
 
 const list = ref([])
 const visible = ref(false)
+const currentUsername = localStorage.getItem('username') || '当前用户'
+const currentUserId = Number(localStorage.getItem('userId'))
+
+const orderTypeOptions = [
+  { label: '维修报修', value: 'REPAIR' },
+  { label: '巡检任务', value: 'PATROL' },
+  { label: '保洁服务', value: 'CLEAN' },
+  { label: '安保事件', value: 'SECURITY' }
+]
+
+const categoryOptions = {
+  REPAIR: [
+    { label: '水电维修', value: 'WATER_ELECTRIC' },
+    { label: '空调暖通', value: 'HVAC' },
+    { label: '电梯故障', value: 'ELEVATOR' },
+    { label: '门禁网络', value: 'ACCESS_NETWORK' },
+    { label: '土建装饰', value: 'CIVIL_DECORATION' },
+    { label: '其他维修', value: 'OTHER_REPAIR' }
+  ],
+  PATROL: [
+    { label: '设备巡检', value: 'EQUIPMENT_PATROL' },
+    { label: '消防巡检', value: 'FIRE_PATROL' },
+    { label: '公共区域巡查', value: 'PUBLIC_AREA_PATROL' },
+    { label: '安全隐患', value: 'SAFETY_RISK' }
+  ],
+  CLEAN: [
+    { label: '公共区域保洁', value: 'PUBLIC_CLEAN' },
+    { label: '卫生间保洁', value: 'RESTROOM_CLEAN' },
+    { label: '垃圾清运', value: 'WASTE_REMOVAL' },
+    { label: '专项清洁', value: 'SPECIAL_CLEAN' }
+  ],
+  SECURITY: [
+    { label: '门岗秩序', value: 'GATE_ORDER' },
+    { label: '车辆秩序', value: 'VEHICLE_ORDER' },
+    { label: '访客协助', value: 'VISITOR_SUPPORT' },
+    { label: '突发事件', value: 'EMERGENCY' }
+  ]
+}
+
+const priorityOptions = [
+  { label: '低', value: 'LOW' },
+  { label: '中', value: 'MEDIUM' },
+  { label: '高', value: 'HIGH' },
+  { label: '紧急', value: 'URGENT' }
+]
 
 const form = reactive({
   title:'',
   description:'',
   location:'',
   orderType:'REPAIR',
-  category:'',
-  priority:'MEDIUM',
-  reporterId:''
+  category:'WATER_ELECTRIC',
+  priority:'MEDIUM'
 })
+
+const currentCategoryOptions = computed(() => categoryOptions[form.orderType] || [])
+
+const optionText = (options, value) => options.find(item => item.value === value)?.label || value || '-'
+const orderTypeText = (value) => optionText(orderTypeOptions, value)
+const categoryText = (value) => {
+  const options = Object.values(categoryOptions).flat()
+  return optionText(options, value)
+}
+const priorityText = (value) => optionText(priorityOptions, value)
 
 const load = async ()=>{
   const data = await request.get('/workorders')
   list.value = data || []
 }
 
+const resetCategory = ()=>{
+  form.category = currentCategoryOptions.value[0]?.value || ''
+}
+
 const openDialog = ()=>{
   form.title=''
   form.description=''
   form.location=''
-  form.category=''
+  form.orderType='REPAIR'
+  form.category='WATER_ELECTRIC'
   form.priority='MEDIUM'
-  form.reporterId=''
   visible.value = true
 }
 
 const save = async ()=>{
+  if (!form.title) {
+    ElMessage.warning('请输入工单标题')
+    return
+  }
+
+  if (!form.category) {
+    ElMessage.warning('请选择问题类别')
+    return
+  }
+
   await request.post('/workorders', {
     title: form.title,
     description: form.description,
     location: form.location,
     orderType: form.orderType,
     category: form.category,
-    priority: form.priority,
-    reporterId: Number(form.reporterId)
+    priority: form.priority
   })
 
   ElMessage.success('创建成功')
@@ -172,5 +272,9 @@ onMounted(load)
 .card-header{
   display:flex;
   justify-content:space-between;
+}
+
+.form-select{
+  width:100%;
 }
 </style>

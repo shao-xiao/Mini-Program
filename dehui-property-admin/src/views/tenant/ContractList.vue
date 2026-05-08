@@ -11,8 +11,12 @@
       <el-table :data="contracts" border style="width: 100%">
         <el-table-column prop="contractNumber" label="合同编号" />
         <el-table-column prop="contractName" label="合同名称" />
-        <el-table-column prop="tenantId" label="租户ID" />
-        <el-table-column prop="roomId" label="房间ID" />
+        <el-table-column label="租户">
+          <template #default="{ row }">{{ tenantName(row.tenantId) }}</template>
+        </el-table-column>
+        <el-table-column label="房间">
+          <template #default="{ row }">{{ roomName(row.roomId) }}</template>
+        </el-table-column>
         <el-table-column prop="leaseId" label="租约ID" />
         <el-table-column prop="startDate" label="开始日期" />
         <el-table-column prop="endDate" label="结束日期" />
@@ -48,16 +52,42 @@
           <el-input v-model="form.contractName" />
         </el-form-item>
 
-        <el-form-item label="租户ID">
-          <el-input v-model="form.tenantId" />
+        <el-form-item label="租户">
+          <el-select
+            v-model="form.tenantId"
+            filterable
+            placeholder="请选择租户"
+            style="width:100%"
+            @change="handleTenantChange"
+          >
+            <el-option
+              v-for="tenant in activeTenants"
+              :key="tenant.id"
+              :label="tenantLabel(tenant)"
+              :value="tenant.id"
+            />
+          </el-select>
         </el-form-item>
 
-        <el-form-item label="房间ID">
-          <el-input v-model="form.roomId" />
+        <el-form-item label="租约">
+          <el-select
+            v-model="form.leaseId"
+            filterable
+            placeholder="请选择该租户的在租记录"
+            style="width:100%"
+            @change="handleLeaseChange"
+          >
+            <el-option
+              v-for="lease in activeLeases"
+              :key="lease.id"
+              :label="leaseLabel(lease)"
+              :value="lease.id"
+            />
+          </el-select>
         </el-form-item>
 
-        <el-form-item label="租约ID">
-          <el-input v-model="form.leaseId" />
+        <el-form-item label="房间">
+          <el-input :model-value="roomName(form.roomId)" disabled />
         </el-form-item>
 
         <el-form-item label="开始日期">
@@ -100,12 +130,16 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { computed, ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '../../utils/request'
 
 const contracts = ref([])
 const dialogVisible = ref(false)
+const tenants = ref([])
+const rooms = ref([])
+const tenantLeases = ref([])
+const BUILDING_ID = 1
 
 const form = reactive({
   contractNumber: '',
@@ -140,12 +174,92 @@ const loadContracts = async () => {
   contracts.value = data || []
 }
 
+const activeTenants = computed(() => {
+  return tenants.value.filter(item => item.status !== 'INACTIVE')
+})
+
+const activeLeases = computed(() => {
+  return tenantLeases.value.filter(item => item.status === 'ACTIVE')
+})
+
+function tenantLabel(tenant) {
+  return `${tenant.tenantName}（ID:${tenant.id}）`
+}
+
+function tenantName(tenantId) {
+  const tenant = tenants.value.find(item => item.id === tenantId)
+  return tenant ? `${tenant.tenantName}（ID:${tenant.id}）` : `租户ID:${tenantId || '-'}`
+}
+
+function roomLabel(room) {
+  return `${room.roomNumber || room.roomName || '未命名房间'}（ID:${room.id}）`
+}
+
+function roomName(roomId) {
+  if (!roomId) return ''
+  const room = rooms.value.find(item => item.id === roomId)
+  return room ? roomLabel(room) : `房间ID:${roomId}`
+}
+
+function leaseLabel(lease) {
+  return `${roomName(lease.roomId)}｜${lease.startDate || '-'} 至 ${lease.endDate || '长期'}`
+}
+
+async function loadTenants() {
+  const data = await request.get('/tenant/list')
+  tenants.value = data || []
+}
+
+async function loadRooms() {
+  const floorsData = await request.get(`/buildings/${BUILDING_ID}/floors`)
+  const floors = floorsData.content || floorsData || []
+  const result = []
+
+  for (const floor of floors) {
+    const data = await request.get(`/buildings/${BUILDING_ID}/floors/${floor.id}/rooms`)
+    result.push(...(data.content || data || []))
+  }
+
+  rooms.value = result
+}
+
+async function loadTenantLeases(tenantId) {
+  if (!tenantId) {
+    tenantLeases.value = []
+    return
+  }
+
+  const data = await request.get(`/rooms/tenants/${tenantId}/rooms`)
+  tenantLeases.value = data || []
+}
+
 const openCreateDialog = () => {
   resetForm()
+  tenantLeases.value = []
   dialogVisible.value = true
 }
 
+async function handleTenantChange(tenantId) {
+  form.leaseId = ''
+  form.roomId = ''
+  await loadTenantLeases(tenantId)
+}
+
+function handleLeaseChange(leaseId) {
+  const lease = tenantLeases.value.find(item => item.id === leaseId)
+  if (!lease) return
+
+  form.roomId = lease.roomId
+  form.startDate = lease.startDate || form.startDate
+  form.endDate = lease.endDate || form.endDate
+}
+
 const createContract = async () => {
+  if (!form.tenantId || !form.roomId || !form.leaseId) {
+    ElMessage.warning('请选择租户和租约')
+    return
+  }
+
   await request.post('/contracts', form)
   ElMessage.success('创建成功')
   dialogVisible.value = false
@@ -165,8 +279,12 @@ const terminate = async (row) => {
   loadContracts()
 }
 
-onMounted(() => {
-  loadContracts()
+onMounted(async () => {
+  await Promise.all([
+    loadContracts(),
+    loadTenants(),
+    loadRooms()
+  ])
 })
 </script>
 

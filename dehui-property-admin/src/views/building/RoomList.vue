@@ -10,11 +10,16 @@
 
       <el-form inline>
         <el-form-item label="楼层">
-          <el-select v-model="query.floorId" @change="loadRooms" placeholder="请选择楼层">
+          <el-select
+            v-model="query.floorId"
+            class="floor-select"
+            @change="loadRooms"
+            placeholder="请选择楼层"
+          >
             <el-option
               v-for="f in floors"
               :key="f.id"
-              :label="f.floorName"
+              :label="formatFloorLabel(f)"
               :value="f.id"
             />
           </el-select>
@@ -26,6 +31,7 @@
       </el-form>
 
       <el-table :data="rooms" border style="width: 100%">
+        <el-table-column prop="id" label="房间ID" width="90" />
         <el-table-column prop="roomNumber" label="房间号" />
         <el-table-column prop="roomName" label="房间名称" />
         <el-table-column prop="area" label="面积㎡" />
@@ -114,6 +120,17 @@ const resetForm = () => {
   form.status = 'AVAILABLE'
 }
 
+const formatFloorLabel = (floor) => {
+  const name = floor.floorName || `${floor.floorNumber}层`
+  const number = floor.floorNumber
+
+  if (number === null || number === undefined) {
+    return name
+  }
+
+  return `${name}（${number}层）`
+}
+
 const loadFloors = async () => {
   const data = await request.get(`/buildings/${BUILDING_ID}/floors`)
   floors.value = data.content || data || []
@@ -200,5 +217,9 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.floor-select {
+  width: 180px;
 }
 </style>

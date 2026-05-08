@@ -4,76 +4,71 @@
       <template #header>
         <div class="page-header">
           <div>
-            <div class="page-title">财务看板</div>
-            <div class="page-subtitle">基于账单数据统计应收、实收、未收与逾期情况</div>
+            <div class="page-title">账务分析</div>
+            <div class="page-subtitle">合并租赁账单与停车账单，分析应收、实收、欠费和逾期风险</div>
           </div>
-          <el-button type="primary" @click="loadBills">刷新</el-button>
+          <el-button type="primary" :loading="loading" @click="loadBills">刷新</el-button>
         </div>
       </template>
 
-      <el-row :gutter="16" class="summary-row">
-        <el-col :span="6">
-          <el-card class="summary-card" shadow="never">
-            <div class="summary-label">应收金额</div>
-            <div class="summary-value">¥ {{ totalAmount }}</div>
-          </el-card>
-        </el-col>
+      <div class="summary-grid">
+        <el-card v-for="item in summaryCards" :key="item.label" class="summary-card" shadow="never">
+          <div class="summary-label">{{ item.label }}</div>
+          <div class="summary-value" :class="item.className">{{ item.value }}</div>
+          <div class="summary-desc">{{ item.desc }}</div>
+        </el-card>
+      </div>
 
-        <el-col :span="6">
-          <el-card class="summary-card" shadow="never">
-            <div class="summary-label">实收金额</div>
-            <div class="summary-value">¥ {{ paidAmount }}</div>
-          </el-card>
-        </el-col>
+      <div class="chart-grid">
+        <el-card class="chart-card wide" shadow="never">
+          <template #header>近6个月应收 / 实收趋势</template>
+          <div ref="trendRef" class="chart"></div>
+        </el-card>
 
-        <el-col :span="6">
-          <el-card class="summary-card" shadow="never">
-            <div class="summary-label">未收金额</div>
-            <div class="summary-value">¥ {{ unpaidAmount }}</div>
-          </el-card>
-        </el-col>
+        <el-card class="chart-card" shadow="never">
+          <template #header>账单来源结构</template>
+          <div ref="sourceRef" class="chart"></div>
+        </el-card>
 
-        <el-col :span="6">
-          <el-card class="summary-card" shadow="never">
-            <div class="summary-label">逾期金额</div>
-            <div class="summary-value danger">¥ {{ overdueAmount }}</div>
-          </el-card>
-        </el-col>
-      </el-row>
+        <el-card class="chart-card" shadow="never">
+          <template #header>费用类型分布</template>
+          <div ref="typeRef" class="chart"></div>
+        </el-card>
 
-      <el-row :gutter="16">
-        <el-col :span="12">
-          <el-card shadow="never">
-            <template #header>账单状态统计</template>
-            <el-table :data="statusStats" border stripe v-loading="loading">
-              <el-table-column prop="statusName" label="状态" />
-              <el-table-column prop="count" label="数量" width="100" align="center" />
-              <el-table-column prop="amount" label="金额" width="160" align="right" />
-            </el-table>
-          </el-card>
-        </el-col>
-
-        <el-col :span="12">
-          <el-card shadow="never">
-            <template #header>费用类型统计</template>
-            <el-table :data="typeStats" border stripe v-loading="loading">
-              <el-table-column prop="billTypeName" label="费用类型" />
-              <el-table-column prop="count" label="数量" width="100" align="center" />
-              <el-table-column prop="amount" label="金额" width="160" align="right" />
-            </el-table>
-          </el-card>
-        </el-col>
-      </el-row>
+        <el-card class="chart-card" shadow="never">
+          <template #header>逾期风险</template>
+          <div ref="riskRef" class="chart"></div>
+        </el-card>
+      </div>
 
       <el-card shadow="never" class="table-card">
-        <template #header>租户财务汇总</template>
+        <template #header>租户欠费排行</template>
         <el-table :data="tenantStats" border stripe v-loading="loading">
           <el-table-column prop="tenantId" label="租户ID" width="100" align="center" />
           <el-table-column prop="billCount" label="账单数" width="100" align="center" />
-          <el-table-column prop="totalAmount" label="应收金额" width="160" align="right" />
-          <el-table-column prop="paidAmount" label="实收金额" width="160" align="right" />
-          <el-table-column prop="unpaidAmount" label="未收金额" width="160" align="right" />
-          <el-table-column prop="overdueAmount" label="逾期金额" width="160" align="right" />
+          <el-table-column label="应收金额" width="150" align="right">
+            <template #default="{ row }">¥ {{ formatMoney(row.totalAmount) }}</template>
+          </el-table-column>
+          <el-table-column label="实收金额" width="150" align="right">
+            <template #default="{ row }">¥ {{ formatMoney(row.paidAmount) }}</template>
+          </el-table-column>
+          <el-table-column label="未收金额" width="150" align="right">
+            <template #default="{ row }">
+              <span :class="{ danger: row.unpaidAmount > 0 }">¥ {{ formatMoney(row.unpaidAmount) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="逾期金额" width="150" align="right">
+            <template #default="{ row }">
+              <span :class="{ danger: row.overdueAmount > 0 }">¥ {{ formatMoney(row.overdueAmount) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="风险状态">
+            <template #default="{ row }">
+              <el-tag v-if="row.overdueAmount > 0" type="danger">逾期</el-tag>
+              <el-tag v-else-if="row.unpaidAmount > 0" type="warning">欠费</el-tag>
+              <el-tag v-else type="success">正常</el-tag>
+            </template>
+          </el-table-column>
         </el-table>
       </el-card>
     </el-card>
@@ -81,91 +76,104 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import request from '../../utils/request'
 
 const loading = ref(false)
 const bills = ref([])
+const parkingBills = ref([])
 
-function unwrap(res) {
-  if (res?.code === 200) return res.data
-  if (res?.data?.code === 200) return res.data.data
-  if (Array.isArray(res)) return res
-  if (Array.isArray(res?.data)) return res.data
-  return res?.data ?? res
+const trendRef = ref(null)
+const sourceRef = ref(null)
+const typeRef = ref(null)
+const riskRef = ref(null)
+const charts = []
+
+function money(value) {
+  const n = Number(value || 0)
+  return Number.isFinite(n) ? n : 0
 }
 
-async function loadBills() {
-  loading.value = true
-  try {
-    const res = await request.get('/bills')
-    bills.value = unwrap(res) || []
-  } catch (e) {
-    ElMessage.error(e.message || '加载财务看板数据失败')
-  } finally {
-    loading.value = false
+function formatMoney(value) {
+  return money(value).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
+function shortMoney(value) {
+  const n = money(value)
+  return Math.abs(n) >= 10000 ? `${(n / 10000).toFixed(1)}万` : formatMoney(n)
+}
+
+function normalizeBill(item) {
+  return {
+    ...item,
+    source: 'RENT',
+    sourceName: '租赁',
+    paidAmount: money(item.paidAmount)
   }
 }
 
-const totalAmount = computed(() => money(sum(bills.value, 'amount')))
+function normalizeParkingBill(item) {
+  const amount = money(item.amount)
+  return {
+    ...item,
+    source: 'PARKING',
+    sourceName: '停车',
+    billType: 'PARKING',
+    paidAmount: item.status === 'PAID' ? amount : 0
+  }
+}
+
+const allBills = computed(() => {
+  return [
+    ...bills.value.map(normalizeBill),
+    ...parkingBills.value.map(normalizeParkingBill)
+  ]
+})
 
 const paidAmount = computed(() => {
-  return money(bills.value.reduce((total, item) => {
-    if (item.status === 'PAID') return total + Number(item.amount || 0)
-    return total + Number(item.paidAmount || 0)
-  }, 0))
+  return allBills.value.reduce((total, item) => total + money(item.paidAmount), 0)
+})
+
+const totalAmount = computed(() => {
+  return allBills.value.reduce((total, item) => total + money(item.amount), 0)
 })
 
 const unpaidAmount = computed(() => {
-  return money(bills.value.reduce((total, item) => {
-    if (item.status !== 'PAID') {
-      return total + Number(item.amount || 0) - Number(item.paidAmount || 0)
-    }
-    return total
-  }, 0))
+  return allBills.value.reduce((total, item) => {
+    if (item.status === 'PAID' || item.status === 'CANCELLED') return total
+    return total + Math.max(money(item.amount) - money(item.paidAmount), 0)
+  }, 0)
 })
 
 const overdueAmount = computed(() => {
-  return money(bills.value.reduce((total, item) => {
-    if (isOverdue(item)) {
-      return total + Number(item.amount || 0) - Number(item.paidAmount || 0)
-    }
-    return total
-  }, 0))
+  return allBills.value.reduce((total, item) => {
+    if (!isOverdue(item)) return total
+    return total + Math.max(money(item.amount) - money(item.paidAmount), 0)
+  }, 0)
 })
 
-const statusStats = computed(() => {
-  const map = new Map()
-  bills.value.forEach(item => {
-    const key = item.status || 'UNKNOWN'
-    if (!map.has(key)) {
-      map.set(key, { statusName: formatStatus(key), count: 0, amount: 0 })
-    }
-    const row = map.get(key)
-    row.count += 1
-    row.amount += Number(item.amount || 0)
-  })
-  return Array.from(map.values()).map(item => ({ ...item, amount: money(item.amount) }))
+const collectionRate = computed(() => {
+  return totalAmount.value > 0 ? Math.round((paidAmount.value / totalAmount.value) * 100) : 0
 })
 
-const typeStats = computed(() => {
-  const map = new Map()
-  bills.value.forEach(item => {
-    const key = item.billType || 'OTHER'
-    if (!map.has(key)) {
-      map.set(key, { billTypeName: formatBillType(key), count: 0, amount: 0 })
-    }
-    const row = map.get(key)
-    row.count += 1
-    row.amount += Number(item.amount || 0)
-  })
-  return Array.from(map.values()).map(item => ({ ...item, amount: money(item.amount) }))
-})
+const summaryCards = computed(() => [
+  { label: '应收金额', value: `¥ ${shortMoney(totalAmount.value)}`, desc: `${allBills.value.length} 笔账单`, className: '' },
+  { label: '实收金额', value: `¥ ${shortMoney(paidAmount.value)}`, desc: `收缴率 ${collectionRate.value}%`, className: 'success' },
+  { label: '未收金额', value: `¥ ${shortMoney(unpaidAmount.value)}`, desc: '未支付与部分支付', className: 'warning' },
+  { label: '逾期金额', value: `¥ ${shortMoney(overdueAmount.value)}`, desc: `${overdueBills.value.length} 笔逾期`, className: 'danger' }
+])
+
+const overdueBills = computed(() => allBills.value.filter(isOverdue))
 
 const tenantStats = computed(() => {
   const map = new Map()
-  bills.value.forEach(item => {
+
+  allBills.value.forEach(item => {
     const key = item.tenantId || '-'
     if (!map.has(key)) {
       map.set(key, {
@@ -179,9 +187,11 @@ const tenantStats = computed(() => {
     }
 
     const row = map.get(key)
-    const amount = Number(item.amount || 0)
-    const paid = item.status === 'PAID' ? amount : Number(item.paidAmount || 0)
-    const unpaid = item.status !== 'PAID' ? amount - paid : 0
+    const amount = money(item.amount)
+    const paid = money(item.paidAmount)
+    const unpaid = item.status !== 'PAID' && item.status !== 'CANCELLED'
+      ? Math.max(amount - paid, 0)
+      : 0
 
     row.billCount += 1
     row.totalAmount += amount
@@ -190,41 +200,71 @@ const tenantStats = computed(() => {
     if (isOverdue(item)) row.overdueAmount += unpaid
   })
 
-  return Array.from(map.values()).map(item => ({
-    ...item,
-    totalAmount: money(item.totalAmount),
-    paidAmount: money(item.paidAmount),
-    unpaidAmount: money(item.unpaidAmount),
-    overdueAmount: money(item.overdueAmount)
-  }))
+  return Array.from(map.values()).sort((a, b) => b.unpaidAmount - a.unpaidAmount)
 })
 
-function sum(list, field) {
-  return list.reduce((total, item) => total + Number(item[field] || 0), 0)
-}
+const monthlyTrend = computed(() => {
+  const months = []
+  const today = new Date()
 
-function money(value) {
-  return Number(value || 0).toFixed(2)
-}
+  for (let i = 5; i >= 0; i -= 1) {
+    const date = new Date(today.getFullYear(), today.getMonth() - i, 1)
+    months.push(date.toISOString().slice(0, 7))
+  }
+
+  return months.map(month => {
+    const rows = allBills.value.filter(item => String(item.periodStart || '').startsWith(month))
+    return {
+      month,
+      receivable: rows.reduce((sum, item) => sum + money(item.amount), 0),
+      received: rows.reduce((sum, item) => sum + money(item.paidAmount), 0)
+    }
+  })
+})
+
+const sourceData = computed(() => {
+  return [
+    { name: '租赁账单', value: bills.value.reduce((sum, item) => sum + money(item.amount), 0) },
+    { name: '停车账单', value: parkingBills.value.reduce((sum, item) => sum + money(item.amount), 0) }
+  ].filter(item => item.value > 0)
+})
+
+const typeData = computed(() => {
+  const map = new Map()
+
+  allBills.value.forEach(item => {
+    const key = formatBillType(item.billType || 'OTHER')
+    map.set(key, (map.get(key) || 0) + money(item.amount))
+  })
+
+  return Array.from(map.entries()).map(([name, value]) => ({ name, value }))
+})
+
+const riskData = computed(() => {
+  const result = { 已逾期: 0, '7天内到期': 0, 正常未收: 0 }
+  const todayText = today()
+  const limit = new Date()
+  limit.setDate(limit.getDate() + 7)
+  const limitText = limit.toISOString().slice(0, 10)
+
+  allBills.value.forEach(item => {
+    if (item.status === 'PAID' || item.status === 'CANCELLED') return
+    if (item.dueDate && String(item.dueDate) < todayText) result['已逾期'] += 1
+    else if (item.dueDate && String(item.dueDate) <= limitText) result['7天内到期'] += 1
+    else result['正常未收'] += 1
+  })
+
+  return Object.entries(result).map(([name, value]) => ({ name, value }))
+})
 
 function isOverdue(item) {
-  if (item.status === 'PAID') return false
-  if (!item.dueDate) return false
+  if (!item || item.status === 'PAID' || item.status === 'CANCELLED' || !item.dueDate) return false
   return String(item.dueDate) < today()
 }
 
 function today() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function formatStatus(status) {
-  return {
-    UNPAID: '未支付',
-    PAID: '已支付',
-    OVERDUE: '逾期',
-    CANCELLED: '已取消'
-  }[status] || status || '-'
 }
 
 function formatBillType(type) {
@@ -237,7 +277,93 @@ function formatBillType(type) {
   }[type] || type || '-'
 }
 
-onMounted(loadBills)
+function createChart(elRef) {
+  if (!elRef.value) return null
+  const chart = echarts.init(elRef.value)
+  charts.push(chart)
+  return chart
+}
+
+function renderCharts() {
+  charts.splice(0).forEach(chart => chart.dispose())
+
+  const trend = createChart(trendRef)
+  const source = createChart(sourceRef)
+  const type = createChart(typeRef)
+  const risk = createChart(riskRef)
+
+  trend?.setOption({
+    color: ['#d93025', '#555555'],
+    tooltip: { trigger: 'axis' },
+    legend: { top: 0 },
+    grid: { left: 42, right: 20, top: 44, bottom: 28 },
+    xAxis: { type: 'category', data: monthlyTrend.value.map(item => item.month) },
+    yAxis: { type: 'value' },
+    series: [
+      { name: '应收', type: 'bar', barMaxWidth: 28, data: monthlyTrend.value.map(item => item.receivable) },
+      { name: '实收', type: 'line', smooth: true, data: monthlyTrend.value.map(item => item.received) }
+    ]
+  })
+
+  source?.setOption({
+    color: ['#d93025', '#4a4a4a'],
+    tooltip: { trigger: 'item' },
+    legend: { bottom: 0 },
+    series: [{ type: 'pie', radius: ['48%', '70%'], center: ['50%', '45%'], data: sourceData.value }]
+  })
+
+  type?.setOption({
+    color: ['#d93025', '#555555', '#8a6d3b', '#67c23a'],
+    tooltip: { trigger: 'item' },
+    series: [{ type: 'pie', radius: '68%', data: typeData.value }]
+  })
+
+  risk?.setOption({
+    color: ['#d93025'],
+    tooltip: { trigger: 'axis' },
+    grid: { left: 80, right: 20, top: 18, bottom: 24 },
+    xAxis: { type: 'value', minInterval: 1 },
+    yAxis: { type: 'category', data: riskData.value.map(item => item.name) },
+    series: [{ type: 'bar', barMaxWidth: 24, label: { show: true, position: 'right' }, data: riskData.value.map(item => item.value) }]
+  })
+}
+
+function resizeCharts() {
+  charts.forEach(chart => chart.resize())
+}
+
+async function loadBills() {
+  loading.value = true
+  try {
+    const [billData, parkingBillData] = await Promise.all([
+      request.get('/bills'),
+      request.get('/parking/bills')
+    ])
+    bills.value = Array.isArray(billData) ? billData : []
+    parkingBills.value = Array.isArray(parkingBillData) ? parkingBillData : []
+  } catch (e) {
+    ElMessage.error(e.message || '加载账务分析数据失败')
+  } finally {
+    loading.value = false
+    await nextTick()
+    renderCharts()
+  }
+}
+
+watch(allBills, async () => {
+  await nextTick()
+  renderCharts()
+})
+
+onMounted(() => {
+  loadBills()
+  window.addEventListener('resize', resizeCharts)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeCharts)
+  charts.splice(0).forEach(chart => chart.dispose())
+})
 </script>
 
 <style scoped>
@@ -262,12 +388,15 @@ onMounted(loadBills)
   color: #909399;
 }
 
-.summary-row {
-  margin-bottom: 16px;
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 18px 0;
 }
 
 .summary-card {
-  height: 100px;
+  min-height: 112px;
 }
 
 .summary-label {
@@ -276,17 +405,46 @@ onMounted(loadBills)
 }
 
 .summary-value {
-  margin-top: 14px;
-  font-size: 26px;
+  margin-top: 12px;
+  font-size: 25px;
   font-weight: 700;
   color: #1f1b1b;
 }
 
-.summary-value.danger {
-  color: #d93025;
+.summary-desc {
+  margin-top: 8px;
+  color: #909399;
+  font-size: 13px;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.chart-card.wide {
+  grid-column: span 2;
+}
+
+.chart {
+  width: 100%;
+  height: 300px;
 }
 
 .table-card {
   margin-top: 16px;
+}
+
+.success {
+  color: #67c23a;
+}
+
+.warning {
+  color: #e6a23c;
+}
+
+.danger {
+  color: #d93025;
 }
 </style>

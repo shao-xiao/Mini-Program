@@ -37,16 +37,6 @@ export const menuSections = [
     ]
   },
   {
-    title: '财务管理',
-    index: 'finance',
-    roles: ['ADMIN', 'FINANCE', 'MANAGER'],
-    children: [
-      { title: '账单管理', path: '/bills' },
-      { title: '收费规则', path: '/feerules' },
-      { title: '财务看板', path: '/finance/dashboard' }
-    ]
-  },
-  {
     title: '停车管理',
     index: 'parking',
     roles: ['ADMIN', 'MANAGER', 'FINANCE'],
@@ -56,12 +46,31 @@ export const menuSections = [
     ]
   },
   {
+    title: '会议经营',
+    index: 'meeting',
+    roles: ['ADMIN', 'MANAGER', 'STAFF', 'FINANCE'],
+    children: [
+      { title: '会议室管理', path: '/meetings/rooms', roles: ['ADMIN', 'MANAGER', 'FINANCE'] },
+      { title: '会议预约', path: '/meetings/bookings' }
+    ]
+  },
+  {
     title: '能耗管理',
     index: 'energy',
     roles: ['ADMIN', 'MANAGER'],
     children: [
       { title: '抄表管理', path: '/energy/records' },
       { title: '能耗统计', path: '/energy/stats' }
+    ]
+  },
+  {
+    title: '财务管理',
+    index: 'finance',
+    roles: ['ADMIN', 'FINANCE', 'MANAGER'],
+    children: [
+      { title: '账单管理', path: '/bills' },
+      { title: '收费规则', path: '/feerules' },
+      { title: '财务看板', path: '/finance/dashboard' }
     ]
   },
   {

@@ -13,6 +13,10 @@ export default defineConfig({
             return 'element-plus'
           }
 
+          if (id.includes('echarts') || id.includes('zrender')) {
+            return 'echarts'
+          }
+
           if (id.includes('vue') || id.includes('pinia')) {
             return 'vue'
           }

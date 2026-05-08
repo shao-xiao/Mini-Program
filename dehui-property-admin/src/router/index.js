@@ -98,6 +98,19 @@ const routes = [
       },
 
       {
+        path: '/meetings/rooms',
+        name: 'MeetingRoomList',
+        component: () => import('../views/meeting/MeetingRoomList.vue'),
+        meta: { title: '会议室管理' }
+      },
+      {
+        path: '/meetings/bookings',
+        name: 'MeetingBookingList',
+        component: () => import('../views/meeting/MeetingBookingList.vue'),
+        meta: { title: '会议预约' }
+      },
+
+      {
         path: '/workorders',
         name: 'WorkOrderList',
         component: () => import('../views/operation/WorkOrderList.vue'),

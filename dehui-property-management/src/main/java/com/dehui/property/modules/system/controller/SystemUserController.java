@@ -1,6 +1,7 @@
 package com.dehui.property.modules.system.controller;
 
 import com.dehui.property.common.Result;
+import com.dehui.property.modules.system.dto.ChangePasswordRequest;
 import com.dehui.property.modules.system.dto.LoginRequest;
 import com.dehui.property.modules.system.dto.LoginResponse;
 import com.dehui.property.modules.system.entity.SysRole;
@@ -18,6 +19,17 @@ import java.util.List;
 public class SystemUserController {
 
     private final SystemUserService systemUserService;
+
+    @PatchMapping("/me/password")
+    public Result<Void> changePassword(
+            @RequestHeader("Authorization") String token,
+            @RequestBody ChangePasswordRequest request) {
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        systemUserService.changePassword(token, request);
+        return Result.success();
+    }
 
     @PostMapping("/users")
     public Result<SysUser> createUser(@RequestBody SysUser user) {

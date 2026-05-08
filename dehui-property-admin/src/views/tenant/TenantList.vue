@@ -9,6 +9,7 @@
       </template>
 
       <el-table :data="tenants" border style="width: 100%">
+        <el-table-column prop="id" label="租户ID" width="90" />
         <el-table-column prop="tenantName" label="租户名称" />
         <el-table-column prop="contactPerson" label="联系人" />
         <el-table-column prop="contactPhone" label="联系电话" />

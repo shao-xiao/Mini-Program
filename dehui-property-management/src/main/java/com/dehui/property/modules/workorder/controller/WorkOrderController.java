@@ -1,6 +1,8 @@
 package com.dehui.property.modules.workorder.controller;
 
 import com.dehui.property.common.Result;
+import com.dehui.property.modules.system.entity.SysUser;
+import com.dehui.property.modules.system.service.SystemUserService;
 import com.dehui.property.modules.workorder.dto.WorkOrderAssignRequest;
 import com.dehui.property.modules.workorder.dto.WorkOrderCreateRequest;
 import com.dehui.property.modules.workorder.dto.WorkOrderResponse;
@@ -16,9 +18,22 @@ import java.util.List;
 @RequiredArgsConstructor
 public class WorkOrderController {
     private final WorkOrderService workOrderService;
+    private final SystemUserService systemUserService;
 
     @PostMapping
-    public Result<WorkOrderResponse> create(@Valid @RequestBody WorkOrderCreateRequest request) {
+    public Result<WorkOrderResponse> create(
+            @RequestHeader("Authorization") String token,
+            @Valid @RequestBody WorkOrderCreateRequest request) {
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+
+        SysUser currentUser = systemUserService.getByToken(token);
+        if (currentUser == null) {
+            return Result.error(401, "未登录或登录已过期");
+        }
+
+        request.setReporterId(currentUser.getId());
         return workOrderService.create(request);
     }
 

@@ -1,7 +1,6 @@
 package com.dehui.property.modules.workorder.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
@@ -27,6 +26,5 @@ public class WorkOrderCreateRequest {
     @NotBlank(message = "优先级不能为空")
     private String priority;
 
-    @NotNull(message = "报修人ID不能为空")
     private Long reporterId;
 }

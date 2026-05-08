@@ -1,5 +1,6 @@
 package com.dehui.property.modules.system.service;
 
+import com.dehui.property.modules.system.dto.ChangePasswordRequest;
 import com.dehui.property.modules.system.dto.LoginRequest;
 import com.dehui.property.modules.system.dto.LoginResponse;
 import com.dehui.property.modules.system.entity.SysRole;
@@ -85,6 +86,42 @@ public class SystemUserService {
         return roleCodes.stream().anyMatch(userRoles::contains);
     }
 
+    @Transactional
+    public void changePassword(String token, ChangePasswordRequest request) {
+        SysUser user = getByToken(token);
+        if (user == null) {
+            throw new RuntimeException("未登录或登录已过期");
+        }
+
+        if (request.getOldPassword() == null || request.getOldPassword().isBlank()) {
+            throw new RuntimeException("原密码不能为空");
+        }
+
+        if (request.getNewPassword() == null || request.getNewPassword().isBlank()) {
+            throw new RuntimeException("新密码不能为空");
+        }
+
+        if (request.getNewPassword().length() < 6) {
+            throw new RuntimeException("新密码长度不能少于6位");
+        }
+
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new RuntimeException("两次输入的新密码不一致");
+        }
+
+        if (!user.getPassword().equals(request.getOldPassword())) {
+            throw new RuntimeException("原密码错误");
+        }
+
+        if (user.getPassword().equals(request.getNewPassword())) {
+            throw new RuntimeException("新密码不能与原密码相同");
+        }
+
+        user.setPassword(request.getNewPassword());
+        SysUser savedUser = sysUserRepository.save(user);
+        tokenStore.put(token, savedUser);
+    }
+
     public boolean hasPermission(String token, String permission) {
         List<String> roles = getRoleCodesByToken(token);
 
@@ -159,8 +196,8 @@ public class SystemUserService {
         SysUser user = sysUserRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("用户不存在"));
 
-        if (getRoleCodesByUserId(user.getId()).contains("ADMIN")) {
-            throw new RuntimeException("管理员用户不允许删除");
+        if ("admin".equals(user.getUsername())) {
+            throw new RuntimeException("超级管理员用户不允许删除");
         }
 
         userRoleRepository.deleteByUserId(user.getId());

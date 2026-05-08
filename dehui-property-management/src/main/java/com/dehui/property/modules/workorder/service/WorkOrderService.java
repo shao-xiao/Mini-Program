@@ -51,7 +51,6 @@ public class WorkOrderService {
         workOrder.setEquipmentId(request.getEquipmentId());
         workOrder.setLocation(request.getLocation());
 
-        // ✅ 新增：工单类型（核心）
         if (request.getOrderType() == null || request.getOrderType().isBlank()) {
             workOrder.setOrderType("REPAIR");
         } else {

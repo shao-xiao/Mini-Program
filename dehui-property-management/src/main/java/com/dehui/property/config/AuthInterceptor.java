@@ -54,6 +54,11 @@ public class AuthInterceptor implements HandlerInterceptor {
             return false;
         }
 
+        // ===== 个人账号：所有已登录用户均可修改自己的密码 =====
+        if (uri.startsWith("/api/system/me/password")) {
+            return true;
+        }
+
         // ===== 系统管理：仅 ADMIN =====
         if (uri.startsWith("/api/system")) {
             if (!systemUserService.hasRole(token, "ADMIN")) {
@@ -175,6 +180,14 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (uri.startsWith("/api/workorders")) {
             if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "STAFF", "SECURITY", "CLEANER"))) {
                 writeForbidden(response, "无权限访问工单接口");
+                return false;
+            }
+        }
+
+        // ===== 会议室经营：ADMIN / MANAGER / STAFF / FINANCE =====
+        if (uri.startsWith("/api/meetings")) {
+            if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "STAFF", "FINANCE"))) {
+                writeForbidden(response, "无权限访问会议管理接口");
                 return false;
             }
         }

@@ -71,7 +71,7 @@
               </el-button>
 
               <el-button
-                v-if="!isAdminUser(row.id)"
+                v-if="!isSuperAdmin(row)"
                 size="small"
                 type="danger"
                 @click="deleteUser(row)"
@@ -238,12 +238,8 @@ function hasUserRole(userId, roleId) {
   return userRoles.some(item => item.roleId === roleId)
 }
 
-function isAdminUser(userId) {
-  const userRoles = userRolesMap.value[userId] || []
-  return userRoles.some(userRole => {
-    const role = roles.value.find(item => item.id === userRole.roleId)
-    return role?.roleCode === 'ADMIN'
-  })
+function isSuperAdmin(row) {
+  return row?.username === 'admin'
 }
 
 function resetForm() {
@@ -345,8 +341,8 @@ async function changeUserStatus(row, status) {
 }
 
 async function deleteUser(row) {
-  if (isAdminUser(row.id)) {
-    ElMessage.warning('管理员用户不允许删除')
+  if (isSuperAdmin(row)) {
+    ElMessage.warning('超级管理员用户不允许删除')
     return
   }
 
