@@ -10,6 +10,7 @@ import com.dehui.property.modules.system.repository.SysUserRepository;
 import com.dehui.property.modules.system.repository.UserRoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -151,6 +152,20 @@ public class SystemUserService {
 
         user.setStatus(status);
         return sysUserRepository.save(user);
+    }
+
+    @Transactional
+    public void deleteUser(Long id) {
+        SysUser user = sysUserRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
+
+        if (getRoleCodesByUserId(user.getId()).contains("ADMIN")) {
+            throw new RuntimeException("管理员用户不允许删除");
+        }
+
+        userRoleRepository.deleteByUserId(user.getId());
+        tokenStore.entrySet().removeIf(entry -> user.getId().equals(entry.getValue().getId()));
+        sysUserRepository.delete(user);
     }
 
     public SysRole createRole(SysRole role) {

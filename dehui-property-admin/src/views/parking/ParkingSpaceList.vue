@@ -59,22 +59,57 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="bindVisible" title="绑定车牌" width="460px" destroy-on-close>
+      <el-form ref="bindFormRef" :model="bindForm" :rules="bindRules" label-width="90px">
+        <el-form-item label="车位编号">
+          <el-input :model-value="currentSpace?.spaceCode || ''" disabled />
+        </el-form-item>
+
+        <el-form-item label="租户ID" prop="tenantId">
+          <el-input-number v-model="bindForm.tenantId" :min="1" :precision="0" style="width: 100%" />
+        </el-form-item>
+
+        <el-form-item label="车牌号" prop="plateNumber">
+          <el-input v-model.trim="bindForm.plateNumber" placeholder="请输入车牌号" />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="bindVisible=false">取消</el-button>
+        <el-button type="primary" :loading="binding" @click="submitBind">确定</el-button>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
 <script setup>
 import {ref, reactive, onMounted} from 'vue'
-import {ElMessage, ElMessageBox} from 'element-plus'
+import {ElMessage} from 'element-plus'
 import request from '../../utils/request'
 
 const list = ref([])
 const visible = ref(false)
+const bindVisible = ref(false)
+const binding = ref(false)
+const bindFormRef = ref(null)
+const currentSpace = ref(null)
 
 const form = reactive({
   spaceCode:'',
   area:'',
   spaceType:'FIXED'
 })
+
+const bindForm = reactive({
+  tenantId: null,
+  plateNumber: ''
+})
+
+const bindRules = {
+  tenantId: [{ required: true, message: '请输入租户ID', trigger: 'change' }],
+  plateNumber: [{ required: true, message: '请输入车牌号', trigger: 'blur' }]
+}
 
 const load = async ()=>{
   const data = await request.get('/parking/spaces')
@@ -95,13 +130,35 @@ const save = async ()=>{
   load()
 }
 
-const bind = async(row)=>{
-  const tenantId = prompt('输入租户ID')
-  const plate = prompt('输入车牌')
+const bind = (row)=>{
+  currentSpace.value = row
+  bindForm.tenantId = row.tenantId || null
+  bindForm.plateNumber = row.plateNumber || ''
+  bindVisible.value = true
+}
 
-  await request.patch(`/parking/spaces/${row.id}/bind?tenantId=${tenantId}&plateNumber=${plate}`)
-  ElMessage.success('绑定成功')
-  load()
+const submitBind = async()=>{
+  if (!bindFormRef.value || !currentSpace.value) return
+
+  await bindFormRef.value.validate(async valid => {
+    if (!valid) return
+
+    binding.value = true
+
+    try {
+      await request.patch(`/parking/spaces/${currentSpace.value.id}/bind`, null, {
+        params: {
+          tenantId: bindForm.tenantId,
+          plateNumber: bindForm.plateNumber
+        }
+      })
+      ElMessage.success('绑定成功')
+      bindVisible.value = false
+      await load()
+    } finally {
+      binding.value = false
+    }
+  })
 }
 
 const release = async(row)=>{

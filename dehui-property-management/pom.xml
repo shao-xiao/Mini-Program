@@ -96,22 +96,6 @@
                 <artifactId>spotbugs-maven-plugin</artifactId>
                 <version>4.8.3.0</version>
             </plugin>
-        
-            <!-- Checkstyle -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>3.3.0</version>
-                <configuration>
-                    <configLocation>config/checkstyle.xml</configLocation>
-                </configuration>
-            </plugin>
-            <!-- SpotBugs -->
-            <plugin>
-                <groupId>com.github.spotbugs</groupId>
-                <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>4.8.3.0</version>
-            </plugin>
         </plugins>
     </build>
 </project>

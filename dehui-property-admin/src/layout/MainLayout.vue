@@ -17,60 +17,22 @@
         text-color="#e6e6e6"
         active-text-color="#d93025"
       >
-        <el-menu-item index="/dashboard">驾驶舱</el-menu-item>
+        <template v-for="item in visibleMenus" :key="item.path || item.index">
+          <el-menu-item v-if="item.path" :index="item.path">
+            {{ item.title }}
+          </el-menu-item>
 
-        <el-sub-menu v-if="hasRole(['ADMIN', 'MANAGER'])" index="asset">
-          <template #title>资产管理</template>
-          <el-menu-item index="/buildings">楼宇管理</el-menu-item>
-          <el-menu-item index="/floors">楼层管理</el-menu-item>
-          <el-menu-item index="/rooms">房间管理</el-menu-item>
-          <el-menu-item index="/equipment">设备台账</el-menu-item>
-        </el-sub-menu>
-
-        <el-sub-menu v-if="hasRole(['ADMIN', 'MANAGER'])" index="tenant">
-          <template #title>租赁管理</template>
-          <el-menu-item index="/tenants">租户管理</el-menu-item>
-          <el-menu-item index="/leases">租户入驻</el-menu-item>
-          <el-menu-item index="/contracts">合同台账</el-menu-item>
-        </el-sub-menu>
-
-        <el-sub-menu v-if="hasRole(['ADMIN', 'MANAGER', 'STAFF', 'SECURITY', 'CLEANER'])" index="ops">
-          <template #title>运营管理</template>
-          <el-menu-item v-if="hasRole(['ADMIN', 'MANAGER', 'STAFF', 'CLEANER'])" index="/workorders">工单管理</el-menu-item>
-          <el-menu-item index="/inspections">巡检管理</el-menu-item>
-          <el-menu-item v-if="hasRole(['ADMIN', 'MANAGER', 'SECURITY'])" index="/visitors">访客管理</el-menu-item>
-          <el-menu-item v-if="hasRole(['ADMIN', 'MANAGER', 'STAFF', 'SECURITY', 'CLEANER'])" index="/announcements">公告管理</el-menu-item>
-        </el-sub-menu>
-
-        <el-sub-menu v-if="hasRole(['ADMIN', 'FINANCE', 'MANAGER'])" index="finance">
-          <template #title>财务管理</template>
-          <el-menu-item index="/bills">账单管理</el-menu-item>
-          <el-menu-item index="/feerules">收费规则</el-menu-item>
-          <el-menu-item index="/finance/dashboard">财务看板</el-menu-item>
-        </el-sub-menu>
-
-        <el-sub-menu v-if="hasRole(['ADMIN', 'MANAGER', 'FINANCE'])" index="parking">
-          <template #title>停车管理</template>
-          <el-menu-item index="/parking/spaces">车位管理</el-menu-item>
-          <el-menu-item index="/parking/bills">停车账单</el-menu-item>
-        </el-sub-menu>
-
-        <el-sub-menu v-if="hasRole(['ADMIN', 'MANAGER'])" index="energy">
-          <template #title>能耗管理</template>
-          <el-menu-item index="/energy/records">抄表管理</el-menu-item>
-          <el-menu-item index="/energy/stats">能耗统计</el-menu-item>
-        </el-sub-menu>
-
-        <el-sub-menu v-if="hasRole(['ADMIN', 'MANAGER'])" index="ai">
-          <template #title>AI分析</template>
-          <el-menu-item index="/ai/daily-report">运营日报</el-menu-item>
-        </el-sub-menu>
-
-        <el-sub-menu v-if="hasRole(['ADMIN'])" index="system">
-          <template #title>系统管理</template>
-          <el-menu-item index="/system/users">用户管理</el-menu-item>
-          <el-menu-item index="/system/roles">角色管理</el-menu-item>
-        </el-sub-menu>
+          <el-sub-menu v-else :index="item.index">
+            <template #title>{{ item.title }}</template>
+            <el-menu-item
+              v-for="child in item.children"
+              :key="child.path"
+              :index="child.path"
+            >
+              {{ child.title }}
+            </el-menu-item>
+          </el-sub-menu>
+        </template>
       </el-menu>
     </el-aside>
 
@@ -95,38 +57,18 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { getCurrentRoles, getVisibleMenuSections } from '../config/access'
 
 const router = useRouter()
 
 const username = localStorage.getItem('username') || '用户'
 
-function getCurrentRoles() {
-  try {
-    const roles = JSON.parse(localStorage.getItem('roles') || '[]')
-    if (Array.isArray(roles) && roles.length > 0) {
-      return roles
-    }
-  } catch (error) {
-    console.warn('roles 解析失败：', error)
-  }
-
-  const legacyRole = localStorage.getItem('role')
-  return legacyRole ? [legacyRole] : []
-}
-
 const currentRoles = getCurrentRoles()
+const visibleMenus = computed(() => getVisibleMenuSections(currentRoles))
 
 const roleText = computed(() => {
   return currentRoles.length > 0 ? currentRoles.join(' / ') : '未分配角色'
 })
-
-function hasRole(allowedRoles) {
-  if (!Array.isArray(allowedRoles) || allowedRoles.length === 0) {
-    return false
-  }
-
-  return currentRoles.some(role => allowedRoles.includes(role))
-}
 
 function logout() {
   localStorage.clear()

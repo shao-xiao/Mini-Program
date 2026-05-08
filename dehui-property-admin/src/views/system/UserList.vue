@@ -45,29 +45,40 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="240" fixed="right" align="center">
+        <el-table-column label="操作" width="320" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openAssignRole(row)">
-              分配角色
-            </el-button>
+            <div class="action-buttons">
+              <el-button size="small" type="primary" @click="openAssignRole(row)">
+                分配角色
+              </el-button>
 
-            <el-button
-              v-if="row.status === 'ACTIVE'"
-              link
-              type="danger"
-              @click="changeUserStatus(row, 'DISABLED')"
-            >
-              禁用
-            </el-button>
+              <el-button
+                v-if="row.status === 'ACTIVE'"
+                size="small"
+                type="danger"
+                @click="changeUserStatus(row, 'DISABLED')"
+              >
+                禁用
+              </el-button>
 
-            <el-button
-              v-else
-              link
-              type="success"
-              @click="changeUserStatus(row, 'ACTIVE')"
-            >
-              启用
-            </el-button>
+              <el-button
+                v-else
+                size="small"
+                type="primary"
+                @click="changeUserStatus(row, 'ACTIVE')"
+              >
+                启用
+              </el-button>
+
+              <el-button
+                v-if="!isAdminUser(row.id)"
+                size="small"
+                type="danger"
+                @click="deleteUser(row)"
+              >
+                删除
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -227,6 +238,14 @@ function hasUserRole(userId, roleId) {
   return userRoles.some(item => item.roleId === roleId)
 }
 
+function isAdminUser(userId) {
+  const userRoles = userRolesMap.value[userId] || []
+  return userRoles.some(userRole => {
+    const role = roles.value.find(item => item.id === userRole.roleId)
+    return role?.roleCode === 'ADMIN'
+  })
+}
+
 function resetForm() {
   form.username = ''
   form.password = ''
@@ -325,6 +344,29 @@ async function changeUserStatus(row, status) {
   }
 }
 
+async function deleteUser(row) {
+  if (isAdminUser(row.id)) {
+    ElMessage.warning('管理员用户不允许删除')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除用户「${row.realName || row.username}」吗？删除后无法恢复。`,
+      '删除确认',
+      { type: 'warning' }
+    )
+
+    await request.delete(`/system/users/${row.id}`)
+    ElMessage.success('删除成功')
+    await loadUsers()
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.message || '删除用户失败')
+    }
+  }
+}
+
 function formatTime(time) {
   if (!time) return '-'
   return String(time).replace('T', ' ').slice(0, 16)
@@ -361,5 +403,17 @@ onMounted(async () => {
 .empty-text {
   color: #909399;
   font-size: 13px;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.action-buttons :deep(.el-button) {
+  min-width: 64px;
+  margin-left: 0;
+  color: #fff !important;
 }
 </style>

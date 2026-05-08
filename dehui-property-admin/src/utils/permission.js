@@ -1,16 +1,6 @@
-export function getCurrentRoles() {
-  try {
-    const roles = JSON.parse(localStorage.getItem('roles') || '[]')
-    if (Array.isArray(roles) && roles.length > 0) {
-      return roles
-    }
-  } catch (error) {
-    console.warn('roles 解析失败：', error)
-  }
+import { getCurrentRoles, hasAnyRole } from '../config/access'
 
-  const legacyRole = localStorage.getItem('role')
-  return legacyRole ? [legacyRole] : []
-}
+export { getCurrentRoles }
 
 export function hasRole(allowedRoles = []) {
   const roles = getCurrentRoles()
@@ -19,7 +9,7 @@ export function hasRole(allowedRoles = []) {
     return false
   }
 
-  return roles.some(role => allowedRoles.includes(role))
+  return hasAnyRole(roles, allowedRoles)
 }
 
 export function hasPermission(permissionCode) {

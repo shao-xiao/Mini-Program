@@ -41,8 +41,20 @@ public class ParkingSpaceService {
             throw new RuntimeException("该车位已停用，无法绑定");
         }
 
+        if ("OCCUPIED".equals(space.getStatus())) {
+            throw new RuntimeException("该车位已被占用，请先释放后再绑定");
+        }
+
+        if (tenantId == null || tenantId <= 0) {
+            throw new RuntimeException("租户ID不能为空");
+        }
+
+        if (plateNumber == null || plateNumber.isBlank()) {
+            throw new RuntimeException("车牌号不能为空");
+        }
+
         space.setTenantId(tenantId);
-        space.setPlateNumber(plateNumber);
+        space.setPlateNumber(plateNumber.trim());
         space.setStatus("OCCUPIED");
 
         return parkingSpaceRepository.save(space);

@@ -36,6 +36,12 @@ public class SystemUserController {
         return Result.success(systemUserService.updateUserStatus(id, status));
     }
 
+    @DeleteMapping("/users/{id}")
+    public Result<Void> deleteUser(@PathVariable Long id) {
+        systemUserService.deleteUser(id);
+        return Result.success();
+    }
+
     @PostMapping("/roles")
     public Result<SysRole> createRole(@RequestBody SysRole role) {
         return Result.success(systemUserService.createRole(role));

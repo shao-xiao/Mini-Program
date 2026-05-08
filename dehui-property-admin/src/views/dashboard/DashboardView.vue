@@ -106,6 +106,7 @@
 
       <el-table :data="recentBills" border style="width: 100%">
         <el-table-column prop="billNumber" label="账单编号" min-width="170" />
+        <el-table-column prop="sourceName" label="来源" width="90" />
         <el-table-column prop="tenantId" label="租户ID" width="90" />
         <el-table-column prop="contractId" label="合同ID" width="90" />
         <el-table-column prop="billType" label="类型" width="110" />
@@ -177,6 +178,7 @@ import request from '../../utils/request'
 const loading = ref(false)
 const report = ref({})
 const bills = ref([])
+const parkingBills = ref([])
 const contracts = ref([])
 
 const currentMonth = new Date().toISOString().slice(0, 7)
@@ -212,10 +214,38 @@ const expiringContracts = computed(() => {
 })
 
 const monthBills = computed(() => {
-  return bills.value.filter(item => {
+  return allBills.value.filter(item => {
     return String(item.periodStart || '').startsWith(currentMonth)
   })
 })
+
+const allBills = computed(() => {
+  return [
+    ...bills.value.map(normalizeBill),
+    ...parkingBills.value.map(normalizeParkingBill)
+  ]
+})
+
+function normalizeBill(item) {
+  return {
+    ...item,
+    source: 'RENT',
+    sourceName: '租赁',
+    paidAmount: money(item.paidAmount)
+  }
+}
+
+function normalizeParkingBill(item) {
+  const amount = money(item.amount)
+
+  return {
+    ...item,
+    source: 'PARKING',
+    sourceName: '停车',
+    contractId: '-',
+    paidAmount: item.status === 'PAID' ? amount : 0
+  }
+}
 
 function isOverdue(row) {
   if (!row || row.status === 'PAID' || !row.dueDate) {
@@ -227,7 +257,7 @@ function isOverdue(row) {
 }
 
 const recentBills = computed(() => {
-  return [...bills.value]
+  return [...allBills.value]
     .sort((a, b) => String(b.createdTime || '').localeCompare(String(a.createdTime || '')))
     .slice(0, 8)
 })
@@ -235,7 +265,7 @@ const recentBills = computed(() => {
 const tenantFinanceList = computed(() => {
   const map = new Map()
 
-  bills.value.forEach(item => {
+  allBills.value.forEach(item => {
     const tenantId = item.tenantId || '未知'
 
     if (!map.has(tenantId)) {
@@ -274,12 +304,18 @@ const tenantFinanceList = computed(() => {
 const finance = computed(() => {
   const monthReceivable = monthBills.value.reduce((sum, item) => sum + money(item.amount), 0)
   const monthReceived = monthBills.value.reduce((sum, item) => sum + money(item.paidAmount), 0)
-  const unpaidAmount = Math.max(monthReceivable - monthReceived, 0)
+  const unpaidAmount = allBills.value.reduce((sum, item) => {
+    if (item.status === 'PAID' || item.status === 'CANCELLED') {
+      return sum
+    }
+
+    return sum + Math.max(money(item.amount) - money(item.paidAmount), 0)
+  }, 0)
 
   const monthBillCount = monthBills.value.length
   const paidBillCount = monthBills.value.filter(item => item.status === 'PAID').length
   const unpaidBillCount = monthBills.value.filter(item => item.status !== 'PAID').length
-  const overdueBills = bills.value.filter(item => isOverdue(item))
+  const overdueBills = allBills.value.filter(item => isOverdue(item))
   const overdueBillCount = overdueBills.length
 
   const collectionRate = monthReceivable > 0
@@ -316,6 +352,15 @@ async function loadBills() {
   }
 }
 
+async function loadParkingBills() {
+  try {
+    const data = await request.get('/parking/bills', { silent: true })
+    parkingBills.value = Array.isArray(data) ? data : []
+  } catch {
+    parkingBills.value = []
+  }
+}
+
 async function loadContracts() {
   try {
     const data = await request.get('/contracts', { silent: true })
@@ -332,6 +377,7 @@ async function loadDashboard() {
     await Promise.allSettled([
       loadReport(),
       loadBills(),
+      loadParkingBills(),
       loadContracts()
     ])
   } finally {

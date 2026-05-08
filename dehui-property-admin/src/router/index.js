@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import MainLayout from '../layout/MainLayout.vue'
+import { canAccessPath, getCurrentRoles } from '../config/access'
 
 const routes = [
   {
@@ -135,6 +136,13 @@ const routes = [
       },
 
       {
+        path: '/ai/daily-report',
+        name: 'DailyReport',
+        component: () => import('../views/ai/DailyReport.vue'),
+        meta: { title: 'AI运营日报' }
+      },
+
+      {
         path: '/system/users',
         name: 'SystemUserList',
         component: () => import('../views/system/UserList.vue'),
@@ -154,81 +162,6 @@ const router = createRouter({
   history: createWebHistory(),
   routes
 })
-
-const roleAccessMap = {
-  ADMIN: ['*'],
-  MANAGER: [
-    '/dashboard',
-    '/buildings',
-    '/floors',
-    '/rooms',
-    '/equipment',
-    '/tenants',
-    '/leases',
-    '/contracts',
-    '/workorders',
-    '/inspections',
-    '/visitors',
-    '/announcements',
-    '/energy/records',
-    '/energy/stats',
-    '/ai/daily-report'
-  ],
-  STAFF: [
-    '/dashboard',
-    '/workorders',
-    '/inspections',
-    '/announcements'
-  ],
-  SECURITY: [
-    '/dashboard',
-    '/inspections',
-    '/visitors',
-    '/announcements'
-  ],
-  CLEANER: [
-    '/dashboard',
-    '/workorders',
-    '/inspections',
-    '/announcements'
-  ],
-  FINANCE: [
-    '/dashboard',
-    '/bills',
-    '/feerules',
-    '/finance/dashboard',
-    '/parking/spaces',
-    '/parking/bills'
-  ]
-}
-
-function getCurrentRoles() {
-  try {
-    const roles = JSON.parse(localStorage.getItem('roles') || '[]')
-    if (Array.isArray(roles) && roles.length > 0) {
-      return roles
-    }
-  } catch (error) {
-    console.warn('roles 解析失败：', error)
-  }
-
-  const legacyRole = localStorage.getItem('role')
-  return legacyRole ? [legacyRole] : []
-}
-
-function canAccessPathByRole(role, path) {
-  const allowed = roleAccessMap[role] || ['/dashboard']
-  if (allowed.includes('*')) return true
-  return allowed.some(item => path === item || path.startsWith(item + '/'))
-}
-
-function canAccessPath(roles, path) {
-  if (!Array.isArray(roles) || roles.length === 0) {
-    return path === '/dashboard'
-  }
-
-  return roles.some(role => canAccessPathByRole(role, path))
-}
 
 router.beforeEach((to, from, next) => {
   if (to.path === '/login') {

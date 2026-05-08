@@ -1,5 +1,7 @@
 package com.dehui.property.config;
 
+import com.dehui.property.common.Result;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.dehui.property.modules.system.entity.SysUser;
 import com.dehui.property.modules.system.service.SystemUserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,6 +18,7 @@ import java.util.List;
 public class AuthInterceptor implements HandlerInterceptor {
 
     private final SystemUserService systemUserService;
+    private final ObjectMapper objectMapper;
 
     @Override
     public boolean preHandle(HttpServletRequest request,
@@ -196,16 +199,17 @@ public class AuthInterceptor implements HandlerInterceptor {
     }
 
     private void writeUnauthorized(HttpServletResponse response, String message) throws Exception {
-        response.setStatus(401);
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.setContentType("text/plain;charset=UTF-8");
-        response.getWriter().write(message);
+        writeError(response, 401, message);
     }
 
     private void writeForbidden(HttpServletResponse response, String message) throws Exception {
-        response.setStatus(403);
+        writeError(response, 403, message);
+    }
+
+    private void writeError(HttpServletResponse response, int status, String message) throws Exception {
+        response.setStatus(status);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.setContentType("text/plain;charset=UTF-8");
-        response.getWriter().write(message);
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write(objectMapper.writeValueAsString(Result.error(status, message)));
     }
 }
