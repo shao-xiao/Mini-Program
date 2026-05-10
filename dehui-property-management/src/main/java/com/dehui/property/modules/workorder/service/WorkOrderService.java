@@ -194,6 +194,7 @@ public class WorkOrderService {
         response.setProcessingTime(wo.getProcessingTime());
         response.setCompletedTime(wo.getCompletedTime());
         response.setClosedTime(wo.getClosedTime());
+        response.setCancelledTime(wo.getCancelledTime());
         response.setCreatedTime(wo.getCreatedTime());
         response.setUpdatedTime(wo.getUpdatedTime());
 

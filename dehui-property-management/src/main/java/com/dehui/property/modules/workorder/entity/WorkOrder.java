@@ -60,4 +60,6 @@ public class WorkOrder extends BaseEntity {
     private LocalDateTime completedTime;
 
     private LocalDateTime closedTime;
+
+    private LocalDateTime cancelledTime;
 }

@@ -35,6 +35,7 @@
             <el-tag v-else-if="row.status==='PROCESSING'" type="primary">处理中</el-tag>
             <el-tag v-else-if="row.status==='COMPLETED'" type="success">已完成</el-tag>
             <el-tag v-else-if="row.status==='CLOSED'" type="info">已关闭</el-tag>
+            <el-tag v-else-if="row.status==='CANCELLED'" type="info">已撤回</el-tag>
           </template>
         </el-table-column>
 
@@ -280,7 +281,8 @@ const stageTime = (row)=>{
     ASSIGNED: row.assignedTime,
     PROCESSING: row.processingTime,
     COMPLETED: row.completedTime,
-    CLOSED: row.closedTime
+    CLOSED: row.closedTime,
+    CANCELLED: row.cancelledTime
   }
   return formatDateTime(timeMap[row.status] || row.updatedTime)
 }

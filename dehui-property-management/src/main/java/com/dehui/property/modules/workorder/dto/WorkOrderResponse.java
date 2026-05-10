@@ -26,6 +26,7 @@ public class WorkOrderResponse {
     private LocalDateTime processingTime;
     private LocalDateTime completedTime;
     private LocalDateTime closedTime;
+    private LocalDateTime cancelledTime;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
 }

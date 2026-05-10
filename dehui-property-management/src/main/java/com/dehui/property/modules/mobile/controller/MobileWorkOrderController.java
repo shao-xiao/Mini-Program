@@ -28,6 +28,13 @@ public class MobileWorkOrderController {
         return mobileWorkOrderService.create(normalizeToken(token), request);
     }
 
+    @PatchMapping("/{id}/cancel")
+    public Result<MobileWorkOrderResponse> cancel(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Long id) {
+        return mobileWorkOrderService.cancel(normalizeToken(token), id);
+    }
+
     private String normalizeToken(String token) {
         if (token != null && token.startsWith("Bearer ")) {
             return token.substring(7);

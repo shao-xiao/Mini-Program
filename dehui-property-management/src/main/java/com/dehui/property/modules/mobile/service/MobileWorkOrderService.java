@@ -62,6 +62,29 @@ public class MobileWorkOrderService {
         return Result.success(toResponse(workOrderRepository.save(workOrder)));
     }
 
+    @Transactional
+    public Result<MobileWorkOrderResponse> cancel(String token, Long id) {
+        MobileUserProfile profile = mobileAuthService.getProfile(token);
+        if (profile == null) {
+            return Result.error(401, "未登录或登录已过期");
+        }
+
+        WorkOrder workOrder = workOrderRepository.findById(id).orElse(null);
+        if (workOrder == null) {
+            return Result.error("报修工单不存在");
+        }
+        if (workOrder.getMobileUserId() == null || !workOrder.getMobileUserId().equals(profile.getId())) {
+            return Result.error(403, "不能撤回他人的报修");
+        }
+        if (!"CREATED".equals(workOrder.getStatus())) {
+            return Result.error("工单已派单或处理中，不能撤回");
+        }
+
+        workOrder.setStatus("CANCELLED");
+        workOrder.setCancelledTime(LocalDateTime.now());
+        return Result.success(toResponse(workOrderRepository.save(workOrder)));
+    }
+
     private String generateOrderNumber() {
         String prefix = "WO-M-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         return prefix + String.format("%04d", workOrderRepository.count() + 1);
@@ -102,6 +125,7 @@ public class MobileWorkOrderService {
         response.setProcessingTime(workOrder.getProcessingTime());
         response.setCompletedTime(workOrder.getCompletedTime());
         response.setClosedTime(workOrder.getClosedTime());
+        response.setCancelledTime(workOrder.getCancelledTime());
         response.setCreatedTime(workOrder.getCreatedTime());
         response.setUpdatedTime(workOrder.getUpdatedTime());
         return response;
@@ -139,6 +163,7 @@ public class MobileWorkOrderService {
         if ("PROCESSING".equals(status)) return "处理中";
         if ("COMPLETED".equals(status)) return "已完成";
         if ("CLOSED".equals(status)) return "已关闭";
+        if ("CANCELLED".equals(status)) return "已撤回";
         return status == null || status.isBlank() ? "未知" : status;
     }
 }
