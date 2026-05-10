@@ -1,6 +1,7 @@
 package com.dehui.property.modules.workorder.entity;
 
 import com.dehui.property.common.BaseEntity;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.Data;
@@ -48,6 +49,9 @@ public class WorkOrder extends BaseEntity {
     private String reporterName;
 
     private String reporterPhone;
+
+    @Column(length = 2000)
+    private String imageUrls;
 
     private Long handlerId;
 

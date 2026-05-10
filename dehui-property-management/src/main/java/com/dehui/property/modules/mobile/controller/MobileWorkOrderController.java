@@ -8,6 +8,7 @@ import com.dehui.property.modules.mobile.service.MobileWorkOrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/mobile/workorders")
@@ -33,6 +34,14 @@ public class MobileWorkOrderController {
             @RequestHeader("Authorization") String token,
             @PathVariable Long id) {
         return mobileWorkOrderService.cancel(normalizeToken(token), id);
+    }
+
+    @PostMapping("/{id}/images")
+    public Result<MobileWorkOrderResponse> uploadImage(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+        return mobileWorkOrderService.uploadImage(normalizeToken(token), id, file);
     }
 
     private String normalizeToken(String token) {

@@ -4,6 +4,7 @@ dehui-property-admin/dist
 
 # backend
 dehui-property-management/target
+dehui-property-management/uploads
 
 # IDE
 .idea

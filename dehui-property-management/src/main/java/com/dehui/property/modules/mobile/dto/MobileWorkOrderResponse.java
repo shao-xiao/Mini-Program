@@ -3,6 +3,7 @@ package com.dehui.property.modules.mobile.dto;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class MobileWorkOrderResponse {
@@ -21,6 +22,7 @@ public class MobileWorkOrderResponse {
     private String statusText;
     private String reporterName;
     private String reporterPhone;
+    private List<String> imageUrls;
     private LocalDateTime submittedTime;
     private LocalDateTime assignedTime;
     private LocalDateTime processingTime;

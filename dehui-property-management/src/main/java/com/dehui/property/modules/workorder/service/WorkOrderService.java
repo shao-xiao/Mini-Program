@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -188,6 +190,7 @@ public class WorkOrderService {
         response.setTenantId(wo.getTenantId());
         response.setReporterName(wo.getReporterName());
         response.setReporterPhone(wo.getReporterPhone());
+        response.setImageUrls(parseImageUrls(wo.getImageUrls()));
         response.setHandlerId(wo.getHandlerId());
         response.setSubmittedTime(wo.getSubmittedTime());
         response.setAssignedTime(wo.getAssignedTime());
@@ -199,5 +202,15 @@ public class WorkOrderService {
         response.setUpdatedTime(wo.getUpdatedTime());
 
         return response;
+    }
+
+    private List<String> parseImageUrls(String imageUrls) {
+        if (imageUrls == null || imageUrls.isBlank()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(imageUrls.split(","))
+                .map(String::trim)
+                .filter(url -> !url.isBlank())
+                .toList();
     }
 }

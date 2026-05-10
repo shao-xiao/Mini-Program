@@ -67,6 +67,19 @@
             {{ stageTime(row) }}
           </template>
         </el-table-column>
+        <el-table-column label="现场图片" min-width="120">
+          <template #default="{row}">
+            <el-image
+              v-if="row.imageUrls && row.imageUrls.length"
+              class="workorder-thumb"
+              :src="imageSrc(row.imageUrls[0])"
+              :preview-src-list="row.imageUrls.map(imageSrc)"
+              preview-teleported
+              fit="cover"
+            />
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
 
         <el-table-column label="操作" width="260">
           <template #default="{row}">
@@ -298,6 +311,12 @@ const handlerText = (handlerId)=>{
   return user ? userLabel(user) : `用户ID ${handlerId}`
 }
 
+const imageSrc = (url)=>{
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  return `/api${url}`
+}
+
 const load = async ()=>{
   const data = await request.get('/workorders')
   list.value = data || []
@@ -407,5 +426,11 @@ onMounted(()=>{
   margin-top:4px;
   color:#909399;
   font-size:12px;
+}
+
+.workorder-thumb{
+  width:48px;
+  height:48px;
+  border-radius:6px;
 }
 </style>

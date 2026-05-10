@@ -2,6 +2,7 @@ package com.dehui.property.modules.workorder.dto;
 
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class WorkOrderResponse {
@@ -20,6 +21,7 @@ public class WorkOrderResponse {
     private Long tenantId;
     private String reporterName;
     private String reporterPhone;
+    private List<String> imageUrls;
     private Long handlerId;
     private LocalDateTime submittedTime;
     private LocalDateTime assignedTime;

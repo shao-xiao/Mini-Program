@@ -10,10 +10,19 @@ import com.dehui.property.modules.workorder.repository.WorkOrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -85,6 +94,50 @@ public class MobileWorkOrderService {
         return Result.success(toResponse(workOrderRepository.save(workOrder)));
     }
 
+    @Transactional
+    public Result<MobileWorkOrderResponse> uploadImage(String token, Long id, MultipartFile file) {
+        MobileUserProfile profile = mobileAuthService.getProfile(token);
+        if (profile == null) {
+            return Result.error(401, "未登录或登录已过期");
+        }
+        if (file == null || file.isEmpty()) {
+            return Result.error("请选择要上传的图片");
+        }
+        if (file.getSize() > 5 * 1024 * 1024) {
+            return Result.error("单张图片不能超过5MB");
+        }
+
+        WorkOrder workOrder = workOrderRepository.findById(id).orElse(null);
+        if (workOrder == null) {
+            return Result.error("报修工单不存在");
+        }
+        if (workOrder.getMobileUserId() == null || !workOrder.getMobileUserId().equals(profile.getId())) {
+            return Result.error(403, "不能给他人的报修上传图片");
+        }
+        if ("CANCELLED".equals(workOrder.getStatus()) || "CLOSED".equals(workOrder.getStatus())) {
+            return Result.error("当前状态不能上传图片");
+        }
+
+        String originalFilename = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
+        String extension = resolveExtension(originalFilename, file.getContentType());
+        if (!List.of(".jpg", ".jpeg", ".png", ".webp").contains(extension)) {
+            return Result.error("仅支持 jpg、png、webp 图片");
+        }
+
+        try {
+            Path uploadDir = Paths.get("uploads", "workorders", String.valueOf(id)).toAbsolutePath().normalize();
+            Files.createDirectories(uploadDir);
+            String filename = UUID.randomUUID() + extension;
+            Path target = uploadDir.resolve(filename);
+            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+            String url = "/uploads/workorders/" + id + "/" + filename;
+            workOrder.setImageUrls(appendImageUrl(workOrder.getImageUrls(), url));
+            return Result.success(toResponse(workOrderRepository.save(workOrder)));
+        } catch (IOException e) {
+            return Result.error("图片保存失败");
+        }
+    }
+
     private String generateOrderNumber() {
         String prefix = "WO-M-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         return prefix + String.format("%04d", workOrderRepository.count() + 1);
@@ -120,6 +173,7 @@ public class MobileWorkOrderService {
         response.setStatusText(toStatusText(workOrder.getStatus()));
         response.setReporterName(workOrder.getReporterName());
         response.setReporterPhone(workOrder.getReporterPhone());
+        response.setImageUrls(parseImageUrls(workOrder.getImageUrls()));
         response.setSubmittedTime(workOrder.getSubmittedTime());
         response.setAssignedTime(workOrder.getAssignedTime());
         response.setProcessingTime(workOrder.getProcessingTime());
@@ -165,5 +219,33 @@ public class MobileWorkOrderService {
         if ("CLOSED".equals(status)) return "已关闭";
         if ("CANCELLED".equals(status)) return "已撤回";
         return status == null || status.isBlank() ? "未知" : status;
+    }
+
+    private String resolveExtension(String filename, String contentType) {
+        String lowerName = filename.toLowerCase();
+        if (lowerName.endsWith(".jpeg")) return ".jpeg";
+        if (lowerName.endsWith(".jpg")) return ".jpg";
+        if (lowerName.endsWith(".png")) return ".png";
+        if (lowerName.endsWith(".webp")) return ".webp";
+        if ("image/png".equals(contentType)) return ".png";
+        if ("image/webp".equals(contentType)) return ".webp";
+        return ".jpg";
+    }
+
+    private String appendImageUrl(String current, String url) {
+        if (current == null || current.isBlank()) {
+            return url;
+        }
+        return current + "," + url;
+    }
+
+    private List<String> parseImageUrls(String imageUrls) {
+        if (imageUrls == null || imageUrls.isBlank()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(imageUrls.split(","))
+                .map(String::trim)
+                .filter(url -> !url.isBlank())
+                .toList();
     }
 }

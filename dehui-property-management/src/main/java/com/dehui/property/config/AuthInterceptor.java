@@ -35,6 +35,7 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (uri.contains("/login")
                 || uri.startsWith("/api/system/login")
                 || uri.startsWith("/api/mobile/auth/dev-login")
+                || ("GET".equalsIgnoreCase(method) && uri.startsWith("/api/uploads/"))
                 || ("GET".equalsIgnoreCase(method) && uri.startsWith("/api/mobile/announcements"))
                 || uri.startsWith("/api/error")) {
             return true;
