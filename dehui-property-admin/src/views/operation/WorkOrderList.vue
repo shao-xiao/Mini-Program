@@ -51,7 +51,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="tenantId" label="租户ID" width="90"/>
-        <el-table-column prop="handlerId" label="处理人" width="90"/>
+        <el-table-column label="处理人" min-width="120">
+          <template #default="{row}">
+            {{ handlerText(row.handlerId) }}
+          </template>
+        </el-table-column>
         <el-table-column label="提交时间" min-width="150">
           <template #default="{row}">
             {{ formatDateTime(row.submittedTime || row.createdTime) }}
@@ -137,6 +141,34 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="assignVisible" title="派单" width="460px">
+      <el-form :model="assignForm" label-width="92px">
+        <el-form-item label="工单">
+          <el-input :model-value="assignForm.orderTitle" disabled/>
+        </el-form-item>
+        <el-form-item label="维修人员">
+          <el-select
+            v-model="assignForm.handlerId"
+            class="form-select"
+            filterable
+            placeholder="请选择维修人员"
+          >
+            <el-option
+              v-for="user in activeUsers"
+              :key="user.id"
+              :label="userLabel(user)"
+              :value="user.id"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="assignVisible=false">取消</el-button>
+        <el-button type="primary" @click="confirmAssign">确认派单</el-button>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -146,7 +178,9 @@ import {ElMessage} from 'element-plus'
 import request from '../../utils/request'
 
 const list = ref([])
+const users = ref([])
 const visible = ref(false)
+const assignVisible = ref(false)
 const currentUsername = localStorage.getItem('username') || '当前用户'
 const currentUserId = Number(localStorage.getItem('userId'))
 
@@ -203,7 +237,14 @@ const form = reactive({
   priority:'MEDIUM'
 })
 
+const assignForm = reactive({
+  orderId: null,
+  orderTitle: '',
+  handlerId: null
+})
+
 const currentCategoryOptions = computed(() => categoryOptions[form.orderType] || [])
+const activeUsers = computed(() => users.value.filter(user => user.status === 'ACTIVE'))
 
 const optionText = (options, value) => options.find(item => item.value === value)?.label || value || '-'
 const orderTypeText = (value) => optionText(orderTypeOptions, value)
@@ -244,9 +285,25 @@ const stageTime = (row)=>{
   return formatDateTime(timeMap[row.status] || row.updatedTime)
 }
 
+const userLabel = (user)=>{
+  const name = user.realName || user.username || `用户${user.id}`
+  return user.phone ? `${name}（${user.phone}）` : name
+}
+
+const handlerText = (handlerId)=>{
+  if (!handlerId) return '-'
+  const user = users.value.find(item => item.id === handlerId)
+  return user ? userLabel(user) : `用户ID ${handlerId}`
+}
+
 const load = async ()=>{
   const data = await request.get('/workorders')
   list.value = data || []
+}
+
+const loadUsers = async ()=>{
+  const data = await request.get('/system/users')
+  users.value = data || []
 }
 
 const resetCategory = ()=>{
@@ -288,10 +345,22 @@ const save = async ()=>{
   load()
 }
 
-const assign = async(row)=>{
-  const handlerId = prompt('输入处理人ID')
-  await request.patch(`/workorders/${row.id}/assign`, {handlerId:Number(handlerId)})
+const assign = (row)=>{
+  assignForm.orderId = row.id
+  assignForm.orderTitle = `${row.orderNumber} ${row.title}`
+  assignForm.handlerId = row.handlerId || null
+  assignVisible.value = true
+}
+
+const confirmAssign = async()=>{
+  if (!assignForm.handlerId) {
+    ElMessage.warning('请选择维修人员')
+    return
+  }
+
+  await request.patch(`/workorders/${assignForm.orderId}/assign`, {handlerId:Number(assignForm.handlerId)})
   ElMessage.success('已派单')
+  assignVisible.value = false
   load()
 }
 
@@ -313,7 +382,10 @@ const close = async(row)=>{
   load()
 }
 
-onMounted(load)
+onMounted(()=>{
+  load()
+  loadUsers()
+})
 </script>
 
 <style scoped>
