@@ -4,7 +4,13 @@
     <view class="subtitle">{{tenantName || '租户'}}的租金、水电煤、停车、会议室等账单</view>
   </view>
 
-  <view class="summary-grid section">
+  <view wx:if="{{errorMessage}}" class="card section">
+    <view class="empty-title">暂时无法显示账单</view>
+    <view class="empty-desc">{{errorMessage}}</view>
+    <button class="button-primary bind-button" bindtap="goProfile">去登录或绑定租户</button>
+  </view>
+
+  <view wx:if="{{!errorMessage}}" class="summary-grid section">
     <view class="summary-card">
       <view class="summary-label">待支付</view>
       <view class="summary-value primary">¥ {{summary.unpaidAmount}}</view>
@@ -27,7 +33,7 @@
     </view>
   </view>
 
-  <view class="filter-row section">
+  <view wx:if="{{!errorMessage}}" class="filter-row section">
     <view
       wx:for="{{filters}}"
       wx:key="value"
@@ -41,7 +47,7 @@
 
   <view wx:if="{{loading}}" class="card muted">正在加载账单...</view>
 
-  <view wx:elif="{{bills.length === 0}}" class="card muted">
+  <view wx:elif="{{!errorMessage && bills.length === 0}}" class="card muted">
     暂无账单数据
   </view>
 

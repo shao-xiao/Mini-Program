@@ -137,3 +137,20 @@
   border-radius: 8rpx;
   font-size: 24rpx;
 }
+
+.empty-title {
+  color: #1f1b1b;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.empty-desc {
+  margin-top: 12rpx;
+  color: #73767a;
+  font-size: 26rpx;
+  line-height: 1.6;
+}
+
+.bind-button {
+  margin-top: 24rpx;
+}

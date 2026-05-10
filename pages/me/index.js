@@ -15,10 +15,10 @@ Page({
       password: ''
     },
     tenantForm: {
-      tenantId: '',
-      name: '',
-      phone: '',
-      role: ''
+      tenantId: '1',
+      name: '账单测试用户',
+      phone: '13900000001',
+      role: '财务联系人'
     }
   },
 

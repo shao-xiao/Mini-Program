@@ -10,9 +10,23 @@ function formatDate(value) {
   return `${year}年${month}月${day}日`
 }
 
+function emptySummary() {
+  return {
+    totalAmount: '0.00',
+    unpaidAmount: '0.00',
+    overdueAmount: '0.00',
+    paidAmount: '0.00',
+    totalCount: 0,
+    unpaidCount: 0,
+    overdueCount: 0,
+    paidCount: 0
+  }
+}
+
 Page({
   data: {
     loading: false,
+    errorMessage: '',
     activeStatus: '',
     filters: [
       { label: '全部', value: '' },
@@ -20,16 +34,7 @@ Page({
       { label: '已支付', value: 'PAID' }
     ],
     tenantName: '',
-    summary: {
-      totalAmount: '0.00',
-      unpaidAmount: '0.00',
-      overdueAmount: '0.00',
-      paidAmount: '0.00',
-      totalCount: 0,
-      unpaidCount: 0,
-      overdueCount: 0,
-      paidCount: 0
-    },
+    summary: emptySummary(),
     bills: []
   },
 
@@ -38,7 +43,7 @@ Page({
   },
 
   async loadBills() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, errorMessage: '' })
     try {
       const query = this.data.activeStatus ? { status: this.data.activeStatus } : {}
       const data = await api.get('/mobile/bills', query)
@@ -68,7 +73,13 @@ Page({
         bills
       })
     } catch (error) {
-      this.setData({ bills: [] })
+      const message = error && error.message ? error.message : '账单加载失败，请重新登录或绑定租户身份'
+      this.setData({
+        tenantName: '',
+        summary: emptySummary(),
+        bills: [],
+        errorMessage: message
+      })
     } finally {
       this.setData({ loading: false })
     }
@@ -85,6 +96,12 @@ Page({
       title: '支付功能待接入',
       content: `账单 ${id} 已可查询，真实微信支付会在后续阶段接入。`,
       showCancel: false
+    })
+  },
+
+  goProfile() {
+    wx.navigateTo({
+      url: '/pages/me/index'
     })
   }
 })
