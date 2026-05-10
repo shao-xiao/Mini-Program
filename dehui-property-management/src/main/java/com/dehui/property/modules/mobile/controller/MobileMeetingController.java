@@ -33,6 +33,13 @@ public class MobileMeetingController {
         return mobileMeetingService.create(normalizeToken(token), request);
     }
 
+    @PatchMapping("/bookings/{id}/cancel")
+    public Result<MeetingBookingResponse> cancel(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Long id) {
+        return mobileMeetingService.cancel(normalizeToken(token), id);
+    }
+
     private String normalizeToken(String token) {
         if (token != null && token.startsWith("Bearer ")) {
             return token.substring(7);

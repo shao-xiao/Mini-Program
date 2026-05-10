@@ -95,9 +95,45 @@ public class MobileMeetingService {
         return meetingService.createBooking(bookingRequest, currentUser);
     }
 
+    public Result<MeetingBookingResponse> cancel(String token, Long bookingId) {
+        MobileUserProfile profile = mobileAuthService.getProfile(token);
+        if (profile == null) {
+            return Result.error(401, "未登录或登录已过期");
+        }
+        if (!isBookableIdentity(profile)) {
+            return Result.error(403, "请先绑定内部员工或租户身份");
+        }
+
+        MeetingBooking booking = meetingBookingRepository.findById(bookingId).orElse(null);
+        if (booking == null) {
+            return Result.error("预约不存在");
+        }
+        if (!belongsToProfile(booking, profile)) {
+            return Result.error(403, "不能取消他人的预约");
+        }
+        if ("COMPLETED".equals(booking.getStatus())) {
+            return Result.error("已完成的预约不能取消");
+        }
+        if ("CANCELLED".equals(booking.getStatus())) {
+            return Result.error("预约已取消");
+        }
+
+        return meetingService.cancelBooking(bookingId);
+    }
+
     private boolean isBookableIdentity(MobileUserProfile profile) {
         return ("INTERNAL".equals(profile.getUserType()) && profile.getBoundSysUserId() != null)
                 || ("TENANT".equals(profile.getUserType()) && profile.getBoundTenantId() != null);
+    }
+
+    private boolean belongsToProfile(MeetingBooking booking, MobileUserProfile profile) {
+        if ("INTERNAL".equals(profile.getUserType())) {
+            return profile.getBoundSysUserId().equals(booking.getInternalUserId());
+        }
+        if ("TENANT".equals(profile.getUserType())) {
+            return profile.getBoundTenantId().equals(booking.getTenantId());
+        }
+        return false;
     }
 
     private List<MeetingBookingResponse> listMyBookings(MobileUserProfile profile) {
