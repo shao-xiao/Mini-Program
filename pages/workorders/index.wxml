@@ -96,6 +96,30 @@
       <view class="workorder-meta">位置：{{item.location}}</view>
       <view class="workorder-desc">{{item.description}}</view>
       <view class="workorder-time">{{item.createdTimeText}}</view>
+      <view class="timeline">
+        <view
+          wx:for="{{item.timeline}}"
+          wx:key="label"
+          wx:for-item="step"
+          class="timeline-item {{step.active ? 'active' : ''}}"
+        >
+          <view class="timeline-dot"></view>
+          <view class="timeline-body">
+            <view class="timeline-label">{{step.label}}</view>
+            <view class="timeline-time">{{step.timeText || '待更新'}}</view>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{item.cancellable}}" class="workorder-actions">
+        <button
+          class="cancel-button"
+          size="mini"
+          data-id="{{item.id}}"
+          bindtap="cancelWorkOrder"
+        >
+          撤回报修
+        </button>
+      </view>
     </view>
   </view>
 </view>
