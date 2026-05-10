@@ -9,11 +9,11 @@
       <view class="action-title">公告通知</view>
       <view class="action-desc">园区公告与运营提醒</view>
     </navigator>
-    <navigator class="action" url="/pages/bills/index">
+    <navigator class="action" url="/pages/bills/index" open-type="switchTab">
       <view class="action-title">账单中心</view>
       <view class="action-desc">租金、能耗、停车、会议账单</view>
     </navigator>
-    <navigator class="action" url="/pages/meeting/index">
+    <navigator class="action" url="/pages/meeting/index" open-type="switchTab">
       <view class="action-title">会议预约</view>
       <view class="action-desc">查询会议室并发起预约</view>
     </navigator>
