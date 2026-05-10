@@ -39,5 +39,13 @@ public class WorkOrder extends BaseEntity {
 
     private Long reporterId;
 
+    private Long mobileUserId;
+
+    private Long tenantId;
+
+    private String reporterName;
+
+    private String reporterPhone;
+
     private Long handlerId;
 }

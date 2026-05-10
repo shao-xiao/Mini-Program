@@ -179,6 +179,10 @@ public class WorkOrderService {
         response.setPriority(wo.getPriority());
         response.setStatus(wo.getStatus());
         response.setReporterId(wo.getReporterId());
+        response.setMobileUserId(wo.getMobileUserId());
+        response.setTenantId(wo.getTenantId());
+        response.setReporterName(wo.getReporterName());
+        response.setReporterPhone(wo.getReporterPhone());
         response.setHandlerId(wo.getHandlerId());
         response.setCreatedTime(wo.getCreatedTime());
         response.setUpdatedTime(wo.getUpdatedTime());

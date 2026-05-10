@@ -1,26 +1,26 @@
-package com.dehui.property.modules.workorder.dto;
+package com.dehui.property.modules.mobile.dto;
 
 import lombok.Data;
+
 import java.time.LocalDateTime;
 
 @Data
-public class WorkOrderResponse {
+public class MobileWorkOrderResponse {
     private Long id;
     private String orderNumber;
     private String title;
     private String description;
-    private Long equipmentId;
     private String location;
     private String orderType;
+    private String orderTypeText;
     private String category;
+    private String categoryText;
     private String priority;
+    private String priorityText;
     private String status;
-    private Long reporterId;
-    private Long mobileUserId;
-    private Long tenantId;
+    private String statusText;
     private String reporterName;
     private String reporterPhone;
-    private Long handlerId;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
 }

@@ -5,9 +5,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     boolean existsByOrderNumber(String orderNumber);
+
+    List<WorkOrder> findByMobileUserIdOrderByCreatedTimeDesc(Long mobileUserId);
 
     @Query(value = "SELECT COUNT(*) FROM work_order WHERE status = :status", nativeQuery = true)
     Long countByStatus(@Param("status") String status);
