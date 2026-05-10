@@ -1,7 +1,102 @@
 <view class="page">
   <view class="section card">
     <view class="title">会议预约</view>
-    <view class="subtitle">先选时间，再查看会议室可用性并发起预约。</view>
+    <view class="subtitle">{{identityText || '先登录绑定身份'}}，先选时间，再查看会议室可用性</view>
   </view>
-  <view class="card muted">移动端接口规划：GET /mobile/meeting-rooms/availability，POST /mobile/meeting-bookings</view>
+
+  <view wx:if="{{errorMessage}}" class="card section">
+    <view class="empty-title">暂时无法预约会议室</view>
+    <view class="empty-desc">{{errorMessage}}</view>
+    <button class="button-primary bind-button" bindtap="goProfile">去登录或绑定身份</button>
+  </view>
+
+  <view wx:if="{{!errorMessage}}" class="section card form-card">
+    <view class="form-row">
+      <view class="form-label">日期</view>
+      <picker mode="date" value="{{form.date}}" bindchange="onDateChange">
+        <view class="picker-value">{{form.date}}</view>
+      </picker>
+    </view>
+    <view class="form-row">
+      <view class="form-label">开始</view>
+      <picker mode="time" value="{{form.startTime}}" bindchange="onStartTimeChange">
+        <view class="picker-value">{{form.startTime}}</view>
+      </picker>
+    </view>
+    <view class="form-row">
+      <view class="form-label">结束</view>
+      <picker mode="time" value="{{form.endTime}}" bindchange="onEndTimeChange">
+        <view class="picker-value">{{form.endTime}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="card muted">正在查询会议室...</view>
+
+  <view wx:if="{{!errorMessage && !loading}}" class="section">
+    <view class="section-title">选择会议室</view>
+    <view
+      wx:for="{{rooms}}"
+      wx:key="id"
+      class="room-card {{item.available ? '' : 'disabled'}} {{item.selected ? 'selected' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="selectRoom"
+    >
+      <view class="room-head">
+        <view>
+          <view class="room-name">{{item.roomName}}</view>
+          <view class="room-location">{{item.location || '位置未填写'}} · {{item.capacity || 0}} 人</view>
+        </view>
+        <view class="room-status">{{item.available ? '可预约' : '不可用'}}</view>
+      </view>
+      <view class="room-facilities">{{item.facilities || '设施待完善'}}</view>
+      <view class="room-rates">
+        <view>{{item.rateText}}</view>
+        <view>{{item.offRateText}}</view>
+        <view>{{item.holidayRateText}}</view>
+      </view>
+      <view wx:if="{{!item.available}}" class="room-reason">{{item.unavailableReason}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{!errorMessage}}" class="section card">
+    <view class="section-title compact">预约信息</view>
+    <input
+      class="input"
+      placeholder="部门名称，内部员工建议填写"
+      value="{{form.departmentName}}"
+      data-field="departmentName"
+      bindinput="onInput"
+    />
+    <input
+      class="input"
+      placeholder="联系电话"
+      value="{{form.contactPhone}}"
+      data-field="contactPhone"
+      bindinput="onInput"
+    />
+    <textarea
+      class="textarea"
+      placeholder="会议用途"
+      value="{{form.purpose}}"
+      data-field="purpose"
+      bindinput="onInput"
+    />
+    <button class="button-primary submit-button" loading="{{submitting}}" bindtap="submitBooking">
+      提交预约
+    </button>
+  </view>
+
+  <view wx:if="{{!errorMessage && bookings.length > 0}}" class="section">
+    <view class="section-title">我的预约</view>
+    <view wx:for="{{bookings}}" wx:key="id" class="booking-card">
+      <view class="booking-head">
+        <view class="booking-room">{{item.meetingRoomName}}</view>
+        <view class="booking-status">{{item.statusText}}</view>
+      </view>
+      <view class="booking-meta">{{item.timeText}}</view>
+      <view class="booking-meta">{{item.purpose || '未填写用途'}}</view>
+      <view class="booking-amount">预计金额 ¥ {{item.amountText}}</view>
+    </view>
+  </view>
 </view>
