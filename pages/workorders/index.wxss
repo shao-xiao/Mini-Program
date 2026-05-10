@@ -189,6 +189,68 @@
   margin-top: 16rpx;
 }
 
+.image-grid,
+.uploaded-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14rpx;
+  margin-top: 14rpx;
+}
+
+.image-item,
+.image-add,
+.uploaded-thumb {
+  width: 144rpx;
+  height: 144rpx;
+  border-radius: 8rpx;
+  overflow: hidden;
+}
+
+.image-item {
+  position: relative;
+}
+
+.image-thumb,
+.uploaded-thumb {
+  width: 144rpx;
+  height: 144rpx;
+  background: #f5f6f8;
+}
+
+.image-remove {
+  position: absolute;
+  top: 6rpx;
+  right: 6rpx;
+  width: 34rpx;
+  height: 34rpx;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+  text-align: center;
+  line-height: 34rpx;
+  font-size: 26rpx;
+}
+
+.image-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx dashed #c0c4cc;
+  color: #909399;
+  background: #f5f6f8;
+}
+
+.image-add-icon {
+  font-size: 44rpx;
+  line-height: 1;
+}
+
+.image-add-text {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+}
+
 .cancel-button {
   margin: 0;
   border-radius: 8rpx;

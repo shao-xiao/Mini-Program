@@ -1,4 +1,5 @@
 const api = require('../../utils/request')
+const { baseURL } = require('../../config/env')
 
 function toDateTimeText(value) {
   if (!value) return '-'
@@ -18,6 +19,12 @@ function initialForm() {
   }
 }
 
+function imageUrl(url) {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  return `${baseURL}${url}`
+}
+
 Page({
   data: {
     loading: false,
@@ -25,6 +32,7 @@ Page({
     errorMessage: '',
     identityText: '',
     form: initialForm(),
+    selectedImages: [],
     categories: [
       { label: '水路', value: 'WATER' },
       { label: '电路', value: 'ELECTRIC' },
@@ -55,7 +63,8 @@ Page({
         createdTimeText: toDateTimeText(item.createdTime),
         statusClass: this.toStatusClass(item.status),
         cancellable: item.status === 'CREATED',
-        timeline: this.buildTimeline(item)
+        timeline: this.buildTimeline(item),
+        imageUrls: (item.imageUrls || []).map(imageUrl)
       }))
       this.setData({
         identityText: this.toIdentityText(data.profile),
@@ -90,6 +99,39 @@ Page({
     })
   },
 
+  chooseImages() {
+    wx.chooseImage({
+      count: Math.max(0, 6 - this.data.selectedImages.length),
+      sizeType: ['compressed'],
+      sourceType: ['album', 'camera'],
+      success: (res) => {
+        this.setData({
+          selectedImages: this.data.selectedImages.concat(res.tempFilePaths).slice(0, 6)
+        })
+      }
+    })
+  },
+
+  removeSelectedImage(event) {
+    const index = event.currentTarget.dataset.index
+    const selectedImages = this.data.selectedImages.filter((_, itemIndex) => itemIndex !== index)
+    this.setData({ selectedImages })
+  },
+
+  previewSelectedImage(event) {
+    const current = event.currentTarget.dataset.url
+    wx.previewImage({
+      current,
+      urls: this.data.selectedImages
+    })
+  },
+
+  previewWorkOrderImage(event) {
+    const current = event.currentTarget.dataset.url
+    const urls = event.currentTarget.dataset.urls || []
+    wx.previewImage({ current, urls })
+  },
+
   async submitWorkOrder() {
     const form = this.data.form
     if (!form.title.trim()) {
@@ -108,12 +150,15 @@ Page({
     this.setData({ submitting: true })
     try {
       const created = await api.post('/mobile/workorders', form)
+      for (const imagePath of this.data.selectedImages) {
+        await api.upload(`/mobile/workorders/${created.id}/images`, imagePath)
+      }
       wx.showModal({
         title: '报修已提交',
         content: `工单号：${created.orderNumber}`,
         showCancel: false
       })
-      this.setData({ form: initialForm() })
+      this.setData({ form: initialForm(), selectedImages: [] })
       this.loadWorkOrders()
     } finally {
       this.setData({ submitting: false })

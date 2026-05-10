@@ -61,5 +61,43 @@ module.exports = {
   get: (url, data) => request({ url, data, method: 'GET' }),
   post: (url, data) => request({ url, data, method: 'POST' }),
   patch: (url, data) => request({ url, data, method: 'PATCH' }),
-  delete: (url, data) => request({ url, data, method: 'DELETE' })
+  delete: (url, data) => request({ url, data, method: 'DELETE' }),
+  upload: (url, filePath, name = 'file') => {
+    const token = wx.getStorageSync('token')
+    return new Promise((resolve, reject) => {
+      wx.uploadFile({
+        url: `${baseURL}${url}`,
+        filePath,
+        name,
+        header: token ? { Authorization: token } : {},
+        success(res) {
+          let data = res.data
+          if (typeof data === 'string') {
+            try {
+              data = JSON.parse(data)
+            } catch (error) {
+              reject(error)
+              return
+            }
+          }
+          if (data && data.code === 200) {
+            resolve(data.data)
+            return
+          }
+          wx.showToast({
+            title: data.message || '上传失败',
+            icon: 'none'
+          })
+          reject(data)
+        },
+        fail(error) {
+          wx.showToast({
+            title: '上传失败',
+            icon: 'none'
+          })
+          reject(error)
+        }
+      })
+    })
+  }
 }
