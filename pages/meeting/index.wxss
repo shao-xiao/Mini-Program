@@ -120,15 +120,30 @@
   width: 100%;
   box-sizing: border-box;
   margin-top: 18rpx;
-  padding: 18rpx;
+  padding: 0 18rpx;
   border-radius: 8rpx;
   background: #f5f6f8;
   color: #1f1b1b;
   font-size: 26rpx;
+  line-height: 1.4;
+}
+
+.input {
+  height: 72rpx;
+  line-height: 72rpx;
 }
 
 .textarea {
+  padding-top: 18rpx;
+  padding-bottom: 18rpx;
   min-height: 150rpx;
+  line-height: 38rpx;
+}
+
+.input-placeholder {
+  color: #a8abb2;
+  font-size: 26rpx;
+  line-height: 72rpx;
 }
 
 .submit-button,

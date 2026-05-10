@@ -63,6 +63,7 @@
     <view class="section-title compact">预约信息</view>
     <input
       class="input"
+      placeholder-class="input-placeholder"
       placeholder="部门名称，内部员工建议填写"
       value="{{form.departmentName}}"
       data-field="departmentName"
@@ -70,6 +71,7 @@
     />
     <input
       class="input"
+      placeholder-class="input-placeholder"
       placeholder="联系电话"
       value="{{form.contactPhone}}"
       data-field="contactPhone"
@@ -77,6 +79,7 @@
     />
     <textarea
       class="textarea"
+      placeholder-class="input-placeholder"
       placeholder="会议用途"
       value="{{form.purpose}}"
       data-field="purpose"
