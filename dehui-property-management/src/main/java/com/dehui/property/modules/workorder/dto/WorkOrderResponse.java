@@ -21,6 +21,11 @@ public class WorkOrderResponse {
     private String reporterName;
     private String reporterPhone;
     private Long handlerId;
+    private LocalDateTime submittedTime;
+    private LocalDateTime assignedTime;
+    private LocalDateTime processingTime;
+    private LocalDateTime completedTime;
+    private LocalDateTime closedTime;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
 }

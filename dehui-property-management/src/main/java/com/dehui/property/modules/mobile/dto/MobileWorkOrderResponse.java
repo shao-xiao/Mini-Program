@@ -21,6 +21,11 @@ public class MobileWorkOrderResponse {
     private String statusText;
     private String reporterName;
     private String reporterPhone;
+    private LocalDateTime submittedTime;
+    private LocalDateTime assignedTime;
+    private LocalDateTime processingTime;
+    private LocalDateTime completedTime;
+    private LocalDateTime closedTime;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
 }

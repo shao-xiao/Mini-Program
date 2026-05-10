@@ -6,6 +6,8 @@ import jakarta.persistence.Table;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.time.LocalDateTime;
+
 @Data
 @Entity
 @Table(name = "work_order")
@@ -48,4 +50,14 @@ public class WorkOrder extends BaseEntity {
     private String reporterPhone;
 
     private Long handlerId;
+
+    private LocalDateTime submittedTime;
+
+    private LocalDateTime assignedTime;
+
+    private LocalDateTime processingTime;
+
+    private LocalDateTime completedTime;
+
+    private LocalDateTime closedTime;
 }

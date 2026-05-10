@@ -10,24 +10,25 @@
 
       <el-table :data="list" border>
         <el-table-column prop="orderNumber" label="工单号" width="150"/>
-        <el-table-column prop="title" label="标题"/>
-        <el-table-column label="类型">
+        <el-table-column prop="title" label="标题" min-width="150"/>
+        <el-table-column prop="location" label="位置" min-width="120"/>
+        <el-table-column label="类型" width="100">
           <template #default="{row}">
             {{ orderTypeText(row.orderType) }}
           </template>
         </el-table-column>
-        <el-table-column label="问题类别">
+        <el-table-column label="问题类别" width="110">
           <template #default="{row}">
             {{ categoryText(row.category) }}
           </template>
         </el-table-column>
-        <el-table-column label="优先级">
+        <el-table-column label="优先级" width="90">
           <template #default="{row}">
             {{ priorityText(row.priority) }}
           </template>
         </el-table-column>
 
-        <el-table-column label="状态">
+        <el-table-column label="状态" width="90">
           <template #default="{row}">
             <el-tag v-if="row.status==='CREATED'">待派单</el-tag>
             <el-tag v-else-if="row.status==='ASSIGNED'" type="warning">已派单</el-tag>
@@ -37,12 +38,30 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="报修人">
+        <el-table-column label="报修人" min-width="130">
           <template #default="{row}">
-            {{ row.reporterId === currentUserId ? currentUsername : row.reporterId }}
+            <div>{{ reporterText(row) }}</div>
+            <div class="sub-text" v-if="row.reporterPhone">{{ row.reporterPhone }}</div>
           </template>
         </el-table-column>
-        <el-table-column prop="handlerId" label="处理人"/>
+        <el-table-column label="来源" width="100">
+          <template #default="{row}">
+            <el-tag v-if="row.mobileUserId" type="success">小程序</el-tag>
+            <el-tag v-else type="info">后台</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="tenantId" label="租户ID" width="90"/>
+        <el-table-column prop="handlerId" label="处理人" width="90"/>
+        <el-table-column label="提交时间" min-width="150">
+          <template #default="{row}">
+            {{ formatDateTime(row.submittedTime || row.createdTime) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="阶段时间" min-width="150">
+          <template #default="{row}">
+            {{ stageTime(row) }}
+          </template>
+        </el-table-column>
 
         <el-table-column label="操作" width="260">
           <template #default="{row}">
@@ -170,6 +189,7 @@ const categoryOptions = {
 const priorityOptions = [
   { label: '低', value: 'LOW' },
   { label: '中', value: 'MEDIUM' },
+  { label: '普通', value: 'NORMAL' },
   { label: '高', value: 'HIGH' },
   { label: '紧急', value: 'URGENT' }
 ]
@@ -188,10 +208,41 @@ const currentCategoryOptions = computed(() => categoryOptions[form.orderType] ||
 const optionText = (options, value) => options.find(item => item.value === value)?.label || value || '-'
 const orderTypeText = (value) => optionText(orderTypeOptions, value)
 const categoryText = (value) => {
-  const options = Object.values(categoryOptions).flat()
+  const mobileCategoryOptions = [
+    { label: '水路', value: 'WATER' },
+    { label: '电路', value: 'ELECTRIC' },
+    { label: '空调', value: 'AIR_CONDITIONER' },
+    { label: '门窗', value: 'DOOR_WINDOW' },
+    { label: '网络', value: 'NETWORK' },
+    { label: '保洁', value: 'CLEANING' },
+    { label: '其他', value: 'OTHER' }
+  ]
+  const options = Object.values(categoryOptions).flat().concat(mobileCategoryOptions)
   return optionText(options, value)
 }
 const priorityText = (value) => optionText(priorityOptions, value)
+
+const formatDateTime = (value)=>{
+  if (!value) return '-'
+  return String(value).replace('T', ' ').slice(0, 16)
+}
+
+const reporterText = (row)=>{
+  if (row.reporterName) return row.reporterName
+  if (row.reporterId === currentUserId) return currentUsername
+  return row.reporterId ? `用户ID ${row.reporterId}` : '-'
+}
+
+const stageTime = (row)=>{
+  const timeMap = {
+    CREATED: row.submittedTime || row.createdTime,
+    ASSIGNED: row.assignedTime,
+    PROCESSING: row.processingTime,
+    COMPLETED: row.completedTime,
+    CLOSED: row.closedTime
+  }
+  return formatDateTime(timeMap[row.status] || row.updatedTime)
+}
 
 const load = async ()=>{
   const data = await request.get('/workorders')
@@ -276,5 +327,11 @@ onMounted(load)
 
 .form-select{
   width:100%;
+}
+
+.sub-text{
+  margin-top:4px;
+  color:#909399;
+  font-size:12px;
 }
 </style>

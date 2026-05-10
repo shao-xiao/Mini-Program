@@ -61,6 +61,7 @@ public class WorkOrderService {
         workOrder.setPriority(request.getPriority());
         workOrder.setReporterId(request.getReporterId());
         workOrder.setStatus("CREATED");
+        workOrder.setSubmittedTime(LocalDateTime.now());
 
         WorkOrder saved = workOrderRepository.save(workOrder);
 
@@ -81,6 +82,7 @@ public class WorkOrderService {
                     }
                     wo.setHandlerId(request.getHandlerId());
                     wo.setStatus("ASSIGNED");
+                    wo.setAssignedTime(LocalDateTime.now());
 
                     WorkOrder saved = workOrderRepository.save(wo);
 
@@ -100,6 +102,7 @@ public class WorkOrderService {
                         return Result.<WorkOrderResponse>error("当前状态不允许开始处理");
                     }
                     wo.setStatus("PROCESSING");
+                    wo.setProcessingTime(LocalDateTime.now());
 
                     WorkOrder saved = workOrderRepository.save(wo);
 
@@ -118,6 +121,7 @@ public class WorkOrderService {
                         return Result.<WorkOrderResponse>error("当前状态不允许完成");
                     }
                     wo.setStatus("COMPLETED");
+                    wo.setCompletedTime(LocalDateTime.now());
 
                     WorkOrder saved = workOrderRepository.save(wo);
 
@@ -146,6 +150,7 @@ public class WorkOrderService {
                         return Result.<WorkOrderResponse>error("当前状态不允许关闭");
                     }
                     wo.setStatus("CLOSED");
+                    wo.setClosedTime(LocalDateTime.now());
 
                     WorkOrder saved = workOrderRepository.save(wo);
 
@@ -184,6 +189,11 @@ public class WorkOrderService {
         response.setReporterName(wo.getReporterName());
         response.setReporterPhone(wo.getReporterPhone());
         response.setHandlerId(wo.getHandlerId());
+        response.setSubmittedTime(wo.getSubmittedTime());
+        response.setAssignedTime(wo.getAssignedTime());
+        response.setProcessingTime(wo.getProcessingTime());
+        response.setCompletedTime(wo.getCompletedTime());
+        response.setClosedTime(wo.getClosedTime());
         response.setCreatedTime(wo.getCreatedTime());
         response.setUpdatedTime(wo.getUpdatedTime());
 

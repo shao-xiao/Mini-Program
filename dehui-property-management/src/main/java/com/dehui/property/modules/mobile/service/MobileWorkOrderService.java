@@ -57,6 +57,7 @@ public class MobileWorkOrderService {
         workOrder.setReporterPhone(request.getContactPhone() == null || request.getContactPhone().isBlank()
                 ? profile.getPhone()
                 : request.getContactPhone());
+        workOrder.setSubmittedTime(LocalDateTime.now());
 
         return Result.success(toResponse(workOrderRepository.save(workOrder)));
     }
@@ -96,6 +97,11 @@ public class MobileWorkOrderService {
         response.setStatusText(toStatusText(workOrder.getStatus()));
         response.setReporterName(workOrder.getReporterName());
         response.setReporterPhone(workOrder.getReporterPhone());
+        response.setSubmittedTime(workOrder.getSubmittedTime());
+        response.setAssignedTime(workOrder.getAssignedTime());
+        response.setProcessingTime(workOrder.getProcessingTime());
+        response.setCompletedTime(workOrder.getCompletedTime());
+        response.setClosedTime(workOrder.getClosedTime());
         response.setCreatedTime(workOrder.getCreatedTime());
         response.setUpdatedTime(workOrder.getUpdatedTime());
         return response;
