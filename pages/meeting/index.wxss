@@ -137,10 +137,26 @@
 }
 
 .booking-amount {
-  margin-top: 12rpx;
   color: #d93025;
   font-size: 26rpx;
   font-weight: 700;
+}
+
+.booking-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 18rpx;
+}
+
+.cancel-button {
+  margin: 0;
+  border-radius: 8rpx;
+  background: #ffffff;
+  color: #d93025;
+  border: 1rpx solid #d93025;
+  font-size: 24rpx;
 }
 
 .empty-title {

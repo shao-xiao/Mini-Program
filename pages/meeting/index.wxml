@@ -96,7 +96,18 @@
       </view>
       <view class="booking-meta">{{item.timeText}}</view>
       <view class="booking-meta">{{item.purpose || '未填写用途'}}</view>
-      <view class="booking-amount">预计金额 ¥ {{item.amountText}}</view>
+      <view class="booking-footer">
+        <view class="booking-amount">预计金额 ¥ {{item.amountText}}</view>
+        <button
+          wx:if="{{item.cancellable}}"
+          class="cancel-button"
+          size="mini"
+          data-id="{{item.id}}"
+          bindtap="cancelBooking"
+        >
+          取消预约
+        </button>
+      </view>
     </view>
   </view>
 </view>

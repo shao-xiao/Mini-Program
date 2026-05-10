@@ -77,7 +77,8 @@ Page({
         ...item,
         timeText: `${toDateTimeText(item.startTime)} 至 ${toDateTimeText(item.endTime)}`,
         amountText: formatMoney(item.calculatedAmount),
-        statusText: this.toStatusText(item.status)
+        statusText: this.toStatusText(item.status),
+        cancellable: item.status === 'BOOKED' || item.status === 'CONFIRMED'
       }))
       this.setData({
         profile: data.profile || {},
@@ -192,6 +193,27 @@ Page({
     } finally {
       this.setData({ submitting: false })
     }
+  },
+
+  cancelBooking(event) {
+    const id = event.currentTarget.dataset.id
+    const booking = this.data.bookings.find(item => item.id === id)
+    wx.showModal({
+      title: '取消预约',
+      content: booking ? `确定取消 ${booking.meetingRoomName} 的预约吗？` : '确定取消该预约吗？',
+      confirmText: '取消预约',
+      confirmColor: '#d93025',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await api.patch(`/mobile/meetings/bookings/${id}/cancel`)
+          wx.showToast({ title: '已取消', icon: 'success' })
+          this.loadMeetingHome()
+        } catch (error) {
+          // request.js already displays the backend message.
+        }
+      }
+    })
   },
 
   goProfile() {

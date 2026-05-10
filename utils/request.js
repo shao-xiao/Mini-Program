@@ -60,5 +60,6 @@ module.exports = {
   request,
   get: (url, data) => request({ url, data, method: 'GET' }),
   post: (url, data) => request({ url, data, method: 'POST' }),
-  patch: (url, data) => request({ url, data, method: 'PATCH' })
+  patch: (url, data) => request({ url, data, method: 'PATCH' }),
+  delete: (url, data) => request({ url, data, method: 'DELETE' })
 }
