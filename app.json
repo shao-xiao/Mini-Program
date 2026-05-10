@@ -3,6 +3,7 @@
     "pages/home/index",
     "pages/me/index",
     "pages/announcements/index",
+    "pages/announcements/detail",
     "pages/bills/index",
     "pages/meeting/index",
     "pages/workorders/index",
