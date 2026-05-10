@@ -9,6 +9,10 @@ import java.util.List;
 public interface MeetingBookingRepository extends JpaRepository<MeetingBooking, Long> {
     List<MeetingBooking> findByMeetingRoomIdOrderByStartTimeDesc(Long meetingRoomId);
 
+    List<MeetingBooking> findByTenantIdOrderByStartTimeDesc(Long tenantId);
+
+    List<MeetingBooking> findByInternalUserIdOrderByStartTimeDesc(Long internalUserId);
+
     boolean existsByMeetingRoomIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(
             Long meetingRoomId,
             List<String> statuses,

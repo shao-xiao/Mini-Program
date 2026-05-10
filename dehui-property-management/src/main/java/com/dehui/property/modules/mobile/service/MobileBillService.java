@@ -100,7 +100,7 @@ public class MobileBillService {
         if ("PARKING".equals(billType)) {
             return "停车费";
         }
-        if ("MEETING".equals(billType)) {
+        if ("MEETING".equals(billType) || "MEETING_ROOM".equals(billType)) {
             return "会议室";
         }
         return billType == null || billType.isBlank() ? "账单" : billType;
