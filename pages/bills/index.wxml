@@ -1,7 +1,76 @@
 <view class="page">
   <view class="section card">
     <view class="title">账单中心</view>
-    <view class="subtitle">租金、水电煤、停车、会议室等账单查询与支付入口。</view>
+    <view class="subtitle">{{tenantName || '租户'}}的租金、水电煤、停车、会议室等账单</view>
   </view>
-  <view class="card muted">移动端接口规划：GET /mobile/bills</view>
+
+  <view class="summary-grid section">
+    <view class="summary-card">
+      <view class="summary-label">待支付</view>
+      <view class="summary-value primary">¥ {{summary.unpaidAmount}}</view>
+      <view class="summary-desc">{{summary.unpaidCount}} 笔</view>
+    </view>
+    <view class="summary-card">
+      <view class="summary-label">已逾期</view>
+      <view class="summary-value warn">¥ {{summary.overdueAmount}}</view>
+      <view class="summary-desc">{{summary.overdueCount}} 笔</view>
+    </view>
+    <view class="summary-card">
+      <view class="summary-label">已支付</view>
+      <view class="summary-value">¥ {{summary.paidAmount}}</view>
+      <view class="summary-desc">{{summary.paidCount}} 笔</view>
+    </view>
+    <view class="summary-card">
+      <view class="summary-label">账单总额</view>
+      <view class="summary-value">¥ {{summary.totalAmount}}</view>
+      <view class="summary-desc">{{summary.totalCount}} 笔</view>
+    </view>
+  </view>
+
+  <view class="filter-row section">
+    <view
+      wx:for="{{filters}}"
+      wx:key="value"
+      class="filter-item {{activeStatus === item.value ? 'active' : ''}}"
+      data-value="{{item.value}}"
+      bindtap="changeStatus"
+    >
+      {{item.label}}
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="card muted">正在加载账单...</view>
+
+  <view wx:elif="{{bills.length === 0}}" class="card muted">
+    暂无账单数据
+  </view>
+
+  <view wx:else class="section">
+    <view wx:for="{{bills}}" wx:key="id" class="bill-card">
+      <view class="bill-head">
+        <view>
+          <view class="bill-title">{{item.billTypeText}}</view>
+          <view class="bill-number">{{item.billNumber}}</view>
+        </view>
+        <view class="bill-status {{item.statusClass}}">{{item.overdue ? '已逾期' : item.statusText}}</view>
+      </view>
+
+      <view class="bill-money">¥ {{item.unpaidAmountText}}</view>
+      <view class="bill-meta">账期：{{item.periodText}}</view>
+      <view class="bill-meta">到期日：{{item.dueDateText}}</view>
+
+      <view class="bill-footer">
+        <view class="bill-paid">已付 ¥ {{item.paidAmountText}}</view>
+        <button
+          wx:if="{{item.status !== 'PAID'}}"
+          class="pay-button"
+          size="mini"
+          data-id="{{item.id}}"
+          bindtap="handlePay"
+        >
+          去支付
+        </button>
+      </view>
+    </view>
+  </view>
 </view>
