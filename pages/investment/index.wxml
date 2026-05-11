@@ -1,7 +1,118 @@
 <view class="page">
-  <view class="section card">
-    <view class="title">招商中心</view>
-    <view class="subtitle">园区介绍、可租房源、招商政策和预约看房。</view>
+  <view class="section hero">
+    <view class="hero-title">{{overview.title || '德汇创新中心'}}</view>
+    <view class="hero-subtitle">{{overview.subtitle || '园区介绍、可租房源、招商政策和预约看房。'}}</view>
+    <view class="hero-address">{{overview.address || '德汇创新中心'}}</view>
   </view>
-  <view class="card muted">移动端接口规划：GET /mobile/investment/rooms，POST /mobile/investment/leads</view>
+
+  <view wx:if="{{loading}}" class="card muted">正在加载招商信息...</view>
+
+  <view wx:if="{{overview}}" class="section card">
+    <view class="section-title">园区亮点</view>
+    <view class="highlight-grid">
+      <view wx:for="{{overview.highlights}}" wx:key="*this" class="highlight-item">
+        {{item}}
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{overview}}" class="section card">
+    <view class="section-title">招商政策</view>
+    <view wx:for="{{overview.policies}}" wx:key="*this" class="policy-item">
+      {{item}}
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">可租房源</view>
+    <view wx:if="{{!loading && rooms.length === 0}}" class="card muted">暂无可租房源</view>
+    <view
+      wx:for="{{rooms}}"
+      wx:key="id"
+      class="room-card {{selectedRoom && selectedRoom.id === item.id ? 'active' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="selectRoom"
+    >
+      <view class="room-head">
+        <view>
+          <view class="room-title">{{item.roomNumber}}</view>
+          <view class="room-meta">{{item.buildingName}} · {{item.floorText}}</view>
+        </view>
+        <view class="room-status">{{item.statusText}}</view>
+      </view>
+      <view class="room-info">
+        <view>{{item.areaText}}</view>
+        <view>{{item.roomType || '办公'}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section card">
+    <view class="section-title">预约看房</view>
+    <view wx:if="{{selectedRoom}}" class="selected-room">
+      <view>已选择：{{selectedRoom.roomNumber}} · {{selectedRoom.area}}㎡</view>
+      <view class="clear-room" bindtap="clearSelectedRoom">取消选择</view>
+    </view>
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="联系人"
+      value="{{leadForm.name}}"
+      data-field="name"
+      bindinput="onLeadInput"
+    />
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="联系电话"
+      type="number"
+      value="{{leadForm.phone}}"
+      data-field="phone"
+      bindinput="onLeadInput"
+    />
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="公司名称"
+      value="{{leadForm.companyName}}"
+      data-field="companyName"
+      bindinput="onLeadInput"
+    />
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="意向面积，例如 100"
+      type="digit"
+      value="{{leadForm.desiredArea}}"
+      data-field="desiredArea"
+      bindinput="onLeadInput"
+    />
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="用途，例如 研发办公 / 企业总部"
+      value="{{leadForm.intendedUse}}"
+      data-field="intendedUse"
+      bindinput="onLeadInput"
+    />
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="期望看房时间，例如 本周五下午"
+      value="{{leadForm.preferredVisitTime}}"
+      data-field="preferredVisitTime"
+      bindinput="onLeadInput"
+    />
+    <textarea
+      class="textarea"
+      placeholder-class="input-placeholder"
+      placeholder="补充需求"
+      value="{{leadForm.remark}}"
+      data-field="remark"
+      bindinput="onLeadInput"
+    />
+    <button class="button-primary submit-button" loading="{{submitting}}" bindtap="submitLead">
+      提交预约
+    </button>
+  </view>
 </view>
