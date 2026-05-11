@@ -303,7 +303,7 @@ const completeForm = reactive({
 })
 
 const currentCategoryOptions = computed(() => categoryOptions[form.orderType] || [])
-const activeUsers = computed(() => users.value.filter(user => user.status === 'ACTIVE'))
+const activeUsers = computed(() => users.value)
 
 const optionText = (options, value) => options.find(item => item.value === value)?.label || value || '-'
 const orderTypeText = (value) => optionText(orderTypeOptions, value)
