@@ -22,6 +22,7 @@ public class ContractResponse {
     private Integer billingDay;
     private Integer dueDay;
     private String paymentTerms;
+    private String billingRule;
     private String status;
     private String remark;
     private LocalDateTime createdTime;

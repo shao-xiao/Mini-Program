@@ -85,6 +85,9 @@ public class ContractService {
         contract.setBillingDay(request.getBillingDay() != null ? request.getBillingDay() : 1);
         contract.setDueDay(request.getDueDay() != null ? request.getDueDay() : 10);
         contract.setPaymentTerms(request.getPaymentTerms());
+        contract.setBillingRule(request.getBillingRule() != null && !request.getBillingRule().isBlank()
+                ? request.getBillingRule()
+                : "租赁日期前7日出账；若遇节假日，则提前至工作日");
         contract.setStatus("DRAFT");
         contract.setRemark(request.getRemark());
         Contract saved = contractRepository.save(contract);
@@ -140,6 +143,7 @@ public class ContractService {
         response.setBillingDay(contract.getBillingDay());
         response.setDueDay(contract.getDueDay());
         response.setPaymentTerms(contract.getPaymentTerms());
+        response.setBillingRule(contract.getBillingRule());
         response.setStatus(contract.getStatus());
         response.setRemark(contract.getRemark());
         response.setCreatedTime(contract.getCreatedTime());

@@ -23,10 +23,14 @@
         <el-table-column prop="rentAmount" label="租金" />
         <el-table-column prop="propertyFeeAmount" label="物业费" />
         <el-table-column prop="depositAmount" label="押金" />
-        <el-table-column prop="paymentCycle" label="付款周期" />
-        <el-table-column label="收款规则" min-width="160">
+        <el-table-column label="付款方式" width="100">
           <template #default="{ row }">
-            {{ paymentRuleText(row) }}
+            {{ paymentMethodText(row.paymentCycle) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="出账日" min-width="220">
+          <template #default="{ row }">
+            {{ billingRuleText(row) }}
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态">
@@ -116,24 +120,23 @@
           <el-input-number v-model="form.depositAmount" style="width:100%" />
         </el-form-item>
 
-        <el-form-item label="付款周期">
+        <el-form-item label="付款方式">
           <el-select v-model="form.paymentCycle" style="width:100%">
+            <el-option label="全款" value="FULL" />
             <el-option label="月付" value="MONTHLY" />
             <el-option label="季付" value="QUARTERLY" />
+            <el-option label="半年付" value="SEMI_ANNUAL" />
             <el-option label="年付" value="YEARLY" />
           </el-select>
         </el-form-item>
 
-        <el-form-item label="每月出账日">
-          <el-input-number v-model="form.billingDay" :min="1" :max="28" style="width:100%" />
-        </el-form-item>
-
-        <el-form-item label="每月到期日">
-          <el-input-number v-model="form.dueDay" :min="1" :max="31" style="width:100%" />
-        </el-form-item>
-
-        <el-form-item label="收款规则">
-          <el-input v-model="form.paymentTerms" type="textarea" :rows="2" placeholder="例如：租金与物业费按月收取，每月1日出账，10日前付款" />
+        <el-form-item label="出账日">
+          <el-input
+            v-model="form.billingRule"
+            type="textarea"
+            :rows="2"
+            placeholder="例如：租赁日期前7日出账；若遇节假日，则提前至工作日"
+          />
         </el-form-item>
 
         <el-form-item label="备注">
@@ -175,9 +178,7 @@ const form = reactive({
   propertyFeeAmount: 0,
   depositAmount: 0,
   paymentCycle: 'MONTHLY',
-  billingDay: 1,
-  dueDay: 10,
-  paymentTerms: '',
+  billingRule: '租赁日期前7日出账；若遇节假日，则提前至工作日',
   remark: ''
 })
 
@@ -193,9 +194,7 @@ const resetForm = () => {
   form.propertyFeeAmount = 0
   form.depositAmount = 0
   form.paymentCycle = 'MONTHLY'
-  form.billingDay = 1
-  form.dueDay = 10
-  form.paymentTerms = ''
+  form.billingRule = '租赁日期前7日出账；若遇节假日，则提前至工作日'
   form.remark = ''
 }
 
@@ -235,16 +234,19 @@ function leaseLabel(lease) {
   return `${roomName(lease.roomId)}｜${lease.startDate || '-'} 至 ${lease.endDate || '长期'}`
 }
 
-function paymentRuleText(row) {
+function paymentMethodText(value) {
   const cycleMap = {
+    FULL: '全款',
     MONTHLY: '月付',
     QUARTERLY: '季付',
+    SEMI_ANNUAL: '半年付',
     YEARLY: '年付'
   }
-  const cycle = cycleMap[row.paymentCycle] || row.paymentCycle || '-'
-  const billing = row.billingDay ? `${row.billingDay}日出账` : '未设出账日'
-  const due = row.dueDay ? `${row.dueDay}日前付款` : '未设到期日'
-  return `${cycle}，${billing}，${due}`
+  return cycleMap[value] || value || '-'
+}
+
+function billingRuleText(row) {
+  return row.billingRule || row.paymentTerms || '租赁日期前7日出账；若遇节假日，则提前至工作日'
 }
 
 async function loadTenants() {

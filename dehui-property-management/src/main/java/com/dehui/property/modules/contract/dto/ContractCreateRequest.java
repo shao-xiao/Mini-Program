@@ -43,5 +43,7 @@ public class ContractCreateRequest {
 
     private String paymentTerms;
 
+    private String billingRule;
+
     private String remark;
 }
