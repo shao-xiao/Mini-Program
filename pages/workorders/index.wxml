@@ -72,6 +72,7 @@
       bindinput="onInput"
     />
     <view class="field-title">现场照片</view>
+    <view class="image-tip">{{imageTip}}，可点右上角删除误传照片</view>
     <view class="image-grid">
       <view
         wx:for="{{selectedImages}}"
@@ -89,9 +90,13 @@
           ×
         </view>
       </view>
-      <view wx:if="{{selectedImages.length < 6}}" class="image-add" bindtap="chooseImages">
+      <view wx:if="{{selectedImages.length < maxImageCount}}" class="image-add" bindtap="chooseImages">
         <view class="image-add-icon">+</view>
         <view class="image-add-text">添加照片</view>
+      </view>
+      <view wx:else class="image-limit">
+        <view class="image-limit-count">{{selectedImages.length}}/{{maxImageCount}}</view>
+        <view class="image-limit-text">已达上限</view>
       </view>
     </view>
     <button class="button-primary submit-button" loading="{{submitting}}" bindtap="submitWorkOrder">

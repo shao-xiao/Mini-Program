@@ -25,6 +25,22 @@ function imageUrl(url) {
   return `${baseURL}${url}`
 }
 
+const MAX_IMAGE_COUNT = 6
+
+function compressImage(filePath) {
+  if (!wx.compressImage) {
+    return Promise.resolve(filePath)
+  }
+  return new Promise((resolve) => {
+    wx.compressImage({
+      src: filePath,
+      quality: 75,
+      success: (res) => resolve(res.tempFilePath || filePath),
+      fail: () => resolve(filePath)
+    })
+  })
+}
+
 Page({
   data: {
     loading: false,
@@ -33,6 +49,8 @@ Page({
     identityText: '',
     form: initialForm(),
     selectedImages: [],
+    maxImageCount: MAX_IMAGE_COUNT,
+    imageTip: `最多上传${MAX_IMAGE_COUNT}张，系统会压缩后提交`,
     evaluationVisible: false,
     evaluationForm: {
       workOrderId: null,
@@ -110,14 +128,26 @@ Page({
   },
 
   chooseImages() {
+    const remaining = MAX_IMAGE_COUNT - this.data.selectedImages.length
+    if (remaining <= 0) {
+      wx.showToast({ title: `最多上传${MAX_IMAGE_COUNT}张照片`, icon: 'none' })
+      return
+    }
     wx.chooseImage({
-      count: Math.max(0, 6 - this.data.selectedImages.length),
+      count: remaining,
       sizeType: ['compressed'],
       sourceType: ['album', 'camera'],
-      success: (res) => {
+      success: async (res) => {
+        wx.showLoading({ title: '压缩图片中', mask: true })
+        const compressedImages = await Promise.all(res.tempFilePaths.map(compressImage))
+        wx.hideLoading()
+        const nextImages = this.data.selectedImages.concat(compressedImages).slice(0, MAX_IMAGE_COUNT)
         this.setData({
-          selectedImages: this.data.selectedImages.concat(res.tempFilePaths).slice(0, 6)
+          selectedImages: nextImages
         })
+        if (res.tempFilePaths.length > remaining) {
+          wx.showToast({ title: `最多保留${MAX_IMAGE_COUNT}张照片`, icon: 'none' })
+        }
       }
     })
   },
