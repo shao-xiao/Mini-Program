@@ -92,9 +92,9 @@ public class BillService {
             return Result.error("租户与合同不匹配");
         }
 
-        // 6. 防重复：同一合同 + 同一账期开始不允许重复
-        if (billRepository.existsByContractIdAndPeriodStart(request.getContractId(), request.getPeriodStart())) {
-            return Result.error("该合同在本账期内已有账单");
+        // 6. 防重复：同一合同 + 同一账期 + 同一类型不允许重复
+        if (billRepository.existsByContractIdAndBillTypeAndPeriodStart(request.getContractId(), request.getBillType(), request.getPeriodStart())) {
+            return Result.error("该合同在本账期内已有同类型账单");
         }
 
         // 7. 校验金额 > 0（@DecimalMin 已在前端校验，此处做兜底）
@@ -146,7 +146,14 @@ public class BillService {
         response.setId(bill.getId());
         response.setBillNumber(bill.getBillNumber());
         response.setTenantId(bill.getTenantId());
+        tenantRepository.findById(bill.getTenantId())
+                .ifPresent(tenant -> response.setTenantName(tenant.getTenantName()));
         response.setContractId(bill.getContractId());
+        contractRepository.findById(bill.getContractId())
+                .ifPresent(contract -> {
+                    response.setContractNumber(contract.getContractNumber());
+                    response.setContractName(contract.getContractName());
+                });
         response.setBillType(bill.getBillType());
         response.setPeriodStart(bill.getPeriodStart());
         response.setPeriodEnd(bill.getPeriodEnd());

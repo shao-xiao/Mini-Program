@@ -29,9 +29,17 @@ public class Contract extends BaseEntity {
     
     private BigDecimal rentAmount;
 
+    private BigDecimal propertyFeeAmount;
+
     private BigDecimal depositAmount;
 
     private String paymentCycle;
+
+    private Integer billingDay;
+
+    private Integer dueDay;
+
+    private String paymentTerms;
     
     private String status;
 

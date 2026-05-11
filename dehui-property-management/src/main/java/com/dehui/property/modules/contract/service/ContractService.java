@@ -79,8 +79,12 @@ public class ContractService {
         contract.setStartDate(request.getStartDate());
         contract.setEndDate(request.getEndDate());
         contract.setRentAmount(request.getRentAmount());
+        contract.setPropertyFeeAmount(request.getPropertyFeeAmount() != null ? request.getPropertyFeeAmount() : java.math.BigDecimal.ZERO);
         contract.setDepositAmount(request.getDepositAmount() != null ? request.getDepositAmount() : java.math.BigDecimal.ZERO);
         contract.setPaymentCycle(request.getPaymentCycle() != null ? request.getPaymentCycle() : "MONTHLY");
+        contract.setBillingDay(request.getBillingDay() != null ? request.getBillingDay() : 1);
+        contract.setDueDay(request.getDueDay() != null ? request.getDueDay() : 10);
+        contract.setPaymentTerms(request.getPaymentTerms());
         contract.setStatus("DRAFT");
         contract.setRemark(request.getRemark());
         Contract saved = contractRepository.save(contract);
@@ -130,8 +134,12 @@ public class ContractService {
         response.setStartDate(contract.getStartDate());
         response.setEndDate(contract.getEndDate());
         response.setRentAmount(contract.getRentAmount());
+        response.setPropertyFeeAmount(contract.getPropertyFeeAmount());
         response.setDepositAmount(contract.getDepositAmount());
         response.setPaymentCycle(contract.getPaymentCycle());
+        response.setBillingDay(contract.getBillingDay());
+        response.setDueDay(contract.getDueDay());
+        response.setPaymentTerms(contract.getPaymentTerms());
         response.setStatus(contract.getStatus());
         response.setRemark(contract.getRemark());
         response.setCreatedTime(contract.getCreatedTime());

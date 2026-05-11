@@ -31,9 +31,17 @@ public class ContractCreateRequest {
     @NotNull(message = "月租金额不能为空")
     private BigDecimal rentAmount;
 
+    private BigDecimal propertyFeeAmount;
+
     private BigDecimal depositAmount;
 
     private String paymentCycle;
+
+    private Integer billingDay;
+
+    private Integer dueDay;
+
+    private String paymentTerms;
 
     private String remark;
 }

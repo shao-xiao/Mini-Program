@@ -29,8 +29,16 @@
       >
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="billNumber" label="账单编号" min-width="170" />
-        <el-table-column prop="tenantId" label="租户ID" width="90" />
-        <el-table-column prop="contractId" label="合同ID" width="90" />
+        <el-table-column label="租户" min-width="150">
+          <template #default="{ row }">
+            {{ row.tenantName || tenantName(row.tenantId) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="合同" min-width="180">
+          <template #default="{ row }">
+            {{ row.contractNumber || contractLabelById(row.contractId) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="billType" label="类型" width="110" />
         <el-table-column prop="periodStart" label="账期开始" width="120" />
         <el-table-column prop="periodEnd" label="账期结束" width="120" />
@@ -108,26 +116,45 @@
           />
         </el-form-item>
 
-        <el-form-item label="租户ID" prop="tenantId">
-          <el-input-number
+        <el-form-item label="租户" prop="tenantId">
+          <el-select
             v-model="form.tenantId"
-            :min="1"
+            filterable
+            placeholder="请选择租户"
             style="width: 100%"
-          />
+            @change="handleTenantChange"
+          >
+            <el-option
+              v-for="tenant in activeTenants"
+              :key="tenant.id"
+              :label="tenantLabel(tenant)"
+              :value="tenant.id"
+            />
+          </el-select>
         </el-form-item>
 
-        <el-form-item label="合同ID" prop="contractId">
-          <el-input-number
+        <el-form-item label="合同" prop="contractId">
+          <el-select
             v-model="form.contractId"
-            :min="1"
+            filterable
+            placeholder="请选择已生效合同"
             style="width: 100%"
-          />
+            @change="handleContractChange"
+          >
+            <el-option
+              v-for="contract in selectableContracts"
+              :key="contract.id"
+              :label="contractOptionLabel(contract)"
+              :value="contract.id"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item label="账单类型" prop="billType">
           <el-select
             v-model="form.billType"
             style="width: 100%"
+            @change="handleBillTypeChange"
           >
             <el-option label="租金 RENT" value="RENT" />
             <el-option label="物业费 PROPERTY" value="PROPERTY" />
@@ -192,12 +219,14 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { computed, reactive, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 import { hasPermission } from '../../utils/permission'
 
 const bills = ref([])
+const tenants = ref([])
+const contracts = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const dialogVisible = ref(false)
@@ -228,7 +257,7 @@ const formRules = {
   tenantId: [
     {
       required: true,
-      message: '请输入租户ID',
+      message: '请选择租户',
       trigger: 'change'
     }
   ],
@@ -236,7 +265,7 @@ const formRules = {
   contractId: [
     {
       required: true,
-      message: '请输入合同ID',
+      message: '请选择合同',
       trigger: 'change'
     }
   ],
@@ -292,6 +321,14 @@ const formRules = {
   ]
 }
 
+const activeTenants = computed(() => tenants.value.filter(item => item.status !== 'INACTIVE'))
+
+const selectableContracts = computed(() => {
+  return contracts.value.filter(item => {
+    return item.status === 'ACTIVE' && (!form.tenantId || item.tenantId === form.tenantId)
+  })
+})
+
 function resetForm() {
   Object.assign(form, defaultForm())
   formRef.value?.clearValidate()
@@ -314,6 +351,58 @@ async function loadBills() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadTenants() {
+  const data = await request.get('/tenant/list')
+  tenants.value = Array.isArray(data) ? data : []
+}
+
+async function loadContracts() {
+  const data = await request.get('/contracts')
+  contracts.value = Array.isArray(data) ? data : []
+}
+
+function tenantLabel(tenant) {
+  return `${tenant.tenantName}（ID:${tenant.id}）`
+}
+
+function tenantName(tenantId) {
+  const tenant = tenants.value.find(item => item.id === tenantId)
+  return tenant ? tenant.tenantName : `租户ID:${tenantId || '-'}`
+}
+
+function contractOptionLabel(contract) {
+  const name = contract.contractName ? `｜${contract.contractName}` : ''
+  const rent = contract.rentAmount ? `｜租金${contract.rentAmount}` : ''
+  const propertyFee = contract.propertyFeeAmount ? `｜物业费${contract.propertyFeeAmount}` : ''
+  return `${contract.contractNumber}${name}${rent}${propertyFee}`
+}
+
+function contractLabelById(contractId) {
+  const contract = contracts.value.find(item => item.id === contractId)
+  return contract ? contract.contractNumber : `合同ID:${contractId || '-'}`
+}
+
+function handleTenantChange() {
+  form.contractId = null
+}
+
+function handleContractChange(contractId) {
+  const contract = contracts.value.find(item => item.id === contractId)
+  if (!contract) return
+
+  form.tenantId = contract.tenantId
+
+  if (form.billType === 'RENT' && contract.rentAmount) {
+    form.amount = Number(contract.rentAmount)
+  } else if (form.billType === 'PROPERTY' && contract.propertyFeeAmount) {
+    form.amount = Number(contract.propertyFeeAmount)
+  }
+}
+
+function handleBillTypeChange() {
+  handleContractChange(form.contractId)
 }
 
 function openCreateDialog() {
@@ -401,7 +490,13 @@ async function payBill(row) {
   }
 }
 
-onMounted(loadBills)
+onMounted(async () => {
+  await Promise.all([
+    loadBills(),
+    loadTenants(),
+    loadContracts()
+  ])
+})
 </script>
 
 <style scoped>

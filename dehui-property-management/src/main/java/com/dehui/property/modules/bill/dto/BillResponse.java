@@ -10,7 +10,10 @@ public class BillResponse {
     private Long id;
     private String billNumber;
     private Long tenantId;
+    private String tenantName;
     private Long contractId;
+    private String contractNumber;
+    private String contractName;
     private String billType;
     private LocalDate periodStart;
     private LocalDate periodEnd;

@@ -23,7 +23,7 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
     boolean existsByBillNumber(String billNumber);
 
-    boolean existsByContractIdAndPeriodStart(Long contractId, LocalDate periodStart);
+    boolean existsByContractIdAndBillTypeAndPeriodStart(Long contractId, String billType, LocalDate periodStart);
 
     @Query(value = "SELECT COUNT(*) FROM bill WHERE status = :status", nativeQuery = true)
     Long countByStatus(@Param("status") String status);

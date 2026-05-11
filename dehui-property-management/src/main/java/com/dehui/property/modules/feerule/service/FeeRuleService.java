@@ -99,7 +99,7 @@ public class FeeRuleService {
                 return Result.error("收费规则已超过有效期，无法生成账单");
             }
 
-            if (!billRepository.existsByContractIdAndPeriodStart(rule.getContractId(), cursor)) {
+            if (!billRepository.existsByContractIdAndBillTypeAndPeriodStart(rule.getContractId(), rule.getFeeType(), cursor)) {
                 LocalDate periodStart = cursor;
                 LocalDate periodEnd = cursor.plusMonths(stepMonths).minusDays(1);
 

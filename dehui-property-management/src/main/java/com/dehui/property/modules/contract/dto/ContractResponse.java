@@ -16,8 +16,12 @@ public class ContractResponse {
     private LocalDate startDate;
     private LocalDate endDate;
     private BigDecimal rentAmount;
+    private BigDecimal propertyFeeAmount;
     private BigDecimal depositAmount;
     private String paymentCycle;
+    private Integer billingDay;
+    private Integer dueDay;
+    private String paymentTerms;
     private String status;
     private String remark;
     private LocalDateTime createdTime;
