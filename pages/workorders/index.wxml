@@ -118,6 +118,23 @@
       <view class="workorder-meta">{{item.categoryText}} · {{item.priorityText}}</view>
       <view class="workorder-meta">位置：{{item.location}}</view>
       <view class="workorder-desc">{{item.description}}</view>
+      <view wx:if="{{item.handlingResult}}" class="result-box">
+        <view class="result-title">处理结果</view>
+        <view class="result-content">{{item.handlingResult}}</view>
+      </view>
+      <view wx:if="{{item.rating}}" class="evaluation-box">
+        <view class="result-title">我的评价</view>
+        <view class="star-row small">
+          <view
+            wx:for="{{item.ratingStars}}"
+            wx:key="value"
+            class="star {{item.active ? 'active' : ''}}"
+          >
+            ★
+          </view>
+        </view>
+        <view wx:if="{{item.evaluationContent}}" class="result-content">{{item.evaluationContent}}</view>
+      </view>
       <view wx:if="{{item.imageUrls.length}}" class="uploaded-images">
         <image
           wx:for="{{item.imageUrls}}"
@@ -155,6 +172,45 @@
         >
           撤回报修
         </button>
+      </view>
+      <view wx:if="{{item.evaluable}}" class="workorder-actions">
+        <button
+          class="evaluate-button"
+          size="mini"
+          data-id="{{item.id}}"
+          bindtap="openEvaluation"
+        >
+          评价服务
+        </button>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{evaluationVisible}}" class="modal-mask" catchtap="closeEvaluation">
+    <view class="modal-card" catchtap="noop">
+      <view class="modal-title">评价服务</view>
+      <view class="modal-subtitle">{{evaluationForm.title}}</view>
+      <view class="star-row">
+        <view
+          wx:for="{{ratingOptions}}"
+          wx:key="*this"
+          class="star {{item <= evaluationForm.rating ? 'active' : ''}}"
+          data-value="{{item}}"
+          bindtap="selectRating"
+        >
+          ★
+        </view>
+      </view>
+      <textarea
+        class="textarea evaluation-textarea"
+        placeholder-class="input-placeholder"
+        placeholder="可以写下维修服务体验或建议"
+        value="{{evaluationForm.content}}"
+        bindinput="onEvaluationInput"
+      />
+      <view class="modal-actions">
+        <button size="mini" bindtap="closeEvaluation">取消</button>
+        <button size="mini" class="button-primary modal-submit" bindtap="submitEvaluation">提交评价</button>
       </view>
     </view>
   </view>

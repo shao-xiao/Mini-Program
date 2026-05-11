@@ -33,6 +33,14 @@ Page({
     identityText: '',
     form: initialForm(),
     selectedImages: [],
+    evaluationVisible: false,
+    evaluationForm: {
+      workOrderId: null,
+      title: '',
+      rating: 5,
+      content: ''
+    },
+    ratingOptions: [1, 2, 3, 4, 5],
     categories: [
       { label: '水路', value: 'WATER' },
       { label: '电路', value: 'ELECTRIC' },
@@ -63,6 +71,8 @@ Page({
         createdTimeText: toDateTimeText(item.createdTime),
         statusClass: this.toStatusClass(item.status),
         cancellable: item.status === 'CREATED',
+        evaluable: (item.status === 'COMPLETED' || item.status === 'CLOSED') && !item.rating,
+        ratingStars: this.ratingStars(item.rating),
         timeline: this.buildTimeline(item),
         imageUrls: (item.imageUrls || []).map(imageUrl)
       }))
@@ -186,6 +196,54 @@ Page({
     })
   },
 
+  openEvaluation(event) {
+    const id = event.currentTarget.dataset.id
+    const workOrder = this.data.workOrders.find(item => item.id === id)
+    this.setData({
+      evaluationVisible: true,
+      evaluationForm: {
+        workOrderId: id,
+        title: workOrder ? workOrder.title : '',
+        rating: 5,
+        content: ''
+      }
+    })
+  },
+
+  closeEvaluation() {
+    this.setData({ evaluationVisible: false })
+  },
+
+  noop() {},
+
+  selectRating(event) {
+    this.setData({
+      'evaluationForm.rating': Number(event.currentTarget.dataset.value)
+    })
+  },
+
+  onEvaluationInput(event) {
+    this.setData({
+      'evaluationForm.content': event.detail.value
+    })
+  },
+
+  async submitEvaluation() {
+    const form = this.data.evaluationForm
+    if (!form.workOrderId) return
+    try {
+      await api.patch(`/mobile/workorders/${form.workOrderId}/evaluation`, {
+        rating: form.rating,
+        content: form.content
+      })
+      wx.showToast({ title: '评价成功', icon: 'success' })
+      this.setData({ evaluationVisible: false })
+      this.loadWorkOrders()
+    } catch (error) {
+      // request.js already shows the backend message.
+    }
+  },
+
   goProfile() {
     wx.navigateTo({
       url: '/pages/me/index'
@@ -226,6 +284,14 @@ Page({
     return steps.map(step => ({
       ...step,
       timeText: step.time ? toDateTimeText(step.time) : ''
+    }))
+  },
+
+  ratingStars(rating) {
+    const score = Number(rating || 0)
+    return [1, 2, 3, 4, 5].map(value => ({
+      value,
+      active: value <= score
     }))
   }
 })
