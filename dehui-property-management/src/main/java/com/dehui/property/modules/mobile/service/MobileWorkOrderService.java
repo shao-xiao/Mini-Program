@@ -29,6 +29,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MobileWorkOrderService {
 
+    private static final int MAX_WORK_ORDER_IMAGE_COUNT = 6;
+
     private final MobileAuthService mobileAuthService;
     private final WorkOrderRepository workOrderRepository;
 
@@ -117,6 +119,9 @@ public class MobileWorkOrderService {
         }
         if ("CANCELLED".equals(workOrder.getStatus()) || "CLOSED".equals(workOrder.getStatus())) {
             return Result.error("当前状态不能上传图片");
+        }
+        if (parseImageUrls(workOrder.getImageUrls()).size() >= MAX_WORK_ORDER_IMAGE_COUNT) {
+            return Result.error("每个报修最多上传" + MAX_WORK_ORDER_IMAGE_COUNT + "张图片");
         }
 
         String originalFilename = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
