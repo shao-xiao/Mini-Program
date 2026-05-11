@@ -4,6 +4,7 @@ import com.dehui.property.common.Result;
 import com.dehui.property.modules.system.entity.SysUser;
 import com.dehui.property.modules.system.service.SystemUserService;
 import com.dehui.property.modules.workorder.dto.WorkOrderAssignRequest;
+import com.dehui.property.modules.workorder.dto.WorkOrderCompleteRequest;
 import com.dehui.property.modules.workorder.dto.WorkOrderCreateRequest;
 import com.dehui.property.modules.workorder.dto.WorkOrderResponse;
 import com.dehui.property.modules.workorder.service.WorkOrderService;
@@ -59,8 +60,9 @@ public class WorkOrderController {
     }
 
     @PatchMapping("/{id}/complete")
-    public Result<WorkOrderResponse> complete(@PathVariable Long id) {
-        return workOrderService.complete(id);
+    public Result<WorkOrderResponse> complete(@PathVariable Long id,
+                                              @RequestBody(required = false) WorkOrderCompleteRequest request) {
+        return workOrderService.complete(id, request);
     }
 
     @PatchMapping("/{id}/close")

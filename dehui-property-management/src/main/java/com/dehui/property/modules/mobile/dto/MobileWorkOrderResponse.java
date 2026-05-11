@@ -23,6 +23,10 @@ public class MobileWorkOrderResponse {
     private String reporterName;
     private String reporterPhone;
     private List<String> imageUrls;
+    private String handlingResult;
+    private Integer rating;
+    private String evaluationContent;
+    private LocalDateTime evaluationTime;
     private LocalDateTime submittedTime;
     private LocalDateTime assignedTime;
     private LocalDateTime processingTime;

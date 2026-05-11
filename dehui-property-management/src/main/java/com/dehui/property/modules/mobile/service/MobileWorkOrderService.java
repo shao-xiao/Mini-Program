@@ -2,6 +2,7 @@ package com.dehui.property.modules.mobile.service;
 
 import com.dehui.property.common.Result;
 import com.dehui.property.modules.mobile.dto.MobileUserProfile;
+import com.dehui.property.modules.mobile.dto.MobileWorkOrderEvaluationRequest;
 import com.dehui.property.modules.mobile.dto.MobileWorkOrderHomeResponse;
 import com.dehui.property.modules.mobile.dto.MobileWorkOrderRequest;
 import com.dehui.property.modules.mobile.dto.MobileWorkOrderResponse;
@@ -138,6 +139,33 @@ public class MobileWorkOrderService {
         }
     }
 
+    @Transactional
+    public Result<MobileWorkOrderResponse> evaluate(String token, Long id, MobileWorkOrderEvaluationRequest request) {
+        MobileUserProfile profile = mobileAuthService.getProfile(token);
+        if (profile == null) {
+            return Result.error(401, "未登录或登录已过期");
+        }
+
+        WorkOrder workOrder = workOrderRepository.findById(id).orElse(null);
+        if (workOrder == null) {
+            return Result.error("报修工单不存在");
+        }
+        if (workOrder.getMobileUserId() == null || !workOrder.getMobileUserId().equals(profile.getId())) {
+            return Result.error(403, "不能评价他人的报修");
+        }
+        if (!"COMPLETED".equals(workOrder.getStatus()) && !"CLOSED".equals(workOrder.getStatus())) {
+            return Result.error("工单完成后才能评价");
+        }
+        if (workOrder.getRating() != null) {
+            return Result.error("该工单已评价");
+        }
+
+        workOrder.setRating(request.getRating());
+        workOrder.setEvaluationContent(request.getContent());
+        workOrder.setEvaluationTime(LocalDateTime.now());
+        return Result.success(toResponse(workOrderRepository.save(workOrder)));
+    }
+
     private String generateOrderNumber() {
         String prefix = "WO-M-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         return prefix + String.format("%04d", workOrderRepository.count() + 1);
@@ -174,6 +202,10 @@ public class MobileWorkOrderService {
         response.setReporterName(workOrder.getReporterName());
         response.setReporterPhone(workOrder.getReporterPhone());
         response.setImageUrls(parseImageUrls(workOrder.getImageUrls()));
+        response.setHandlingResult(workOrder.getHandlingResult());
+        response.setRating(workOrder.getRating());
+        response.setEvaluationContent(workOrder.getEvaluationContent());
+        response.setEvaluationTime(workOrder.getEvaluationTime());
         response.setSubmittedTime(workOrder.getSubmittedTime());
         response.setAssignedTime(workOrder.getAssignedTime());
         response.setProcessingTime(workOrder.getProcessingTime());

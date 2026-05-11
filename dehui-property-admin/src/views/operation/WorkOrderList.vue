@@ -80,6 +80,20 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
+        <el-table-column label="处理结果" min-width="160">
+          <template #default="{row}">
+            <span>{{ row.handlingResult || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="用户评价" min-width="160">
+          <template #default="{row}">
+            <div v-if="row.rating">
+              <el-rate :model-value="row.rating" disabled size="small"/>
+              <div class="sub-text" v-if="row.evaluationContent">{{ row.evaluationContent }}</div>
+            </div>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
 
         <el-table-column label="操作" width="260">
           <template #default="{row}">
@@ -183,6 +197,27 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="completeVisible" title="完成工单" width="520px">
+      <el-form :model="completeForm" label-width="92px">
+        <el-form-item label="工单">
+          <el-input :model-value="completeForm.orderTitle" disabled/>
+        </el-form-item>
+        <el-form-item label="处理结果">
+          <el-input
+            v-model="completeForm.handlingResult"
+            type="textarea"
+            :rows="4"
+            placeholder="请填写维修处理情况、处理结果或后续建议"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="completeVisible=false">取消</el-button>
+        <el-button type="primary" @click="confirmComplete">确认完成</el-button>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -195,6 +230,7 @@ const list = ref([])
 const users = ref([])
 const visible = ref(false)
 const assignVisible = ref(false)
+const completeVisible = ref(false)
 const currentUsername = localStorage.getItem('username') || '当前用户'
 const currentUserId = Number(localStorage.getItem('userId'))
 
@@ -255,6 +291,12 @@ const assignForm = reactive({
   orderId: null,
   orderTitle: '',
   handlerId: null
+})
+
+const completeForm = reactive({
+  orderId: null,
+  orderTitle: '',
+  handlingResult: ''
 })
 
 const currentCategoryOptions = computed(() => categoryOptions[form.orderType] || [])
@@ -391,9 +433,23 @@ const start = async(row)=>{
   load()
 }
 
-const complete = async(row)=>{
-  await request.patch(`/workorders/${row.id}/complete`)
+const complete = (row)=>{
+  completeForm.orderId = row.id
+  completeForm.orderTitle = `${row.orderNumber} ${row.title}`
+  completeForm.handlingResult = row.handlingResult || ''
+  completeVisible.value = true
+}
+
+const confirmComplete = async()=>{
+  if (!completeForm.handlingResult.trim()) {
+    ElMessage.warning('请填写处理结果')
+    return
+  }
+  await request.patch(`/workorders/${completeForm.orderId}/complete`, {
+    handlingResult: completeForm.handlingResult
+  })
   ElMessage.success('已完成')
+  completeVisible.value = false
   load()
 }
 

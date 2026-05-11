@@ -2,6 +2,7 @@ package com.dehui.property.modules.workorder.service;
 
 import com.dehui.property.common.Result;
 import com.dehui.property.modules.workorder.dto.WorkOrderAssignRequest;
+import com.dehui.property.modules.workorder.dto.WorkOrderCompleteRequest;
 import com.dehui.property.modules.workorder.dto.WorkOrderCreateRequest;
 import com.dehui.property.modules.workorder.dto.WorkOrderResponse;
 import com.dehui.property.modules.workorder.entity.WorkOrder;
@@ -116,7 +117,7 @@ public class WorkOrderService {
     }
 
     @Transactional
-    public Result<WorkOrderResponse> complete(Long id) {
+    public Result<WorkOrderResponse> complete(Long id, WorkOrderCompleteRequest request) {
         return workOrderRepository.findById(id)
                 .map(wo -> {
                     if (!"PROCESSING".equals(wo.getStatus())) {
@@ -124,6 +125,9 @@ public class WorkOrderService {
                     }
                     wo.setStatus("COMPLETED");
                     wo.setCompletedTime(LocalDateTime.now());
+                    if (request != null && request.getHandlingResult() != null) {
+                        wo.setHandlingResult(request.getHandlingResult());
+                    }
 
                     WorkOrder saved = workOrderRepository.save(wo);
 
@@ -191,6 +195,10 @@ public class WorkOrderService {
         response.setReporterName(wo.getReporterName());
         response.setReporterPhone(wo.getReporterPhone());
         response.setImageUrls(parseImageUrls(wo.getImageUrls()));
+        response.setHandlingResult(wo.getHandlingResult());
+        response.setRating(wo.getRating());
+        response.setEvaluationContent(wo.getEvaluationContent());
+        response.setEvaluationTime(wo.getEvaluationTime());
         response.setHandlerId(wo.getHandlerId());
         response.setSubmittedTime(wo.getSubmittedTime());
         response.setAssignedTime(wo.getAssignedTime());

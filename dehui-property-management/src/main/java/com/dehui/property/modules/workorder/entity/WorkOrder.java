@@ -53,6 +53,16 @@ public class WorkOrder extends BaseEntity {
     @Column(length = 2000)
     private String imageUrls;
 
+    @Column(length = 1000)
+    private String handlingResult;
+
+    private Integer rating;
+
+    @Column(length = 1000)
+    private String evaluationContent;
+
+    private LocalDateTime evaluationTime;
+
     private Long handlerId;
 
     private LocalDateTime submittedTime;

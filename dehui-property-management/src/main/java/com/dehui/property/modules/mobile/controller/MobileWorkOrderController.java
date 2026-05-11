@@ -2,6 +2,7 @@ package com.dehui.property.modules.mobile.controller;
 
 import com.dehui.property.common.Result;
 import com.dehui.property.modules.mobile.dto.MobileWorkOrderHomeResponse;
+import com.dehui.property.modules.mobile.dto.MobileWorkOrderEvaluationRequest;
 import com.dehui.property.modules.mobile.dto.MobileWorkOrderRequest;
 import com.dehui.property.modules.mobile.dto.MobileWorkOrderResponse;
 import com.dehui.property.modules.mobile.service.MobileWorkOrderService;
@@ -42,6 +43,14 @@ public class MobileWorkOrderController {
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file) {
         return mobileWorkOrderService.uploadImage(normalizeToken(token), id, file);
+    }
+
+    @PatchMapping("/{id}/evaluation")
+    public Result<MobileWorkOrderResponse> evaluate(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Long id,
+            @Valid @RequestBody MobileWorkOrderEvaluationRequest request) {
+        return mobileWorkOrderService.evaluate(normalizeToken(token), id, request);
     }
 
     private String normalizeToken(String token) {
