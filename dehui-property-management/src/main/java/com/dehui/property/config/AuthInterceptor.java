@@ -37,6 +37,7 @@ public class AuthInterceptor implements HandlerInterceptor {
                 || uri.startsWith("/api/mobile/auth/dev-login")
                 || ("GET".equalsIgnoreCase(method) && uri.startsWith("/api/uploads/"))
                 || ("GET".equalsIgnoreCase(method) && uri.startsWith("/api/mobile/announcements"))
+                || uri.startsWith("/api/mobile/investment")
                 || uri.startsWith("/api/error")) {
             return true;
         }
@@ -193,6 +194,14 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (uri.startsWith("/api/workorders")) {
             if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "STAFF", "SECURITY", "CLEANER"))) {
                 writeForbidden(response, "无权限访问工单接口");
+                return false;
+            }
+        }
+
+        // ===== 招商线索：ADMIN / MANAGER / STAFF =====
+        if (uri.startsWith("/api/investment")) {
+            if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "STAFF"))) {
+                writeForbidden(response, "无权限访问招商接口");
                 return false;
             }
         }

@@ -60,6 +60,12 @@ const routes = [
         meta: { title: '租约管理' }
       },
       {
+        path: '/investment/leads',
+        name: 'InvestmentLeadList',
+        component: () => import('../views/investment/InvestmentLeadList.vue'),
+        meta: { title: '招商线索' }
+      },
+      {
         path: '/contracts',
         name: 'ContractList',
         component: () => import('../views/tenant/ContractList.vue'),

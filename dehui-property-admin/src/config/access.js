@@ -22,6 +22,7 @@ export const menuSections = [
     children: [
       { title: '租户管理', path: '/tenants' },
       { title: '租户入驻', path: '/leases' },
+      { title: '招商线索', path: '/investment/leads' },
       { title: '合同台账', path: '/contracts' }
     ]
   },
