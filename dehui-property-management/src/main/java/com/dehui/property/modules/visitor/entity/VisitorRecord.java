@@ -22,6 +22,8 @@ public class VisitorRecord extends BaseEntity {
 
     private Long tenantId; // 可选
 
+    private Long mobileUserId; // 小程序提交人
+
     private String visitedPerson;
 
     private String visitReason;
@@ -31,6 +33,8 @@ public class VisitorRecord extends BaseEntity {
     private LocalDateTime leaveTime;
 
     private String status; // REGISTERED / ENTERED / LEFT / CANCELLED
+
+    private String source; // ADMIN / MINIPROGRAM
 
     private String remark;
 }

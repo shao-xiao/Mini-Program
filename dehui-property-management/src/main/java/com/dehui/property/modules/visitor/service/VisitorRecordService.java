@@ -23,6 +23,10 @@ public class VisitorRecordService {
             record.setStatus("REGISTERED");
         }
 
+        if (record.getSource() == null || record.getSource().isBlank()) {
+            record.setSource("ADMIN");
+        }
+
         return visitorRecordRepository.save(record);
     }
 

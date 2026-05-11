@@ -12,7 +12,17 @@
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="visitorName" label="访客姓名" width="120" />
         <el-table-column prop="visitorPhone" label="手机号" width="130" />
-        <el-table-column prop="tenantId" label="租户ID" width="90" />
+        <el-table-column label="租户" width="130">
+          <template #default="{ row }">
+            {{ tenantName(row.tenantId) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="来源" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="row.source === 'MINIPROGRAM'" type="success">小程序</el-tag>
+            <el-tag v-else type="info">后台</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="visitedPerson" label="被访人" width="120" />
         <el-table-column prop="visitReason" label="来访事由" min-width="150" />
         <el-table-column prop="visitTime" label="来访时间" width="180" />
@@ -117,6 +127,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 
 const list = ref([])
+const tenants = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const visible = ref(false)
@@ -158,6 +169,17 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadTenants() {
+  const data = await request.get('/tenant/list')
+  tenants.value = Array.isArray(data) ? data : []
+}
+
+function tenantName(tenantId) {
+  if (!tenantId) return '-'
+  const tenant = tenants.value.find(item => item.id === tenantId)
+  return tenant ? tenant.tenantName : `租户ID:${tenantId}`
 }
 
 function openDialog() {
@@ -219,7 +241,9 @@ async function cancel(row) {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await Promise.all([load(), loadTenants()])
+})
 </script>
 
 <style scoped>
