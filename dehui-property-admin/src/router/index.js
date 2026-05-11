@@ -66,6 +66,12 @@ const routes = [
         meta: { title: '招商线索' }
       },
       {
+        path: '/investment/contents',
+        name: 'InvestmentContentList',
+        component: () => import('../views/investment/InvestmentContentList.vue'),
+        meta: { title: '招商内容' }
+      },
+      {
         path: '/contracts',
         name: 'ContractList',
         component: () => import('../views/tenant/ContractList.vue'),

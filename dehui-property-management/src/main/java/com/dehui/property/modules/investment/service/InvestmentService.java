@@ -10,6 +10,8 @@ import com.dehui.property.modules.investment.dto.InvestmentLeadResponse;
 import com.dehui.property.modules.investment.dto.InvestmentOverviewResponse;
 import com.dehui.property.modules.investment.dto.InvestmentRoomResponse;
 import com.dehui.property.modules.investment.entity.InvestmentLead;
+import com.dehui.property.modules.investment.entity.InvestmentContent;
+import com.dehui.property.modules.investment.repository.InvestmentContentRepository;
 import com.dehui.property.modules.investment.repository.InvestmentLeadRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,23 +19,70 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
 public class InvestmentService {
 
     private final RoomRepository roomRepository;
+    private final InvestmentContentRepository investmentContentRepository;
     private final InvestmentLeadRepository investmentLeadRepository;
 
     public InvestmentOverviewResponse overview() {
+        List<InvestmentContent> contents = investmentContentRepository.findByStatusOrderBySortOrderAscPublishTimeDesc("PUBLISHED");
+        if (!contents.isEmpty()) {
+            String title = firstContent(contents, "OVERVIEW", "德汇创新中心");
+            String subtitle = firstContent(contents, "INTRO", "面向科技创新、研发办公、企业总部和成长型团队的综合办公空间。");
+            String address = firstContent(contents, "ADDRESS", "德汇创新中心");
+            String contactPhone = firstContent(contents, "CONTACT", "400-000-0000");
+            List<String> highlights = contentList(contents, "HIGHLIGHT");
+            List<String> policies = contentList(contents, "POLICY");
+            return new InvestmentOverviewResponse(
+                    title,
+                    subtitle,
+                    address,
+                    contactPhone,
+                    highlights.isEmpty() ? defaultHighlights() : highlights,
+                    policies.isEmpty() ? defaultPolicies() : policies
+            );
+        }
+
         return new InvestmentOverviewResponse(
                 "德汇创新中心",
                 "面向科技创新、研发办公、企业总部和成长型团队的综合办公空间。",
                 "德汇创新中心",
                 "400-000-0000",
-                List.of("多面积段可选", "成熟物业服务", "会议室与停车配套", "适合研发办公与企业总部"),
-                List.of("可预约看房", "租赁方案一企一议", "重点企业可洽谈优惠政策")
+                defaultHighlights(),
+                defaultPolicies()
         );
+    }
+
+    public InvestmentContent createContent(InvestmentContent content) {
+        if (content.getStatus() == null || content.getStatus().isBlank()) {
+            content.setStatus("DRAFT");
+        }
+        if (content.getSortOrder() == null) {
+            content.setSortOrder(100);
+        }
+        return investmentContentRepository.save(content);
+    }
+
+    public List<InvestmentContent> listContents() {
+        return investmentContentRepository.findAll()
+                .stream()
+                .sorted(Comparator
+                        .comparing(InvestmentContent::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(InvestmentContent::getCreatedTime, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    public InvestmentContent publishContent(Long id) {
+        InvestmentContent content = investmentContentRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("招商内容不存在"));
+        content.setStatus("PUBLISHED");
+        content.setPublishTime(LocalDateTime.now());
+        return investmentContentRepository.save(content);
     }
 
     @Transactional(readOnly = true)
@@ -119,5 +168,30 @@ public class InvestmentService {
                 lead.getCreatedTime(),
                 lead.getUpdatedTime()
         );
+    }
+
+    private String firstContent(List<InvestmentContent> contents, String type, String fallback) {
+        return contents.stream()
+                .filter(item -> type.equals(item.getContentType()))
+                .map(InvestmentContent::getContent)
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse(fallback);
+    }
+
+    private List<String> contentList(List<InvestmentContent> contents, String type) {
+        return contents.stream()
+                .filter(item -> type.equals(item.getContentType()))
+                .map(item -> item.getTitle() != null && !item.getTitle().isBlank() ? item.getTitle() : item.getContent())
+                .filter(value -> value != null && !value.isBlank())
+                .toList();
+    }
+
+    private List<String> defaultHighlights() {
+        return List.of("多面积段可选", "成熟物业服务", "会议室与停车配套", "适合研发办公与企业总部");
+    }
+
+    private List<String> defaultPolicies() {
+        return List.of("可预约看房", "租赁方案一企一议", "重点企业可洽谈优惠政策");
     }
 }
