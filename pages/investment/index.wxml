@@ -1,7 +1,7 @@
 <view class="page">
   <view class="section hero">
     <view class="hero-title">{{overview.title || '德汇创新中心'}}</view>
-    <view class="hero-subtitle">{{overview.subtitle || '园区介绍、可租房源、招商政策和预约看房。'}}</view>
+    <view class="hero-subtitle">{{overview.subtitle || '园区介绍、招商政策和预约看房。'}}</view>
     <view class="hero-address">{{overview.address || '德汇创新中心'}}</view>
   </view>
 
@@ -23,36 +23,9 @@
     </view>
   </view>
 
-  <view class="section">
-    <view class="section-title">可租房源</view>
-    <view wx:if="{{!loading && rooms.length === 0}}" class="card muted">暂无可租房源</view>
-    <view
-      wx:for="{{rooms}}"
-      wx:key="id"
-      class="room-card {{selectedRoom && selectedRoom.id === item.id ? 'active' : ''}}"
-      data-id="{{item.id}}"
-      bindtap="selectRoom"
-    >
-      <view class="room-head">
-        <view>
-          <view class="room-title">{{item.roomNumber}}</view>
-          <view class="room-meta">{{item.buildingName}} · {{item.floorText}}</view>
-        </view>
-        <view class="room-status">{{item.statusText}}</view>
-      </view>
-      <view class="room-info">
-        <view>{{item.areaText}}</view>
-        <view>{{item.roomType || '办公'}}</view>
-      </view>
-    </view>
-  </view>
-
   <view class="section card">
     <view class="section-title">预约看房</view>
-    <view wx:if="{{selectedRoom}}" class="selected-room">
-      <view>已选择：{{selectedRoom.roomNumber}} · {{selectedRoom.area}}㎡</view>
-      <view class="clear-room" bindtap="clearSelectedRoom">取消选择</view>
-    </view>
+    <view class="form-tip">请留下意向面积和使用需求，招商顾问会根据实际房源情况与您联系。</view>
     <input
       class="input"
       placeholder-class="input-placeholder"
@@ -81,7 +54,7 @@
     <input
       class="input"
       placeholder-class="input-placeholder"
-      placeholder="意向面积，例如 100"
+      placeholder="意向面积，例如 100㎡"
       type="digit"
       value="{{leadForm.desiredArea}}"
       data-field="desiredArea"
@@ -106,7 +79,7 @@
     <textarea
       class="textarea"
       placeholder-class="input-placeholder"
-      placeholder="补充需求"
+      placeholder="补充需求，例如楼层偏好、入驻时间、预算范围"
       value="{{leadForm.remark}}"
       data-field="remark"
       bindinput="onLeadInput"

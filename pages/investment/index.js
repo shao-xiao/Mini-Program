@@ -8,7 +8,6 @@ function initialLeadForm() {
     desiredArea: '',
     intendedUse: '',
     preferredVisitTime: '',
-    roomId: null,
     remark: ''
   }
 }
@@ -18,8 +17,6 @@ Page({
     loading: false,
     submitting: false,
     overview: null,
-    rooms: [],
-    selectedRoom: null,
     leadForm: initialLeadForm()
   },
 
@@ -30,39 +27,11 @@ Page({
   async loadInvestment() {
     this.setData({ loading: true })
     try {
-      const [overview, rooms] = await Promise.all([
-        api.get('/mobile/investment/overview'),
-        api.get('/mobile/investment/rooms')
-      ])
-      this.setData({
-        overview,
-        rooms: (rooms || []).map(item => ({
-          ...item,
-          floorText: item.floorName || (item.floorNumber ? `${item.floorNumber}层` : ''),
-          areaText: item.area ? `${item.area}㎡` : '-'
-        }))
-      })
+      const overview = await api.get('/mobile/investment/overview')
+      this.setData({ overview })
     } finally {
       this.setData({ loading: false })
     }
-  },
-
-  selectRoom(event) {
-    const id = Number(event.currentTarget.dataset.id)
-    const selectedRoom = this.data.rooms.find(item => item.id === id) || null
-    this.setData({
-      selectedRoom,
-      'leadForm.roomId': selectedRoom ? selectedRoom.id : null,
-      'leadForm.desiredArea': selectedRoom && selectedRoom.area ? String(selectedRoom.area) : this.data.leadForm.desiredArea,
-      'leadForm.remark': selectedRoom ? `意向房源：${selectedRoom.roomNumber}` : this.data.leadForm.remark
-    })
-  },
-
-  clearSelectedRoom() {
-    this.setData({
-      selectedRoom: null,
-      'leadForm.roomId': null
-    })
   },
 
   onLeadInput(event) {
@@ -95,7 +64,6 @@ Page({
         showCancel: false
       })
       this.setData({
-        selectedRoom: null,
         leadForm: initialLeadForm()
       })
     } finally {
