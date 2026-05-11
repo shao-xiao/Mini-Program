@@ -25,8 +25,16 @@
         </el-table-column>
         <el-table-column prop="visitedPerson" label="被访人" width="120" />
         <el-table-column prop="visitReason" label="来访事由" min-width="150" />
-        <el-table-column prop="visitTime" label="来访时间" width="180" />
-        <el-table-column prop="leaveTime" label="离开时间" width="180" />
+        <el-table-column label="来访时间" width="160">
+          <template #default="{ row }">
+            {{ formatDateTimeMinute(row.visitTime) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="离开时间" width="160">
+          <template #default="{ row }">
+            {{ formatDateTimeMinute(row.leaveTime) }}
+          </template>
+        </el-table-column>
 
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
@@ -103,6 +111,7 @@
           <el-date-picker
             v-model="form.visitTime"
             type="datetime"
+            format="YYYY-MM-DD HH:mm"
             value-format="YYYY-MM-DDTHH:mm:ss"
             style="width: 100%"
           />
@@ -180,6 +189,11 @@ function tenantName(tenantId) {
   if (!tenantId) return '-'
   const tenant = tenants.value.find(item => item.id === tenantId)
   return tenant ? tenant.tenantName : `租户ID:${tenantId}`
+}
+
+function formatDateTimeMinute(value) {
+  if (!value) return '-'
+  return String(value).replace('T', ' ').slice(0, 16)
 }
 
 function openDialog() {
