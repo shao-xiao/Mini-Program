@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -31,6 +32,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class WorkOrderService {
+
+    private static final int URGENT_RESPONSE_SLA_MINUTES = 30;
 
     private final WorkOrderRepository workOrderRepository;
     private final EquipmentRepository equipmentRepository;
@@ -234,6 +237,8 @@ public class WorkOrderService {
         response.setCategory(wo.getCategory());
         response.setPriority(wo.getPriority());
         response.setStatus(wo.getStatus());
+        response.setSlaOverdue(isUrgentResponseOverdue(wo));
+        response.setSlaLabel(resolveSlaLabel(wo));
         response.setReporterId(wo.getReporterId());
         response.setMobileUserId(wo.getMobileUserId());
         response.setTenantId(wo.getTenantId());
@@ -265,6 +270,25 @@ public class WorkOrderService {
                 .map(String::trim)
                 .filter(url -> !url.isBlank())
                 .toList();
+    }
+
+    private boolean isUrgentResponseOverdue(WorkOrder wo) {
+        if (!"URGENT".equals(wo.getPriority()) || !"CREATED".equals(wo.getStatus())) {
+            return false;
+        }
+        LocalDateTime submittedTime = wo.getSubmittedTime() != null ? wo.getSubmittedTime() : wo.getCreatedTime();
+        return submittedTime != null
+                && Duration.between(submittedTime, LocalDateTime.now()).toMinutes() >= URGENT_RESPONSE_SLA_MINUTES;
+    }
+
+    private String resolveSlaLabel(WorkOrder wo) {
+        if (isUrgentResponseOverdue(wo)) {
+            return "紧急工单超30分钟未响应";
+        }
+        if ("URGENT".equals(wo.getPriority()) && "CREATED".equals(wo.getStatus())) {
+            return "紧急工单需30分钟内派单";
+        }
+        return null;
     }
 
     private boolean isAssignableWorker(AssignableUserResponse user) {

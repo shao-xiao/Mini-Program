@@ -8,7 +8,7 @@
         </div>
       </template>
 
-      <el-table :data="list" border>
+      <el-table :data="list" border :row-class-name="workOrderRowClassName">
         <el-table-column prop="orderNumber" label="工单号" width="150"/>
         <el-table-column prop="title" label="标题" min-width="150"/>
         <el-table-column prop="location" label="位置" min-width="120"/>
@@ -24,7 +24,8 @@
         </el-table-column>
         <el-table-column label="优先级" width="90">
           <template #default="{row}">
-            {{ priorityText(row.priority) }}
+            <div>{{ priorityText(row.priority) }}</div>
+            <el-tag v-if="row.slaOverdue" class="sla-tag" type="danger" size="small">超时</el-tag>
           </template>
         </el-table-column>
 
@@ -64,7 +65,10 @@
         </el-table-column>
         <el-table-column label="阶段时间" min-width="150">
           <template #default="{row}">
-            {{ stageTime(row) }}
+            <div>{{ stageTime(row) }}</div>
+            <div v-if="row.slaLabel" :class="row.slaOverdue ? 'sla-overdue-text' : 'sub-text'">
+              {{ row.slaLabel }}
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="现场图片" min-width="120">
@@ -362,6 +366,8 @@ const imageSrc = (url)=>{
   return `/api${url}`
 }
 
+const workOrderRowClassName = ({row}) => row.slaOverdue ? 'sla-overdue-row' : ''
+
 const load = async ()=>{
   const data = await request.get('/workorders')
   list.value = data || []
@@ -485,6 +491,25 @@ onMounted(()=>{
   margin-top:4px;
   color:#909399;
   font-size:12px;
+}
+
+.sla-tag{
+  margin-top:4px;
+}
+
+.sla-overdue-text{
+  margin-top:4px;
+  color:#d93025;
+  font-size:12px;
+  font-weight:600;
+}
+
+:deep(.sla-overdue-row){
+  background:#fff1f0;
+}
+
+:deep(.sla-overdue-row:hover > td.el-table__cell){
+  background:#ffe7e6 !important;
 }
 
 .workorder-thumb{

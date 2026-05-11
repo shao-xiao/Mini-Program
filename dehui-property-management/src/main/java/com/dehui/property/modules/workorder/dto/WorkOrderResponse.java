@@ -16,6 +16,8 @@ public class WorkOrderResponse {
     private String category;
     private String priority;
     private String status;
+    private Boolean slaOverdue;
+    private String slaLabel;
     private Long reporterId;
     private Long mobileUserId;
     private Long tenantId;
