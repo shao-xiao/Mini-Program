@@ -7,6 +7,7 @@
     "pages/bills/index",
     "pages/meeting/index",
     "pages/workorders/index",
+    "pages/visitors/index",
     "pages/investment/index",
     "pages/checkin/index"
   ],

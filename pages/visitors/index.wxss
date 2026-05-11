@@ -1,0 +1,136 @@
+.section-title {
+  margin: 4rpx 0 16rpx;
+  color: #1f1b1b;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 18rpx;
+  padding: 0 18rpx;
+  border-radius: 8rpx;
+  background: #f5f6f8;
+  color: #1f1b1b;
+  font-size: 26rpx;
+}
+
+.input {
+  height: 72rpx;
+  line-height: 72rpx;
+}
+
+.textarea {
+  min-height: 150rpx;
+  padding-top: 18rpx;
+  padding-bottom: 18rpx;
+  line-height: 38rpx;
+}
+
+.input-placeholder {
+  color: #a8abb2;
+  font-size: 26rpx;
+}
+
+.submit-button,
+.bind-button {
+  margin-top: 24rpx;
+}
+
+.visitor-card {
+  margin-bottom: 20rpx;
+  padding: 28rpx;
+  border-radius: 12rpx;
+  background: #ffffff;
+  box-shadow: 0 8rpx 24rpx rgba(31, 27, 27, 0.06);
+}
+
+.visitor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.visitor-title {
+  color: #1f1b1b;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.visitor-phone,
+.visitor-meta {
+  margin-top: 8rpx;
+  color: #73767a;
+  font-size: 24rpx;
+}
+
+.visitor-desc {
+  margin-top: 14rpx;
+  color: #303133;
+  font-size: 26rpx;
+  line-height: 1.6;
+}
+
+.visitor-remark {
+  margin-top: 14rpx;
+  padding: 16rpx;
+  border-radius: 8rpx;
+  background: #f5f6f8;
+  color: #606266;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.status {
+  flex: none;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+}
+
+.status.registered {
+  background: #fdecea;
+  color: #d93025;
+}
+
+.status.entered {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status.left,
+.status.cancelled {
+  background: #ebeef5;
+  color: #909399;
+}
+
+.visitor-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18rpx;
+}
+
+.cancel-button {
+  margin: 0;
+  border-radius: 8rpx;
+  background: #ffffff;
+  color: #d93025;
+  border: 1rpx solid #d93025;
+  font-size: 24rpx;
+}
+
+.empty-title {
+  color: #1f1b1b;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.empty-desc {
+  margin-top: 12rpx;
+  color: #73767a;
+  font-size: 26rpx;
+  line-height: 1.6;
+}
