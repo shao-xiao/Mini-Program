@@ -1,6 +1,13 @@
 package com.dehui.property.modules.workorder.service;
 
 import com.dehui.property.common.Result;
+import com.dehui.property.modules.system.entity.SysRole;
+import com.dehui.property.modules.system.entity.SysUser;
+import com.dehui.property.modules.system.entity.UserRole;
+import com.dehui.property.modules.system.repository.SysRoleRepository;
+import com.dehui.property.modules.system.repository.SysUserRepository;
+import com.dehui.property.modules.system.repository.UserRoleRepository;
+import com.dehui.property.modules.workorder.dto.AssignableUserResponse;
 import com.dehui.property.modules.workorder.dto.WorkOrderAssignRequest;
 import com.dehui.property.modules.workorder.dto.WorkOrderCompleteRequest;
 import com.dehui.property.modules.workorder.dto.WorkOrderCreateRequest;
@@ -27,6 +34,18 @@ public class WorkOrderService {
 
     private final WorkOrderRepository workOrderRepository;
     private final EquipmentRepository equipmentRepository;
+    private final SysUserRepository sysUserRepository;
+    private final SysRoleRepository sysRoleRepository;
+    private final UserRoleRepository userRoleRepository;
+
+    private static final List<String> ASSIGNABLE_ROLE_CODES = List.of(
+            "MAINTENANCE",
+            "REPAIR",
+            "ENGINEER",
+            "ENGINEERING",
+            "PROPERTY",
+            "STAFF"
+    );
 
     public Result<List<WorkOrderResponse>> findAll() {
         List<WorkOrderResponse> responses = workOrderRepository.findAll()
@@ -40,6 +59,32 @@ public class WorkOrderService {
         return workOrderRepository.findById(id)
                 .map(wo -> Result.success(toResponse(wo)))
                 .orElseGet(() -> Result.error("工单不存在"));
+    }
+
+    public List<AssignableUserResponse> listAssignableUsers() {
+        return sysUserRepository.findAll()
+                .stream()
+                .filter(user -> "ACTIVE".equals(user.getStatus()))
+                .map(user -> {
+                    List<SysRole> roles = userRoleRepository.findByUserId(user.getId())
+                            .stream()
+                            .map(UserRole::getRoleId)
+                            .map(sysRoleRepository::findById)
+                            .filter(java.util.Optional::isPresent)
+                            .map(java.util.Optional::get)
+                            .filter(role -> "ACTIVE".equals(role.getStatus()))
+                            .toList();
+                    return new AssignableUserResponse(
+                            user.getId(),
+                            user.getUsername(),
+                            user.getRealName(),
+                            user.getPhone(),
+                            roles.stream().map(SysRole::getRoleCode).toList(),
+                            roles.stream().map(SysRole::getRoleName).toList()
+                    );
+                })
+                .filter(this::isAssignableWorker)
+                .toList();
     }
 
     @Transactional
@@ -220,5 +265,16 @@ public class WorkOrderService {
                 .map(String::trim)
                 .filter(url -> !url.isBlank())
                 .toList();
+    }
+
+    private boolean isAssignableWorker(AssignableUserResponse user) {
+        boolean roleCodeMatched = user.getRoleCodes().stream()
+                .anyMatch(ASSIGNABLE_ROLE_CODES::contains);
+        boolean roleNameMatched = user.getRoleNames().stream()
+                .anyMatch(name -> name != null
+                        && (name.contains("维修")
+                        || name.contains("工程")
+                        || name.contains("物业")));
+        return roleCodeMatched || roleNameMatched;
     }
 }

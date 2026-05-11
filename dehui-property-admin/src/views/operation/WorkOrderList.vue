@@ -77,6 +77,9 @@
               preview-teleported
               fit="cover"
             />
+            <div v-if="row.imageUrls && row.imageUrls.length" class="sub-text">
+              共 {{ row.imageUrls.length }} 张
+            </div>
             <span v-else>-</span>
           </template>
         </el-table-column>
@@ -365,7 +368,7 @@ const load = async ()=>{
 }
 
 const loadUsers = async ()=>{
-  const data = await request.get('/system/users')
+  const data = await request.get('/workorders/assignable-users')
   users.value = data || []
 }
 

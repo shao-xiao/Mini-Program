@@ -3,6 +3,7 @@ package com.dehui.property.modules.workorder.controller;
 import com.dehui.property.common.Result;
 import com.dehui.property.modules.system.entity.SysUser;
 import com.dehui.property.modules.system.service.SystemUserService;
+import com.dehui.property.modules.workorder.dto.AssignableUserResponse;
 import com.dehui.property.modules.workorder.dto.WorkOrderAssignRequest;
 import com.dehui.property.modules.workorder.dto.WorkOrderCompleteRequest;
 import com.dehui.property.modules.workorder.dto.WorkOrderCreateRequest;
@@ -41,6 +42,11 @@ public class WorkOrderController {
     @GetMapping
     public Result<List<WorkOrderResponse>> list() {
         return workOrderService.findAll();
+    }
+
+    @GetMapping("/assignable-users")
+    public Result<List<AssignableUserResponse>> assignableUsers() {
+        return Result.success(workOrderService.listAssignableUsers());
     }
 
     @GetMapping("/{id}")
