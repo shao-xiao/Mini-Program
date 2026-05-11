@@ -146,14 +146,18 @@ public class BillService {
         response.setId(bill.getId());
         response.setBillNumber(bill.getBillNumber());
         response.setTenantId(bill.getTenantId());
-        tenantRepository.findById(bill.getTenantId())
-                .ifPresent(tenant -> response.setTenantName(tenant.getTenantName()));
+        if (bill.getTenantId() != null) {
+            tenantRepository.findById(bill.getTenantId())
+                    .ifPresent(tenant -> response.setTenantName(tenant.getTenantName()));
+        }
         response.setContractId(bill.getContractId());
-        contractRepository.findById(bill.getContractId())
-                .ifPresent(contract -> {
-                    response.setContractNumber(contract.getContractNumber());
-                    response.setContractName(contract.getContractName());
-                });
+        if (bill.getContractId() != null) {
+            contractRepository.findById(bill.getContractId())
+                    .ifPresent(contract -> {
+                        response.setContractNumber(contract.getContractNumber());
+                        response.setContractName(contract.getContractName());
+                    });
+        }
         response.setBillType(bill.getBillType());
         response.setPeriodStart(bill.getPeriodStart());
         response.setPeriodEnd(bill.getPeriodEnd());

@@ -380,8 +380,9 @@ function contractOptionLabel(contract) {
 }
 
 function contractLabelById(contractId) {
+  if (!contractId) return '无合同关联'
   const contract = contracts.value.find(item => item.id === contractId)
-  return contract ? contract.contractNumber : `合同ID:${contractId || '-'}`
+  return contract ? contract.contractNumber : `合同ID:${contractId}`
 }
 
 function handleTenantChange() {
