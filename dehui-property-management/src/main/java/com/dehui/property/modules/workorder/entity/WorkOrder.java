@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Data
 @Entity
@@ -55,6 +56,15 @@ public class WorkOrder extends BaseEntity {
 
     @Column(length = 1000)
     private String handlingResult;
+
+    private Boolean billable;
+
+    private BigDecimal chargeAmount;
+
+    @Column(length = 500)
+    private String chargeRemark;
+
+    private Long billId;
 
     private Integer rating;
 

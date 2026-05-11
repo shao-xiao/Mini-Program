@@ -1,6 +1,7 @@
 package com.dehui.property.modules.workorder.dto;
 
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -25,6 +26,10 @@ public class WorkOrderResponse {
     private String reporterPhone;
     private List<String> imageUrls;
     private String handlingResult;
+    private Boolean billable;
+    private BigDecimal chargeAmount;
+    private String chargeRemark;
+    private Long billId;
     private Integer rating;
     private String evaluationContent;
     private LocalDateTime evaluationTime;

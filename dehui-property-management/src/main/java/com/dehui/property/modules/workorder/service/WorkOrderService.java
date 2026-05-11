@@ -1,6 +1,8 @@
 package com.dehui.property.modules.workorder.service;
 
 import com.dehui.property.common.Result;
+import com.dehui.property.modules.bill.entity.Bill;
+import com.dehui.property.modules.bill.repository.BillRepository;
 import com.dehui.property.modules.system.entity.SysRole;
 import com.dehui.property.modules.system.entity.SysUser;
 import com.dehui.property.modules.system.entity.UserRole;
@@ -21,8 +23,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -40,6 +44,7 @@ public class WorkOrderService {
     private final SysUserRepository sysUserRepository;
     private final SysRoleRepository sysRoleRepository;
     private final UserRoleRepository userRoleRepository;
+    private final BillRepository billRepository;
 
     private static final List<String> ASSIGNABLE_ROLE_CODES = List.of(
             "MAINTENANCE",
@@ -111,6 +116,8 @@ public class WorkOrderService {
         workOrder.setCategory(request.getCategory());
         workOrder.setPriority(request.getPriority());
         workOrder.setReporterId(request.getReporterId());
+        workOrder.setTenantId(request.getTenantId());
+        workOrder.setBillable(false);
         workOrder.setStatus("CREATED");
         workOrder.setSubmittedTime(LocalDateTime.now());
 
@@ -176,6 +183,19 @@ public class WorkOrderService {
                     if (request != null && request.getHandlingResult() != null) {
                         wo.setHandlingResult(request.getHandlingResult());
                     }
+                    if (request != null) {
+                        boolean billable = Boolean.TRUE.equals(request.getBillable());
+                        if (billable && wo.getTenantId() == null) {
+                            return Result.<WorkOrderResponse>error("向租户收费的工单需先关联租户");
+                        }
+                        if (billable && (request.getChargeAmount() == null
+                                || request.getChargeAmount().compareTo(BigDecimal.ZERO) <= 0)) {
+                            return Result.<WorkOrderResponse>error("收费金额必须大于0");
+                        }
+                        wo.setBillable(billable);
+                        wo.setChargeAmount(billable ? request.getChargeAmount() : null);
+                        wo.setChargeRemark(billable ? request.getChargeRemark() : null);
+                    }
 
                     WorkOrder saved = workOrderRepository.save(wo);
 
@@ -191,6 +211,49 @@ public class WorkOrderService {
 
                     log.info("工单已完成: orderNumber={}", saved.getOrderNumber());
 
+                    return Result.success(toResponse(saved));
+                })
+                .orElseGet(() -> Result.error("工单不存在"));
+    }
+
+    @Transactional
+    public Result<WorkOrderResponse> generateBill(Long id) {
+        return workOrderRepository.findById(id)
+                .map(wo -> {
+                    if (!"COMPLETED".equals(wo.getStatus()) && !"CLOSED".equals(wo.getStatus())) {
+                        return Result.<WorkOrderResponse>error("工单完成后才能生成账单");
+                    }
+                    if (!Boolean.TRUE.equals(wo.getBillable())) {
+                        return Result.<WorkOrderResponse>error("该工单未标记为向租户收费");
+                    }
+                    if (wo.getTenantId() == null) {
+                        return Result.<WorkOrderResponse>error("工单未关联租户，无法生成账单");
+                    }
+                    if (wo.getChargeAmount() == null || wo.getChargeAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                        return Result.<WorkOrderResponse>error("收费金额必须大于0");
+                    }
+                    if (wo.getBillId() != null) {
+                        return Result.<WorkOrderResponse>error("该工单已生成账单");
+                    }
+
+                    Bill bill = new Bill();
+                    bill.setBillNumber("WO-" + wo.getOrderNumber());
+                    bill.setTenantId(wo.getTenantId());
+                    bill.setContractId(null);
+                    bill.setBillType("OTHER");
+                    LocalDate today = LocalDate.now();
+                    bill.setPeriodStart(today);
+                    bill.setPeriodEnd(today);
+                    bill.setAmount(wo.getChargeAmount());
+                    bill.setPaidAmount(BigDecimal.ZERO);
+                    bill.setDueDate(today);
+                    bill.setStatus("UNPAID");
+
+                    Bill savedBill = billRepository.save(bill);
+                    wo.setBillId(savedBill.getId());
+                    WorkOrder saved = workOrderRepository.save(wo);
+
+                    log.info("工单已生成账单: orderNumber={}, billId={}", saved.getOrderNumber(), savedBill.getId());
                     return Result.success(toResponse(saved));
                 })
                 .orElseGet(() -> Result.error("工单不存在"));
@@ -246,6 +309,10 @@ public class WorkOrderService {
         response.setReporterPhone(wo.getReporterPhone());
         response.setImageUrls(parseImageUrls(wo.getImageUrls()));
         response.setHandlingResult(wo.getHandlingResult());
+        response.setBillable(wo.getBillable());
+        response.setChargeAmount(wo.getChargeAmount());
+        response.setChargeRemark(wo.getChargeRemark());
+        response.setBillId(wo.getBillId());
         response.setRating(wo.getRating());
         response.setEvaluationContent(wo.getEvaluationContent());
         response.setEvaluationTime(wo.getEvaluationTime());

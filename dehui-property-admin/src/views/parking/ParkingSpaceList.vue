@@ -12,7 +12,11 @@
         <el-table-column prop="id" label="ID" width="70"/>
         <el-table-column prop="spaceCode" label="车位编号"/>
         <el-table-column prop="area" label="区域"/>
-        <el-table-column prop="spaceType" label="类型"/>
+        <el-table-column label="类型">
+          <template #default="{row}">
+            {{ spaceTypeText(row.spaceType) }}
+          </template>
+        </el-table-column>
         
         <el-table-column label="状态">
           <template #default="{row}">
@@ -22,35 +26,69 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="tenantId" label="租户ID"/>
+        <el-table-column label="使用方" min-width="150">
+          <template #default="{row}">
+            {{ ownerText(row) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="plateNumber" label="车牌"/>
 
-        <el-table-column label="操作" width="200">
+        <el-table-column label="操作" width="280">
           <template #default="{row}">
             <el-button size="small" @click="bind(row)" v-if="row.status==='AVAILABLE'">绑定</el-button>
             <el-button size="small" type="warning" @click="release(row)" v-if="row.status==='OCCUPIED'">释放</el-button>
+            <el-button size="small" type="primary" @click="edit(row)">编辑</el-button>
+            <el-button size="small" type="danger" @click="remove(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <el-dialog v-model="visible" title="新增车位">
+    <el-dialog v-model="visible" :title="form.id ? '编辑车位' : '新增车位'" width="520px">
       <el-form :model="form">
         <el-form-item label="车位编号">
           <el-input v-model="form.spaceCode"/>
         </el-form-item>
 
         <el-form-item label="区域">
-          <el-input v-model="form.area"/>
+          <el-select v-model="form.area" placeholder="请选择区域" style="width: 100%">
+            <el-option v-for="area in areaOptions" :key="area" :label="area" :value="area"/>
+          </el-select>
         </el-form-item>
 
         <el-form-item label="类型">
-          <el-select v-model="form.spaceType">
+          <el-select v-model="form.spaceType" style="width: 100%">
             <el-option label="固定" value="FIXED"/>
             <el-option label="临停" value="TEMP"/>
             <el-option label="VIP" value="VIP"/>
           </el-select>
         </el-form-item>
+
+        <el-form-item label="状态">
+          <el-select v-model="form.status" style="width: 100%">
+            <el-option label="空闲" value="AVAILABLE"/>
+            <el-option label="占用" value="OCCUPIED"/>
+            <el-option label="停用" value="DISABLED"/>
+          </el-select>
+        </el-form-item>
+
+        <template v-if="form.status === 'OCCUPIED'">
+          <el-form-item label="使用方">
+            <el-select v-model="form.ownerKey" filterable placeholder="请选择租户或VIP" style="width: 100%">
+              <el-option label="VIP" value="VIP"/>
+              <el-option
+                v-for="tenant in tenants"
+                :key="tenant.id"
+                :label="tenantLabel(tenant)"
+                :value="tenantOwnerKey(tenant.id)"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="车牌号">
+            <el-input v-model.trim="form.plateNumber" placeholder="请输入车牌号"/>
+          </el-form-item>
+        </template>
       </el-form>
 
       <template #footer>
@@ -65,8 +103,16 @@
           <el-input :model-value="currentSpace?.spaceCode || ''" disabled />
         </el-form-item>
 
-        <el-form-item label="租户ID" prop="tenantId">
-          <el-input-number v-model="bindForm.tenantId" :min="1" :precision="0" style="width: 100%" />
+        <el-form-item label="使用方" prop="ownerKey">
+          <el-select v-model="bindForm.ownerKey" filterable placeholder="请选择租户或VIP" style="width: 100%">
+            <el-option label="VIP" value="VIP"/>
+            <el-option
+              v-for="tenant in tenants"
+              :key="tenant.id"
+              :label="tenantLabel(tenant)"
+              :value="tenantOwnerKey(tenant.id)"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item label="车牌号" prop="plateNumber">
@@ -85,29 +131,36 @@
 
 <script setup>
 import {ref, reactive, onMounted} from 'vue'
-import {ElMessage} from 'element-plus'
+import {ElMessage, ElMessageBox} from 'element-plus'
 import request from '../../utils/request'
 
 const list = ref([])
+const tenants = ref([])
 const visible = ref(false)
 const bindVisible = ref(false)
 const binding = ref(false)
 const bindFormRef = ref(null)
 const currentSpace = ref(null)
+const areaOptions = ['A', 'B', 'C', 'D']
 
 const form = reactive({
+  id:null,
   spaceCode:'',
-  area:'',
-  spaceType:'FIXED'
+  area:'A',
+  spaceType:'FIXED',
+  status:'AVAILABLE',
+  ownerKey:'',
+  plateNumber:'',
+  remark:''
 })
 
 const bindForm = reactive({
-  tenantId: null,
+  ownerKey: '',
   plateNumber: ''
 })
 
 const bindRules = {
-  tenantId: [{ required: true, message: '请输入租户ID', trigger: 'change' }],
+  ownerKey: [{ required: true, message: '请选择租户或VIP', trigger: 'change' }],
   plateNumber: [{ required: true, message: '请输入车牌号', trigger: 'blur' }]
 }
 
@@ -116,23 +169,118 @@ const load = async ()=>{
   list.value = data || []
 }
 
+const loadTenants = async ()=>{
+  const data = await request.get('/tenant/list')
+  tenants.value = data || []
+}
+
+const tenantOwnerKey = (tenantId)=>`TENANT:${tenantId}`
+
+const parseOwnerKey = (ownerKey)=>{
+  if (ownerKey === 'VIP') return { vip: true, tenantId: null }
+  if (String(ownerKey || '').startsWith('TENANT:')) {
+    return { vip: false, tenantId: Number(String(ownerKey).replace('TENANT:', '')) }
+  }
+  return { vip: false, tenantId: null }
+}
+
+const tenantLabel = (tenant)=>{
+  const name = tenant.tenantName || tenant.tenantCode || `租户${tenant.id}`
+  return tenant.contactPerson ? `${name}（${tenant.contactPerson}）` : name
+}
+
+const tenantText = (tenantId)=>{
+  if (!tenantId) return ''
+  const tenant = tenants.value.find(item => item.id === tenantId)
+  return tenant ? tenantLabel(tenant) : `租户 ${tenantId}`
+}
+
+const ownerKeyOf = (row)=>{
+  if (row.spaceType === 'VIP' && !row.tenantId) return 'VIP'
+  return row.tenantId ? tenantOwnerKey(row.tenantId) : ''
+}
+
+const ownerText = (row)=>{
+  if (row.spaceType === 'VIP' && !row.tenantId) return 'VIP'
+  return tenantText(row.tenantId) || '-'
+}
+
+const spaceTypeText = (type)=>({
+  FIXED: '固定',
+  TEMP: '临停',
+  VIP: 'VIP'
+}[type] || type || '-')
+
 const openDialog = ()=>{
+  form.id=null
   form.spaceCode=''
-  form.area=''
+  form.area='A'
   form.spaceType='FIXED'
+  form.status='AVAILABLE'
+  form.ownerKey=''
+  form.plateNumber=''
+  form.remark=''
   visible.value = true
 }
 
+const edit = (row)=>{
+  form.id = row.id
+  form.spaceCode = row.spaceCode || ''
+  form.area = row.area || 'A'
+  form.spaceType = row.spaceType || 'FIXED'
+  form.status = row.status || 'AVAILABLE'
+  form.ownerKey = ownerKeyOf(row)
+  form.plateNumber = row.plateNumber || ''
+  form.remark = row.remark || ''
+  visible.value = true
+}
+
+const buildPayload = ()=>{
+  const owner = parseOwnerKey(form.ownerKey)
+  const occupied = form.status === 'OCCUPIED'
+  return {
+    spaceCode: form.spaceCode,
+    area: form.area,
+    spaceType: occupied && owner.vip ? 'VIP' : form.spaceType,
+    status: form.status,
+    tenantId: occupied && !owner.vip ? owner.tenantId : null,
+    plateNumber: occupied ? form.plateNumber : null,
+    remark: form.remark
+  }
+}
+
 const save = async ()=>{
-  await request.post('/parking/spaces', form)
-  ElMessage.success('新增成功')
+  if (!form.spaceCode.trim()) {
+    ElMessage.warning('请输入车位编号')
+    return
+  }
+  if (!form.area) {
+    ElMessage.warning('请选择区域')
+    return
+  }
+  if (form.status === 'OCCUPIED' && !form.ownerKey) {
+    ElMessage.warning('请选择使用方')
+    return
+  }
+  if (form.status === 'OCCUPIED' && !form.plateNumber) {
+    ElMessage.warning('请输入车牌号')
+    return
+  }
+
+  if (form.id) {
+    await request.put(`/parking/spaces/${form.id}`, buildPayload())
+    ElMessage.success('保存成功')
+  } else {
+    await request.post('/parking/spaces', buildPayload())
+    ElMessage.success('新增成功')
+  }
   visible.value = false
   load()
 }
 
 const bind = (row)=>{
   currentSpace.value = row
-  bindForm.tenantId = row.tenantId || null
+  bindForm.ownerKey = ownerKeyOf(row)
   bindForm.plateNumber = row.plateNumber || ''
   bindVisible.value = true
 }
@@ -148,7 +296,8 @@ const submitBind = async()=>{
     try {
       await request.patch(`/parking/spaces/${currentSpace.value.id}/bind`, null, {
         params: {
-          tenantId: bindForm.tenantId,
+          tenantId: parseOwnerKey(bindForm.ownerKey).tenantId,
+          vip: parseOwnerKey(bindForm.ownerKey).vip,
           plateNumber: bindForm.plateNumber
         }
       })
@@ -167,7 +316,17 @@ const release = async(row)=>{
   load()
 }
 
-onMounted(load)
+const remove = async(row)=>{
+  await ElMessageBox.confirm(`确定删除车位「${row.spaceCode}」吗？`, '删除确认', {type: 'warning'})
+  await request.delete(`/parking/spaces/${row.id}`)
+  ElMessage.success('已删除')
+  load()
+}
+
+onMounted(()=>{
+  load()
+  loadTenants()
+})
 </script>
 
 <style scoped>

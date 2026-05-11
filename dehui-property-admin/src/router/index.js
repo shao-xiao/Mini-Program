@@ -84,12 +84,6 @@ const routes = [
         meta: { title: '账单管理' }
       },
       {
-        path: '/feerules',
-        name: 'FeeRuleList',
-        component: () => import('../views/tenant/FeeRuleList.vue'),
-        meta: { title: '收费规则管理' }
-      },
-      {
         path: '/finance/dashboard',
         name: 'FinanceDashboard',
         component: () => import('../views/finance/FinanceDashboard.vue'),

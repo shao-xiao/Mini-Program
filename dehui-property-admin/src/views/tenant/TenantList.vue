@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>租户管理</span>
-          <el-button type="primary" @click="openCreateDialog">新增租户</el-button>
+          <span class="header-tip">租户由合同台账新增合同自动生成</span>
         </div>
       </template>
 
@@ -132,5 +132,10 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-tip {
+  color: #909399;
+  font-size: 13px;
 }
 </style>

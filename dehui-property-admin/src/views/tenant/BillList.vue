@@ -39,7 +39,11 @@
             {{ row.contractNumber || contractLabelById(row.contractId) }}
           </template>
         </el-table-column>
-        <el-table-column prop="billType" label="类型" width="110" />
+        <el-table-column label="类型" width="100">
+          <template #default="{ row }">
+            {{ billTypeText(row.billType) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="periodStart" label="账期开始" width="120" />
         <el-table-column prop="periodEnd" label="账期结束" width="120" />
         <el-table-column prop="amount" label="应收金额" width="110" />
@@ -156,11 +160,12 @@
             style="width: 100%"
             @change="handleBillTypeChange"
           >
-            <el-option label="租金 RENT" value="RENT" />
-            <el-option label="物业费 PROPERTY" value="PROPERTY" />
-            <el-option label="水费 WATER" value="WATER" />
-            <el-option label="电费 ELECTRICITY" value="ELECTRICITY" />
-            <el-option label="其他 OTHER" value="OTHER" />
+            <el-option
+              v-for="type in billTypeOptions"
+              :key="type.value"
+              :label="type.label"
+              :value="type.value"
+            />
           </el-select>
         </el-form-item>
 
@@ -244,6 +249,17 @@ const defaultForm = () => ({
 })
 
 const form = reactive(defaultForm())
+
+const billTypeOptions = [
+  { label: '租金', value: 'RENT' },
+  { label: '物业费', value: 'PROPERTY' },
+  { label: '会议', value: 'MEETING_ROOM' },
+  { label: '停车', value: 'PARKING' },
+  { label: '水', value: 'WATER' },
+  { label: '电', value: 'ELECTRICITY' },
+  { label: '煤', value: 'GAS' },
+  { label: '其它', value: 'OTHER' }
+]
 
 const formRules = {
   billNumber: [
@@ -383,6 +399,17 @@ function contractLabelById(contractId) {
   if (!contractId) return '无合同关联'
   const contract = contracts.value.find(item => item.id === contractId)
   return contract ? contract.contractNumber : `合同ID:${contractId}`
+}
+
+function billTypeText(value) {
+  const type = billTypeOptions.find(item => item.value === value)
+  if (type) return type.label
+
+  if (value === 'MEETING') return '会议'
+  if (value === 'PARKING') return '停车'
+  if (value === 'UTILITY') return '水电煤'
+
+  return value || '-'
 }
 
 function handleTenantChange() {

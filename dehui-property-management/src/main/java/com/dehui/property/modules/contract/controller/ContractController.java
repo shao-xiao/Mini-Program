@@ -3,6 +3,7 @@ package com.dehui.property.modules.contract.controller;
 import com.dehui.property.common.Result;
 import com.dehui.property.modules.contract.dto.ContractCreateRequest;
 import com.dehui.property.modules.contract.dto.ContractResponse;
+import com.dehui.property.modules.contract.service.ContractBillGenerationService;
 import com.dehui.property.modules.contract.service.ContractService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ContractController {
     private final ContractService contractService;
+    private final ContractBillGenerationService contractBillGenerationService;
 
     @PostMapping
     public Result<ContractResponse> create(@Valid @RequestBody ContractCreateRequest request) {
@@ -24,6 +26,16 @@ public class ContractController {
     @GetMapping
     public Result<List<ContractResponse>> list() {
         return contractService.findAll();
+    }
+
+    @GetMapping("/pending-checkin")
+    public Result<List<ContractResponse>> pendingCheckin() {
+        return contractService.findActivePendingCheckin();
+    }
+
+    @PostMapping("/generate-bills")
+    public Result<Integer> generateBills() {
+        return Result.success(contractBillGenerationService.generateDueBills());
     }
 
     @GetMapping("/{id}")

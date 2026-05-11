@@ -52,7 +52,11 @@
             <el-tag v-else type="info">后台</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="tenantId" label="租户ID" width="90"/>
+        <el-table-column label="租户" min-width="140">
+          <template #default="{row}">
+            {{ tenantText(row.tenantId) }}
+          </template>
+        </el-table-column>
         <el-table-column label="处理人" min-width="120">
           <template #default="{row}">
             {{ handlerText(row.handlerId) }}
@@ -87,6 +91,17 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
+        <el-table-column label="收费" min-width="130">
+          <template #default="{row}">
+            <div v-if="row.billable">
+              <el-tag :type="row.billId ? 'success' : 'warning'">
+                {{ row.billId ? '已生成账单' : '待生成账单' }}
+              </el-tag>
+              <div class="sub-text">¥ {{ row.chargeAmount || 0 }}</div>
+            </div>
+            <el-tag v-else type="info">不收费</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="处理结果" min-width="160">
           <template #default="{row}">
             <span>{{ row.handlingResult || '-' }}</span>
@@ -102,11 +117,19 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="260">
+        <el-table-column label="操作" width="340">
           <template #default="{row}">
             <el-button size="small" v-if="row.status==='CREATED'" @click="assign(row)">派单</el-button>
             <el-button size="small" type="primary" v-if="row.status==='ASSIGNED'" @click="start(row)">开始</el-button>
             <el-button size="small" type="success" v-if="row.status==='PROCESSING'" @click="complete(row)">完成</el-button>
+            <el-button
+              size="small"
+              type="warning"
+              v-if="row.status==='COMPLETED' && row.billable && !row.billId"
+              @click="generateBill(row)"
+            >
+              生成账单
+            </el-button>
             <el-button size="small" type="info" v-if="row.status==='COMPLETED'" @click="close(row)">关闭</el-button>
           </template>
         </el-table-column>
@@ -134,6 +157,23 @@
 
         <el-form-item label="位置">
           <el-input v-model="form.location" placeholder="例如：三楼 308 / B1 车库入口"/>
+        </el-form-item>
+
+        <el-form-item label="关联租户">
+          <el-select
+            v-model="form.tenantId"
+            class="form-select"
+            clearable
+            filterable
+            placeholder="可选，涉及收费时建议选择"
+          >
+            <el-option
+              v-for="tenant in tenants"
+              :key="tenant.id"
+              :label="tenantLabel(tenant)"
+              :value="tenant.id"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item label="工单类型">
@@ -217,6 +257,35 @@
             placeholder="请填写维修处理情况、处理结果或后续建议"
           />
         </el-form-item>
+        <el-form-item label="是否收费">
+          <el-switch
+            v-model="completeForm.billable"
+            active-text="向租户收费"
+            inactive-text="不收费"
+          />
+        </el-form-item>
+        <template v-if="completeForm.billable">
+          <el-form-item label="关联租户">
+            <el-input :model-value="tenantText(completeForm.tenantId)" disabled/>
+          </el-form-item>
+          <el-form-item label="收费金额">
+            <el-input-number
+              v-model="completeForm.chargeAmount"
+              :min="0"
+              :precision="2"
+              :step="50"
+              class="form-select"
+            />
+          </el-form-item>
+          <el-form-item label="收费说明">
+            <el-input
+              v-model="completeForm.chargeRemark"
+              type="textarea"
+              :rows="2"
+              placeholder="例如：装修垃圾清运费 / 人为损坏维修材料费"
+            />
+          </el-form-item>
+        </template>
       </el-form>
 
       <template #footer>
@@ -235,6 +304,7 @@ import request from '../../utils/request'
 
 const list = ref([])
 const users = ref([])
+const tenants = ref([])
 const visible = ref(false)
 const assignVisible = ref(false)
 const completeVisible = ref(false)
@@ -289,6 +359,7 @@ const form = reactive({
   title:'',
   description:'',
   location:'',
+  tenantId:null,
   orderType:'REPAIR',
   category:'WATER_ELECTRIC',
   priority:'MEDIUM'
@@ -303,7 +374,11 @@ const assignForm = reactive({
 const completeForm = reactive({
   orderId: null,
   orderTitle: '',
-  handlingResult: ''
+  tenantId: null,
+  handlingResult: '',
+  billable: false,
+  chargeAmount: 0,
+  chargeRemark: ''
 })
 
 const currentCategoryOptions = computed(() => categoryOptions[form.orderType] || [])
@@ -354,6 +429,17 @@ const userLabel = (user)=>{
   return user.phone ? `${name}（${user.phone}）` : name
 }
 
+const tenantLabel = (tenant)=>{
+  const name = tenant.tenantName || tenant.tenantCode || `租户${tenant.id}`
+  return tenant.contactPerson ? `${name}（${tenant.contactPerson}）` : name
+}
+
+const tenantText = (tenantId)=>{
+  if (!tenantId) return '-'
+  const tenant = tenants.value.find(item => item.id === tenantId)
+  return tenant ? tenantLabel(tenant) : `租户ID ${tenantId}`
+}
+
 const handlerText = (handlerId)=>{
   if (!handlerId) return '-'
   const user = users.value.find(item => item.id === handlerId)
@@ -378,6 +464,11 @@ const loadUsers = async ()=>{
   users.value = data || []
 }
 
+const loadTenants = async ()=>{
+  const data = await request.get('/tenant/list')
+  tenants.value = data || []
+}
+
 const resetCategory = ()=>{
   form.category = currentCategoryOptions.value[0]?.value || ''
 }
@@ -386,6 +477,7 @@ const openDialog = ()=>{
   form.title=''
   form.description=''
   form.location=''
+  form.tenantId=null
   form.orderType='REPAIR'
   form.category='WATER_ELECTRIC'
   form.priority='MEDIUM'
@@ -407,6 +499,7 @@ const save = async ()=>{
     title: form.title,
     description: form.description,
     location: form.location,
+    tenantId: form.tenantId ? Number(form.tenantId) : null,
     orderType: form.orderType,
     category: form.category,
     priority: form.priority
@@ -445,7 +538,11 @@ const start = async(row)=>{
 const complete = (row)=>{
   completeForm.orderId = row.id
   completeForm.orderTitle = `${row.orderNumber} ${row.title}`
+  completeForm.tenantId = row.tenantId || null
   completeForm.handlingResult = row.handlingResult || ''
+  completeForm.billable = Boolean(row.billable)
+  completeForm.chargeAmount = Number(row.chargeAmount || 0)
+  completeForm.chargeRemark = row.chargeRemark || ''
   completeVisible.value = true
 }
 
@@ -454,8 +551,19 @@ const confirmComplete = async()=>{
     ElMessage.warning('请填写处理结果')
     return
   }
+  if (completeForm.billable && !completeForm.tenantId) {
+    ElMessage.warning('向租户收费的工单需先关联租户')
+    return
+  }
+  if (completeForm.billable && Number(completeForm.chargeAmount) <= 0) {
+    ElMessage.warning('请输入大于0的收费金额')
+    return
+  }
   await request.patch(`/workorders/${completeForm.orderId}/complete`, {
-    handlingResult: completeForm.handlingResult
+    handlingResult: completeForm.handlingResult,
+    billable: completeForm.billable,
+    chargeAmount: completeForm.billable ? Number(completeForm.chargeAmount) : null,
+    chargeRemark: completeForm.billable ? completeForm.chargeRemark : null
   })
   ElMessage.success('已完成')
   completeVisible.value = false
@@ -468,9 +576,16 @@ const close = async(row)=>{
   load()
 }
 
+const generateBill = async(row)=>{
+  await request.post(`/workorders/${row.id}/generate-bill`)
+  ElMessage.success('账单已生成')
+  load()
+}
+
 onMounted(()=>{
   load()
   loadUsers()
+  loadTenants()
 })
 </script>
 

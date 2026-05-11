@@ -4,22 +4,43 @@
       <template #header>
         <div class="card-header">
           <span>停车账单</span>
-          <el-button type="primary" @click="openCreateDialog">新增停车账单</el-button>
+          <div class="header-actions">
+            <el-button @click="syncToBills">同步到账单中心</el-button>
+            <el-button type="primary" @click="openCreateDialog">新增停车账单</el-button>
+          </div>
         </div>
       </template>
 
       <el-table v-loading="loading" :data="bills" border style="width: 100%">
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="billNumber" label="账单编号" min-width="160" />
-        <el-table-column prop="parkingSpaceId" label="车位ID" width="90" />
-        <el-table-column prop="tenantId" label="租户ID" width="90" />
+        <el-table-column label="车位" min-width="130">
+          <template #default="{ row }">
+            {{ spaceText(row.parkingSpaceId) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="使用方" min-width="160">
+          <template #default="{ row }">
+            {{ ownerText(row) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="plateNumber" label="车牌号" width="120" />
-        <el-table-column prop="billType" label="类型" width="100" />
+        <el-table-column label="类型" width="100">
+          <template #default="{ row }">
+            {{ formatBillType(row.billType) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="periodStart" label="账期开始" width="120" />
         <el-table-column prop="periodEnd" label="账期结束" width="120" />
         <el-table-column prop="amount" label="金额" width="110" />
         <el-table-column prop="dueDate" label="到期日" width="120" />
         <el-table-column prop="paidDate" label="支付日期" width="120" />
+        <el-table-column label="账单中心" width="110">
+          <template #default="{ row }">
+            <el-tag v-if="row.billId" type="success">已同步</el-tag>
+            <el-tag v-else type="warning">未同步</el-tag>
+          </template>
+        </el-table-column>
 
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
@@ -56,12 +77,33 @@
           <el-input v-model="form.billNumber" placeholder="如 PARK-202605-001" />
         </el-form-item>
 
-        <el-form-item label="车位ID" prop="parkingSpaceId">
-          <el-input-number v-model="form.parkingSpaceId" :min="1" style="width: 100%" />
+        <el-form-item label="车位" prop="parkingSpaceId">
+          <el-select
+            v-model="form.parkingSpaceId"
+            filterable
+            placeholder="请选择车位"
+            style="width: 100%"
+            @change="handleSpaceChange"
+          >
+            <el-option
+              v-for="space in spaces"
+              :key="space.id"
+              :label="spaceLabel(space)"
+              :value="space.id"
+            />
+          </el-select>
         </el-form-item>
 
-        <el-form-item label="租户ID" prop="tenantId">
-          <el-input-number v-model="form.tenantId" :min="1" style="width: 100%" />
+        <el-form-item label="使用方" prop="ownerKey">
+          <el-select v-model="form.ownerKey" filterable placeholder="请选择租户或VIP" style="width: 100%">
+            <el-option label="VIP" value="VIP" />
+            <el-option
+              v-for="tenant in tenants"
+              :key="tenant.id"
+              :label="tenantLabel(tenant)"
+              :value="tenantOwnerKey(tenant.id)"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item label="车牌号" prop="plateNumber">
@@ -125,6 +167,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 
 const bills = ref([])
+const spaces = ref([])
+const tenants = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const dialogVisible = ref(false)
@@ -133,7 +177,7 @@ const formRef = ref(null)
 const defaultForm = () => ({
   billNumber: '',
   parkingSpaceId: null,
-  tenantId: null,
+  ownerKey: '',
   plateNumber: '',
   billType: 'MONTHLY',
   periodStart: '',
@@ -147,8 +191,8 @@ const form = reactive(defaultForm())
 
 const formRules = {
   billNumber: [{ required: true, message: '请输入账单编号', trigger: 'blur' }],
-  parkingSpaceId: [{ required: true, message: '请输入车位ID', trigger: 'change' }],
-  tenantId: [{ required: true, message: '请输入租户ID', trigger: 'change' }],
+  parkingSpaceId: [{ required: true, message: '请选择车位', trigger: 'change' }],
+  ownerKey: [{ required: true, message: '请选择租户或VIP', trigger: 'change' }],
   plateNumber: [{ required: true, message: '请输入车牌号', trigger: 'blur' }],
   billType: [{ required: true, message: '请选择账单类型', trigger: 'change' }],
   periodStart: [{ required: true, message: '请选择账期开始日期', trigger: 'change' }],
@@ -183,6 +227,16 @@ async function loadBills() {
   }
 }
 
+async function loadSpaces() {
+  const data = await request.get('/parking/spaces')
+  spaces.value = Array.isArray(data) ? data : []
+}
+
+async function loadTenants() {
+  const data = await request.get('/tenant/list')
+  tenants.value = Array.isArray(data) ? data : []
+}
+
 function openCreateDialog() {
   resetForm()
   dialogVisible.value = true
@@ -190,13 +244,15 @@ function openCreateDialog() {
 
 async function createBill() {
   await formRef.value.validate()
+  const owner = parseOwnerKey(form.ownerKey)
 
   saving.value = true
   try {
     await request.post('/parking/bills', {
       billNumber: form.billNumber,
       parkingSpaceId: Number(form.parkingSpaceId),
-      tenantId: Number(form.tenantId),
+      tenantId: owner.vip ? null : owner.tenantId,
+      vip: owner.vip,
       plateNumber: form.plateNumber,
       billType: form.billType,
       periodStart: form.periodStart,
@@ -235,7 +291,84 @@ async function payBill(row) {
   }
 }
 
-onMounted(loadBills)
+async function syncToBills() {
+  try {
+    const count = await request.post('/parking/bills/sync-to-bills')
+    ElMessage.success(`已同步 ${count || 0} 条停车账单`)
+    await loadBills()
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || '同步失败')
+  }
+}
+
+function formatBillType(type) {
+  return {
+    MONTHLY: '月租',
+    TEMP: '临停'
+  }[type] || type || '-'
+}
+
+function tenantOwnerKey(tenantId) {
+  return `TENANT:${tenantId}`
+}
+
+function parseOwnerKey(ownerKey) {
+  if (ownerKey === 'VIP') return { vip: true, tenantId: null }
+  if (String(ownerKey || '').startsWith('TENANT:')) {
+    return { vip: false, tenantId: Number(String(ownerKey).replace('TENANT:', '')) }
+  }
+  return { vip: false, tenantId: null }
+}
+
+function tenantLabel(tenant) {
+  const name = tenant.tenantName || tenant.tenantCode || `租户${tenant.id}`
+  return tenant.contactPerson ? `${name}（${tenant.contactPerson}）` : name
+}
+
+function tenantText(tenantId) {
+  if (!tenantId) return ''
+  const tenant = tenants.value.find(item => item.id === tenantId)
+  return tenant ? tenantLabel(tenant) : `租户 ${tenantId}`
+}
+
+function ownerText(row) {
+  if (row.vip) return 'VIP'
+  return tenantText(row.tenantId) || '-'
+}
+
+function spaceLabel(space) {
+  const status = space.status === 'AVAILABLE' ? '空闲' : space.status === 'OCCUPIED' ? '占用' : '停用'
+  const plate = space.plateNumber ? ` | ${space.plateNumber}` : ''
+  return `${space.spaceCode} | ${space.area || '-'}区 | ${status}${plate}`
+}
+
+function spaceText(spaceId) {
+  if (!spaceId) return '-'
+  const space = spaces.value.find(item => item.id === spaceId)
+  return space ? `${space.spaceCode}（${space.area || '-'}区）` : `车位 ${spaceId}`
+}
+
+function handleSpaceChange(spaceId) {
+  const space = spaces.value.find(item => item.id === spaceId)
+  if (!space) return
+
+  if (!form.plateNumber && space.plateNumber) {
+    form.plateNumber = space.plateNumber
+  }
+  if (!form.ownerKey) {
+    if (space.spaceType === 'VIP' && !space.tenantId) {
+      form.ownerKey = 'VIP'
+    } else if (space.tenantId) {
+      form.ownerKey = tenantOwnerKey(space.tenantId)
+    }
+  }
+}
+
+onMounted(()=>{
+  loadBills()
+  loadSpaces()
+  loadTenants()
+})
 </script>
 
 <style scoped>
@@ -247,5 +380,10 @@ onMounted(loadBills)
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 </style>

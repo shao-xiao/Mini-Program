@@ -5,6 +5,7 @@ import com.dehui.property.modules.contract.dto.ContractCreateRequest;
 import com.dehui.property.modules.contract.dto.ContractResponse;
 import com.dehui.property.modules.contract.entity.Contract;
 import com.dehui.property.modules.contract.repository.ContractRepository;
+import com.dehui.property.modules.tenant.entity.Tenant;
 import com.dehui.property.modules.lease.repository.RoomLeaseRepository;
 import com.dehui.property.modules.tenant.repository.TenantRepository;
 import com.dehui.property.modules.building.repository.RoomRepository;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,6 +24,7 @@ public class ContractService {
     private final TenantRepository tenantRepository;
     private final RoomRepository roomRepository;
     private final RoomLeaseRepository roomLeaseRepository;
+    private final ContractBillGenerationService contractBillGenerationService;
 
     public Result<List<ContractResponse>> findAll() {
         List<ContractResponse> responses = contractRepository.findAll()
@@ -44,28 +47,24 @@ public class ContractService {
             return Result.error("合同编号已存在");
         }
 
-        // 2. 校验租户存在
-        if (!tenantRepository.existsById(request.getTenantId())) {
-            return Result.error("租户不存在");
+        Long tenantId = resolveTenantId(request);
+        if (tenantId == null) {
+            return Result.error("请输入租户名称");
         }
 
         // 3. 校验房间存在
-        if (!roomRepository.existsById(request.getRoomId())) {
+        var room = roomRepository.findById(request.getRoomId()).orElse(null);
+        if (room == null) {
             return Result.error("房间不存在");
         }
 
-        // 4. 校验租约存在且为 ACTIVE 状态
-        roomLeaseRepository.findById(request.getLeaseId())
-                .filter(lease -> "ACTIVE".equals(lease.getStatus()))
-                .orElseGet(() -> null);
-        if (request.getLeaseId() == null ||
-            roomLeaseRepository.findById(request.getLeaseId()).isEmpty() ||
-            !"ACTIVE".equals(roomLeaseRepository.findById(request.getLeaseId()).get().getStatus())) {
-            return Result.error("租约不存在或未生效");
+        // 4. 合同签订阶段只允许选择可租房间，后续再办理入驻。
+        if (!"AVAILABLE".equals(room.getStatus())) {
+            return Result.error("房间当前不可租，状态为：" + room.getStatus());
         }
 
-        // 5. 校验租约未被其他合同占用
-        if (contractRepository.existsByLeaseId(request.getLeaseId())) {
+        // 5. 如传入租约，则校验租约未被其他合同占用；新流程下租约可为空。
+        if (request.getLeaseId() != null && contractRepository.existsByLeaseId(request.getLeaseId())) {
             return Result.error("该租约已绑定其他合同");
         }
 
@@ -73,7 +72,7 @@ public class ContractService {
         Contract contract = new Contract();
         contract.setContractNumber(request.getContractNumber());
         contract.setContractName(request.getContractName());
-        contract.setTenantId(request.getTenantId());
+        contract.setTenantId(tenantId);
         contract.setRoomId(request.getRoomId());
         contract.setLeaseId(request.getLeaseId());
         contract.setStartDate(request.getStartDate());
@@ -85,14 +84,24 @@ public class ContractService {
         contract.setBillingDay(request.getBillingDay() != null ? request.getBillingDay() : 1);
         contract.setDueDay(request.getDueDay() != null ? request.getDueDay() : 10);
         contract.setPaymentTerms(request.getPaymentTerms());
+        contract.setBillingLeadDays(request.getBillingLeadDays() != null ? request.getBillingLeadDays() : 7);
         contract.setBillingRule(request.getBillingRule() != null && !request.getBillingRule().isBlank()
                 ? request.getBillingRule()
-                : "租赁日期前7日出账；若遇节假日，则提前至工作日");
+                : String.format("账期开始前%d日出账；若遇周末，则提前至工作日", contract.getBillingLeadDays()));
         contract.setStatus("DRAFT");
         contract.setRemark(request.getRemark());
         Contract saved = contractRepository.save(contract);
 
         return Result.success(toResponse(saved));
+    }
+
+    @Transactional
+    public Result<List<ContractResponse>> findActivePendingCheckin() {
+        List<ContractResponse> responses = contractRepository.findByStatusAndLeaseIdIsNull("ACTIVE")
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+        return Result.success(responses);
     }
 
     @Transactional
@@ -107,6 +116,7 @@ public class ContractService {
                     }
                     contract.setStatus("ACTIVE");
                     Contract saved = contractRepository.save(contract);
+                    contractBillGenerationService.generateDueBillsForContract(saved, LocalDate.now());
                     return Result.success(toResponse(saved));
                 })
                 .orElseGet(() -> Result.error("合同不存在"));
@@ -143,11 +153,36 @@ public class ContractService {
         response.setBillingDay(contract.getBillingDay());
         response.setDueDay(contract.getDueDay());
         response.setPaymentTerms(contract.getPaymentTerms());
+        response.setBillingLeadDays(contract.getBillingLeadDays() != null ? contract.getBillingLeadDays() : 7);
         response.setBillingRule(contract.getBillingRule());
         response.setStatus(contract.getStatus());
         response.setRemark(contract.getRemark());
         response.setCreatedTime(contract.getCreatedTime());
         response.setUpdatedTime(contract.getUpdatedTime());
         return response;
+    }
+
+    private Long resolveTenantId(ContractCreateRequest request) {
+        if (request.getTenantId() != null && tenantRepository.existsById(request.getTenantId())) {
+            return request.getTenantId();
+        }
+
+        if (request.getTenantName() == null || request.getTenantName().isBlank()) {
+            return null;
+        }
+
+        String tenantName = request.getTenantName().trim();
+        Tenant tenant = tenantRepository.findFirstByTenantName(tenantName)
+                .orElseGet(() -> {
+                    Tenant created = new Tenant();
+                    created.setTenantName(tenantName);
+                    created.setContactPerson(request.getContactPerson());
+                    created.setContactPhone(request.getContactPhone());
+                    created.setContactEmail(request.getContactEmail());
+                    created.setStatus("ACTIVE");
+                    return tenantRepository.save(created);
+                });
+
+        return tenant.getId();
     }
 }

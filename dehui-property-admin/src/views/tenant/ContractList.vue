@@ -4,145 +4,182 @@
       <template #header>
         <div class="card-header">
           <span>合同管理</span>
-          <el-button type="primary" @click="openCreateDialog">新增合同</el-button>
+          <div class="header-actions">
+            <el-button @click="generateBills">生成到期账单</el-button>
+            <el-button type="primary" @click="openCreateDialog">新增合同</el-button>
+          </div>
         </div>
       </template>
 
-      <el-table :data="contracts" border style="width: 100%">
-        <el-table-column prop="contractNumber" label="合同编号" />
-        <el-table-column prop="contractName" label="合同名称" />
-        <el-table-column label="租户">
-          <template #default="{ row }">{{ tenantName(row.tenantId) }}</template>
-        </el-table-column>
-        <el-table-column label="房间">
-          <template #default="{ row }">{{ roomName(row.roomId) }}</template>
-        </el-table-column>
-        <el-table-column prop="leaseId" label="租约ID" />
-        <el-table-column prop="startDate" label="开始日期" />
-        <el-table-column prop="endDate" label="结束日期" />
-        <el-table-column prop="rentAmount" label="租金" />
-        <el-table-column prop="propertyFeeAmount" label="物业费" />
-        <el-table-column prop="depositAmount" label="押金" />
-        <el-table-column label="付款方式" width="100">
+      <el-table
+        :data="contracts"
+        border
+        stripe
+        class="contract-table"
+        row-key="id"
+        style="width: 100%"
+      >
+        <el-table-column label="合同信息" min-width="185">
           <template #default="{ row }">
-            {{ paymentMethodText(row.paymentCycle) }}
+            <div class="primary-text">{{ row.contractNumber || '-' }}</div>
+            <div class="secondary-text">{{ row.contractName || '未填写合同名称' }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="出账日" min-width="220">
+        <el-table-column label="租户 / 房间" min-width="175">
           <template #default="{ row }">
-            {{ billingRuleText(row) }}
+            <div class="primary-text">{{ tenantDisplayName(row.tenantId) }}</div>
+            <div class="secondary-text">{{ roomDisplayName(row.roomId) }}</div>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态">
+        <el-table-column label="合同周期" width="145">
           <template #default="{ row }">
-            <el-tag v-if="row.status === 'DRAFT'" type="info">草稿</el-tag>
-            <el-tag v-else-if="row.status === 'ACTIVE'" type="success">已生效</el-tag>
-            <el-tag v-else-if="row.status === 'TERMINATED'" type="danger">已终止</el-tag>
-            <el-tag v-else type="warning">{{ row.status }}</el-tag>
+            <div class="primary-text">{{ row.startDate || '-' }}</div>
+            <div class="secondary-text">至 {{ row.endDate || '长期' }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="费用" min-width="155">
+          <template #default="{ row }">
+            <div class="money-line">
+              <span>月租</span>
+              <strong>{{ formatMoney(row.rentAmount) }}</strong>
+            </div>
+            <div class="money-line">
+              <span>物业</span>
+              <strong>{{ formatMoney(row.propertyFeeAmount) }}</strong>
+            </div>
+            <div class="money-line muted-line">
+              <span>押金</span>
+              <strong>{{ formatMoney(row.depositAmount) }}</strong>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="规则 / 状态" width="118" align="center">
+          <template #default="{ row }">
+            <div class="primary-text">{{ paymentMethodText(row.paymentCycle) }}</div>
+            <div class="secondary-text">{{ billingRuleText(row) }}</div>
+            <div class="status-tag">
+              <el-tag v-if="row.status === 'DRAFT'" type="info" effect="plain">草稿</el-tag>
+              <el-tag v-else-if="row.status === 'ACTIVE'" type="success">已生效</el-tag>
+              <el-tag v-else-if="row.status === 'TERMINATED'" type="danger">已终止</el-tag>
+              <el-tag v-else type="warning">{{ row.status }}</el-tag>
+            </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="200">
+        <el-table-column label="操作" width="118" align="center">
           <template #default="{ row }">
-            <el-button size="small" :disabled="row.status !== 'DRAFT'" @click="activate(row)">生效</el-button>
-            <el-button size="small" type="danger" :disabled="row.status !== 'ACTIVE'" @click="terminate(row)">终止</el-button>
+            <div class="action-buttons">
+              <el-button size="small" :disabled="row.status !== 'DRAFT'" @click="activate(row)">生效</el-button>
+              <el-button size="small" type="danger" :disabled="row.status !== 'ACTIVE'" @click="terminate(row)">终止</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" title="新增合同" width="520px">
-      <el-form :model="form" label-width="110px">
+    <el-dialog v-model="dialogVisible" title="新增合同" width="760px" class="contract-dialog">
+      <el-form :model="form" label-position="top">
+        <div class="form-section-title">合同信息</div>
+        <div class="form-grid">
+          <el-form-item label="合同编号">
+            <el-input v-model="form.contractNumber" />
+          </el-form-item>
 
-        <el-form-item label="合同编号">
-          <el-input v-model="form.contractNumber" />
-        </el-form-item>
+          <el-form-item label="合同名称">
+            <el-input v-model="form.contractName" />
+          </el-form-item>
+        </div>
 
-        <el-form-item label="合同名称">
-          <el-input v-model="form.contractName" />
-        </el-form-item>
+        <div class="form-section-title">租户信息</div>
+        <div class="form-grid">
+          <el-form-item label="租户名称">
+            <el-input v-model="form.tenantName" placeholder="可直接录入新租户名称" />
+          </el-form-item>
 
-        <el-form-item label="租户">
-          <el-select
-            v-model="form.tenantId"
-            filterable
-            placeholder="请选择租户"
-            style="width:100%"
-            @change="handleTenantChange"
-          >
-            <el-option
-              v-for="tenant in activeTenants"
-              :key="tenant.id"
-              :label="tenantLabel(tenant)"
-              :value="tenant.id"
+          <el-form-item label="联系人">
+            <el-input v-model="form.contactPerson" />
+          </el-form-item>
+
+          <el-form-item label="联系电话">
+            <el-input v-model="form.contactPhone" />
+          </el-form-item>
+
+          <el-form-item label="邮箱">
+            <el-input v-model="form.contactEmail" />
+          </el-form-item>
+        </div>
+
+        <div class="form-section-title">房间与周期</div>
+        <div class="form-grid">
+          <el-form-item label="楼层">
+            <el-select v-model="form.floorId" filterable placeholder="请选择楼层" style="width:100%" @change="handleFloorChange">
+              <el-option
+                v-for="floor in floors"
+                :key="floor.id"
+                :label="floorLabel(floor)"
+                :value="floor.id"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="房间">
+            <el-select v-model="form.roomId" filterable placeholder="请选择可租房间" style="width:100%">
+              <el-option
+                v-for="room in availableRooms"
+                :key="room.id"
+                :label="roomLabel(room)"
+                :value="room.id"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="开始日期">
+            <el-date-picker v-model="form.startDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+          </el-form-item>
+
+          <el-form-item label="结束日期">
+            <el-date-picker v-model="form.endDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+          </el-form-item>
+        </div>
+
+        <div class="form-section-title">费用与收款</div>
+        <div class="form-grid">
+          <el-form-item label="月租金额">
+            <el-input-number v-model="form.rentAmount" :min="0" :precision="2" style="width:100%" />
+          </el-form-item>
+
+          <el-form-item label="月物业费">
+            <el-input-number v-model="form.propertyFeeAmount" :min="0" :precision="2" style="width:100%" />
+          </el-form-item>
+
+          <el-form-item label="押金">
+            <el-input-number v-model="form.depositAmount" :min="0" :precision="2" style="width:100%" />
+          </el-form-item>
+
+          <el-form-item label="付款方式">
+            <el-select v-model="form.paymentCycle" style="width:100%">
+              <el-option label="全款" value="FULL" />
+              <el-option label="月付" value="MONTHLY" />
+              <el-option label="季付" value="QUARTERLY" />
+              <el-option label="半年付" value="SEMI_ANNUAL" />
+              <el-option label="年付" value="YEARLY" />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="提前出账天数">
+            <el-input-number
+              v-model="form.billingLeadDays"
+              :min="0"
+              :max="60"
+              style="width:100%"
             />
-          </el-select>
-        </el-form-item>
+            <div class="form-tip">例如填 7，表示每个账期开始前 7 天自动生成下一期账单。</div>
+          </el-form-item>
 
-        <el-form-item label="租约">
-          <el-select
-            v-model="form.leaseId"
-            filterable
-            placeholder="请选择该租户的在租记录"
-            style="width:100%"
-            @change="handleLeaseChange"
-          >
-            <el-option
-              v-for="lease in activeLeases"
-              :key="lease.id"
-              :label="leaseLabel(lease)"
-              :value="lease.id"
-            />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="房间">
-          <el-input :model-value="roomName(form.roomId)" disabled />
-        </el-form-item>
-
-        <el-form-item label="开始日期">
-          <el-date-picker v-model="form.startDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
-        </el-form-item>
-
-        <el-form-item label="结束日期">
-          <el-date-picker v-model="form.endDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
-        </el-form-item>
-
-        <el-form-item label="月租金额">
-          <el-input-number v-model="form.rentAmount" style="width:100%" />
-        </el-form-item>
-
-        <el-form-item label="月物业费">
-          <el-input-number v-model="form.propertyFeeAmount" style="width:100%" />
-        </el-form-item>
-
-        <el-form-item label="押金">
-          <el-input-number v-model="form.depositAmount" style="width:100%" />
-        </el-form-item>
-
-        <el-form-item label="付款方式">
-          <el-select v-model="form.paymentCycle" style="width:100%">
-            <el-option label="全款" value="FULL" />
-            <el-option label="月付" value="MONTHLY" />
-            <el-option label="季付" value="QUARTERLY" />
-            <el-option label="半年付" value="SEMI_ANNUAL" />
-            <el-option label="年付" value="YEARLY" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="出账日">
-          <el-input
-            v-model="form.billingRule"
-            type="textarea"
-            :rows="2"
-            placeholder="例如：租赁日期前7日出账；若遇节假日，则提前至工作日"
-          />
-        </el-form-item>
-
-        <el-form-item label="备注">
-          <el-input v-model="form.remark" />
-        </el-form-item>
-
+          <el-form-item label="备注">
+            <el-input v-model="form.remark" />
+          </el-form-item>
+        </div>
       </el-form>
 
       <template #footer>
@@ -163,13 +200,18 @@ const contracts = ref([])
 const dialogVisible = ref(false)
 const tenants = ref([])
 const rooms = ref([])
-const tenantLeases = ref([])
+const floors = ref([])
 const BUILDING_ID = 1
 
 const form = reactive({
   contractNumber: '',
   contractName: '',
   tenantId: '',
+  tenantName: '',
+  contactPerson: '',
+  contactPhone: '',
+  contactEmail: '',
+  floorId: '',
   roomId: '',
   leaseId: '',
   startDate: '',
@@ -178,7 +220,8 @@ const form = reactive({
   propertyFeeAmount: 0,
   depositAmount: 0,
   paymentCycle: 'MONTHLY',
-  billingRule: '租赁日期前7日出账；若遇节假日，则提前至工作日',
+  billingLeadDays: 7,
+  billingRule: '',
   remark: ''
 })
 
@@ -186,6 +229,11 @@ const resetForm = () => {
   form.contractNumber = ''
   form.contractName = ''
   form.tenantId = ''
+  form.tenantName = ''
+  form.contactPerson = ''
+  form.contactPhone = ''
+  form.contactEmail = ''
+  form.floorId = ''
   form.roomId = ''
   form.leaseId = ''
   form.startDate = ''
@@ -194,7 +242,8 @@ const resetForm = () => {
   form.propertyFeeAmount = 0
   form.depositAmount = 0
   form.paymentCycle = 'MONTHLY'
-  form.billingRule = '租赁日期前7日出账；若遇节假日，则提前至工作日'
+  form.billingLeadDays = 7
+  form.billingRule = ''
   form.remark = ''
 }
 
@@ -203,12 +252,11 @@ const loadContracts = async () => {
   contracts.value = data || []
 }
 
-const activeTenants = computed(() => {
-  return tenants.value.filter(item => item.status !== 'INACTIVE')
-})
-
-const activeLeases = computed(() => {
-  return tenantLeases.value.filter(item => item.status === 'ACTIVE')
+const availableRooms = computed(() => {
+  return rooms.value.filter(item => {
+    const sameFloor = form.floorId ? item.floorId === form.floorId : true
+    return sameFloor && item.status === 'AVAILABLE'
+  })
 })
 
 function tenantLabel(tenant) {
@@ -220,8 +268,14 @@ function tenantName(tenantId) {
   return tenant ? `${tenant.tenantName}（ID:${tenant.id}）` : `租户ID:${tenantId || '-'}`
 }
 
+function tenantDisplayName(tenantId) {
+  const tenant = tenants.value.find(item => item.id === tenantId)
+  return tenant ? tenant.tenantName : `租户ID:${tenantId || '-'}`
+}
+
 function roomLabel(room) {
-  return `${room.roomNumber || room.roomName || '未命名房间'}（ID:${room.id}）`
+  const areaText = room.area ? `｜${room.area}㎡` : ''
+  return `${room.roomNumber || room.roomName || '未命名房间'}${areaText}（ID:${room.id}）`
 }
 
 function roomName(roomId) {
@@ -230,8 +284,22 @@ function roomName(roomId) {
   return room ? roomLabel(room) : `房间ID:${roomId}`
 }
 
-function leaseLabel(lease) {
-  return `${roomName(lease.roomId)}｜${lease.startDate || '-'} 至 ${lease.endDate || '长期'}`
+function roomDisplayName(roomId) {
+  if (!roomId) return '-'
+  const room = rooms.value.find(item => item.id === roomId)
+  if (!room) return `房间ID:${roomId}`
+
+  const areaText = room.area ? ` / ${room.area}㎡` : ''
+  return `${room.roomNumber || room.roomName || '未命名房间'}${areaText}`
+}
+
+function formatMoney(value) {
+  const number = Number(value || 0)
+  if (!number) return '-'
+  return number.toLocaleString('zh-CN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  })
 }
 
 function paymentMethodText(value) {
@@ -246,7 +314,11 @@ function paymentMethodText(value) {
 }
 
 function billingRuleText(row) {
-  return row.billingRule || row.paymentTerms || '租赁日期前7日出账；若遇节假日，则提前至工作日'
+  if (row.billingLeadDays !== null && row.billingLeadDays !== undefined) {
+    return `${row.billingLeadDays} 天`
+  }
+
+  return '7 天'
 }
 
 async function loadTenants() {
@@ -256,10 +328,10 @@ async function loadTenants() {
 
 async function loadRooms() {
   const floorsData = await request.get(`/buildings/${BUILDING_ID}/floors`)
-  const floors = floorsData.content || floorsData || []
+  floors.value = floorsData.content || floorsData || []
   const result = []
 
-  for (const floor of floors) {
+  for (const floor of floors.value) {
     const data = await request.get(`/buildings/${BUILDING_ID}/floors/${floor.id}/rooms`)
     result.push(...(data.content || data || []))
   }
@@ -267,48 +339,48 @@ async function loadRooms() {
   rooms.value = result
 }
 
-async function loadTenantLeases(tenantId) {
-  if (!tenantId) {
-    tenantLeases.value = []
-    return
-  }
-
-  const data = await request.get(`/rooms/tenants/${tenantId}/rooms`)
-  tenantLeases.value = data || []
-}
-
 const openCreateDialog = () => {
   resetForm()
-  tenantLeases.value = []
   dialogVisible.value = true
 }
 
-async function handleTenantChange(tenantId) {
-  form.leaseId = ''
+function handleFloorChange() {
   form.roomId = ''
-  await loadTenantLeases(tenantId)
 }
 
-function handleLeaseChange(leaseId) {
-  const lease = tenantLeases.value.find(item => item.id === leaseId)
-  if (!lease) return
-
-  form.roomId = lease.roomId
-  form.startDate = lease.startDate || form.startDate
-  form.endDate = lease.endDate || form.endDate
+function floorLabel(floor) {
+  return floor.floorName || floor.floorNumber || `${floor.floorNo || floor.id}层`
 }
 
 const createContract = async () => {
-  if (!form.tenantId || !form.roomId || !form.leaseId) {
-    ElMessage.warning('请选择租户和租约')
+  if (!form.tenantName || !form.roomId) {
+    ElMessage.warning('请输入租户名称并选择房间')
     return
   }
 
-  await request.post('/contracts', form)
+  const payload = {
+    contractNumber: form.contractNumber,
+    contractName: form.contractName,
+    tenantName: form.tenantName,
+    contactPerson: form.contactPerson,
+    contactPhone: form.contactPhone,
+    contactEmail: form.contactEmail,
+    roomId: Number(form.roomId),
+    startDate: form.startDate,
+    endDate: form.endDate,
+    rentAmount: form.rentAmount,
+    propertyFeeAmount: form.propertyFeeAmount,
+    depositAmount: form.depositAmount,
+    paymentCycle: form.paymentCycle,
+    billingLeadDays: form.billingLeadDays,
+    remark: form.remark
+  }
+
+  await request.post('/contracts', payload)
   ElMessage.success('创建成功')
   dialogVisible.value = false
   resetForm()
-  loadContracts()
+  await Promise.all([loadContracts(), loadTenants()])
 }
 
 const activate = async (row) => {
@@ -321,6 +393,11 @@ const terminate = async (row) => {
   await request.post(`/contracts/${row.id}/terminate`)
   ElMessage.success('已终止')
   loadContracts()
+}
+
+const generateBills = async () => {
+  const count = await request.post('/contracts/generate-bills')
+  ElMessage.success(`已生成 ${count || 0} 张到期账单`)
 }
 
 onMounted(async () => {
@@ -337,9 +414,143 @@ onMounted(async () => {
   padding: 20px;
 }
 
+.page-container :deep(.el-card__body) {
+  padding: 22px 24px 28px;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-height: 36px;
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.contract-table {
+  font-size: 14px;
+}
+
+.contract-table :deep(.el-table__header th) {
+  height: 52px;
+  background: #f7f8fa;
+  color: #303133;
+  font-weight: 600;
+}
+
+.contract-table :deep(.el-table__row td) {
+  padding: 14px 0;
+  vertical-align: middle;
+}
+
+.primary-text {
+  color: #1f2937;
+  font-weight: 600;
+  line-height: 22px;
+  word-break: break-word;
+}
+
+.secondary-text {
+  margin-top: 4px;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 20px;
+  word-break: break-word;
+}
+
+.money-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  line-height: 22px;
+  white-space: nowrap;
+}
+
+.money-line span {
+  color: #909399;
+}
+
+.money-line strong {
+  min-width: 66px;
+  color: #1f2937;
+  font-weight: 600;
+  text-align: right;
+}
+
+.muted-line strong {
+  color: #4b5563;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.action-buttons :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
+.status-tag {
+  margin-top: 8px;
+}
+
+.contract-dialog :deep(.el-dialog__body) {
+  padding: 8px 28px 4px;
+  max-height: 68vh;
+  overflow-y: auto;
+}
+
+.contract-dialog :deep(.el-dialog__footer) {
+  padding: 14px 28px 22px;
+}
+
+.form-section-title {
+  margin: 18px 0 12px;
+  padding-left: 10px;
+  border-left: 3px solid #d93025;
+  color: #303133;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.form-section-title:first-child {
+  margin-top: 4px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 18px;
+  row-gap: 2px;
+}
+
+.form-grid :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.form-grid :deep(.el-form-item__label) {
+  padding-bottom: 6px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.form-tip {
+  width: 100%;
+  margin-top: 6px;
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

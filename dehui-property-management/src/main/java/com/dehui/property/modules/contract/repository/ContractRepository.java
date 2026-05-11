@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface ContractRepository extends JpaRepository<Contract, Long> {
 
@@ -14,6 +15,10 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
     boolean existsByLeaseId(Long leaseId);
 
     boolean existsByContractNumber(String contractNumber);
+
+    List<Contract> findByStatus(String status);
+
+    List<Contract> findByStatusAndLeaseIdIsNull(String status);
 
     @Query(value = "SELECT COUNT(*) FROM contract WHERE status = :status", nativeQuery = true)
     Long countByStatus(@Param("status") String status);

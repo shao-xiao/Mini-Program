@@ -40,6 +40,11 @@ public class ParkingBillController {
         return Result.success(parkingBillService.pay(id));
     }
 
+    @PostMapping("/sync-to-bills")
+    public Result<Integer> syncToBills() {
+        return Result.success(parkingBillService.syncAllToUnifiedBills());
+    }
+
     @GetMapping("/stats")
     public Result<java.util.Map<String, Object>> stats() {
         return Result.success(parkingBillService.stats());

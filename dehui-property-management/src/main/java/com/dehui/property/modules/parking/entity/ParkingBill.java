@@ -21,6 +21,8 @@ public class ParkingBill extends BaseEntity {
 
     private Long tenantId;
 
+    private Boolean vip;
+
     private String plateNumber;
 
     private String billType; // MONTHLY / TEMP
@@ -32,6 +34,8 @@ public class ParkingBill extends BaseEntity {
     private BigDecimal amount;
 
     private String status; // UNPAID / PAID / CANCELLED
+
+    private Long billId;
 
     private LocalDate dueDate;
 

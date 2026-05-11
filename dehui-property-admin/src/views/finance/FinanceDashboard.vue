@@ -79,17 +79,24 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
-import request from '../../utils/request'
-
-const loading = ref(false)
-const bills = ref([])
-const parkingBills = ref([])
+  import request from '../../utils/request'
+  
+  const loading = ref(false)
+  const bills = ref([])
 
 const trendRef = ref(null)
 const sourceRef = ref(null)
 const typeRef = ref(null)
 const riskRef = ref(null)
 const charts = []
+
+function localDateText(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function monthText(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
 
 function money(value) {
   const n = Number(value || 0)
@@ -117,22 +124,8 @@ function normalizeBill(item) {
   }
 }
 
-function normalizeParkingBill(item) {
-  const amount = money(item.amount)
-  return {
-    ...item,
-    source: 'PARKING',
-    sourceName: '停车',
-    billType: 'PARKING',
-    paidAmount: item.status === 'PAID' ? amount : 0
-  }
-}
-
 const allBills = computed(() => {
-  return [
-    ...bills.value.map(normalizeBill),
-    ...parkingBills.value.map(normalizeParkingBill)
-  ]
+  return bills.value.map(normalizeBill)
 })
 
 const paidAmount = computed(() => {
@@ -205,11 +198,11 @@ const tenantStats = computed(() => {
 
 const monthlyTrend = computed(() => {
   const months = []
-  const today = new Date()
+  const endMonth = latestTrendMonth.value
 
   for (let i = 5; i >= 0; i -= 1) {
-    const date = new Date(today.getFullYear(), today.getMonth() - i, 1)
-    months.push(date.toISOString().slice(0, 7))
+    const date = new Date(endMonth.getFullYear(), endMonth.getMonth() - i, 1)
+    months.push(monthText(date))
   }
 
   return months.map(month => {
@@ -222,11 +215,33 @@ const monthlyTrend = computed(() => {
   })
 })
 
+const latestTrendMonth = computed(() => {
+  const current = new Date()
+  const latest = new Date(current.getFullYear(), current.getMonth(), 1)
+
+  allBills.value.forEach(item => {
+    const month = String(item.periodStart || '').slice(0, 7)
+    if (!/^\d{4}-\d{2}$/.test(month)) return
+
+    const [year, monthNumber] = month.split('-').map(Number)
+    const billMonth = new Date(year, monthNumber - 1, 1)
+    if (billMonth > latest) {
+      latest.setFullYear(billMonth.getFullYear(), billMonth.getMonth(), 1)
+    }
+  })
+
+  return latest
+})
+
 const sourceData = computed(() => {
-  return [
-    { name: '租赁账单', value: bills.value.reduce((sum, item) => sum + money(item.amount), 0) },
-    { name: '停车账单', value: parkingBills.value.reduce((sum, item) => sum + money(item.amount), 0) }
-  ].filter(item => item.value > 0)
+  const map = new Map()
+
+  allBills.value.forEach(item => {
+    const key = formatBillType(item.billType || 'OTHER')
+    map.set(key, (map.get(key) || 0) + money(item.amount))
+  })
+
+  return Array.from(map.entries()).map(([name, value]) => ({ name, value }))
 })
 
 const typeData = computed(() => {
@@ -263,17 +278,22 @@ function isOverdue(item) {
 }
 
 function today() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return localDateText(new Date())
 }
 
 function formatBillType(type) {
   return {
     RENT: '租金',
     PROPERTY: '物业费',
+    MEETING: '会议',
+    MEETING_ROOM: '会议',
+    WATER: '水',
+    ELECTRICITY: '电',
+    GAS: '煤',
     PARKING: '停车费',
     ENERGY: '能耗费',
-    OTHER: '其他'
+    UTILITY: '水电煤',
+    OTHER: '其它'
   }[type] || type || '-'
 }
 
@@ -293,19 +313,49 @@ function renderCharts() {
   const risk = createChart(riskRef)
 
   trend?.setOption({
+    animation: false,
     color: ['#d93025', '#555555'],
-    tooltip: { trigger: 'axis' },
-    legend: { top: 0 },
-    grid: { left: 42, right: 20, top: 44, bottom: 28 },
+    tooltip: {
+      trigger: 'axis',
+      valueFormatter: value => `¥ ${formatMoney(value)}`
+    },
+    legend: { top: 0, data: ['应收金额', '实收金额'] },
+    grid: { left: 58, right: 24, top: 44, bottom: 28 },
     xAxis: { type: 'category', data: monthlyTrend.value.map(item => item.month) },
-    yAxis: { type: 'value' },
+    yAxis: {
+      type: 'value',
+      axisLabel: {
+        formatter: value => shortMoney(value)
+      }
+    },
     series: [
-      { name: '应收', type: 'bar', barMaxWidth: 28, data: monthlyTrend.value.map(item => item.receivable) },
-      { name: '实收', type: 'line', smooth: true, data: monthlyTrend.value.map(item => item.received) }
+      {
+        name: '应收金额',
+        type: 'bar',
+        barMaxWidth: 28,
+        data: monthlyTrend.value.map(item => item.receivable),
+        label: {
+          show: true,
+          position: 'top',
+          formatter: params => (money(params.value) > 0 ? shortMoney(params.value) : '')
+        }
+      },
+      {
+        name: '实收金额',
+        type: 'line',
+        smooth: true,
+        symbolSize: 8,
+        data: monthlyTrend.value.map(item => item.received),
+        label: {
+          show: true,
+          formatter: params => (money(params.value) > 0 ? shortMoney(params.value) : '')
+        }
+      }
     ]
   })
 
   source?.setOption({
+    animation: false,
     color: ['#d93025', '#4a4a4a'],
     tooltip: { trigger: 'item' },
     legend: { bottom: 0 },
@@ -313,12 +363,14 @@ function renderCharts() {
   })
 
   type?.setOption({
+    animation: false,
     color: ['#d93025', '#555555', '#8a6d3b', '#67c23a'],
     tooltip: { trigger: 'item' },
     series: [{ type: 'pie', radius: '68%', data: typeData.value }]
   })
 
   risk?.setOption({
+    animation: false,
     color: ['#d93025'],
     tooltip: { trigger: 'axis' },
     grid: { left: 80, right: 20, top: 18, bottom: 24 },
@@ -335,12 +387,8 @@ function resizeCharts() {
 async function loadBills() {
   loading.value = true
   try {
-    const [billData, parkingBillData] = await Promise.all([
-      request.get('/bills'),
-      request.get('/parking/bills')
-    ])
+    const billData = await request.get('/bills')
     bills.value = Array.isArray(billData) ? billData : []
-    parkingBills.value = Array.isArray(parkingBillData) ? parkingBillData : []
   } catch (e) {
     ElMessage.error(e.message || '加载账务分析数据失败')
   } finally {

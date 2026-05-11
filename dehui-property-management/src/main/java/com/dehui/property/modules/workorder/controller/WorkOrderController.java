@@ -71,6 +71,11 @@ public class WorkOrderController {
         return workOrderService.complete(id, request);
     }
 
+    @PostMapping("/{id}/generate-bill")
+    public Result<WorkOrderResponse> generateBill(@PathVariable Long id) {
+        return workOrderService.generateBill(id);
+    }
+
     @PatchMapping("/{id}/close")
     public Result<WorkOrderResponse> close(@PathVariable Long id) {
         return workOrderService.close(id);

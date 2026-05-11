@@ -6,6 +6,8 @@ import com.dehui.property.modules.building.entity.Room;
 import com.dehui.property.modules.building.repository.BuildingRepository;
 import com.dehui.property.modules.building.repository.FloorRepository;
 import com.dehui.property.modules.building.repository.RoomRepository;
+import com.dehui.property.modules.energy.entity.EnergyRateRule;
+import com.dehui.property.modules.energy.repository.EnergyRateRuleRepository;
 import com.dehui.property.modules.system.entity.SysRole;
 import com.dehui.property.modules.system.entity.SysUser;
 import com.dehui.property.modules.system.entity.UserRole;
@@ -17,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Component
@@ -31,11 +34,13 @@ public class DataInitializer {
     private final SysUserRepository sysUserRepository;
     private final SysRoleRepository sysRoleRepository;
     private final UserRoleRepository userRoleRepository;
+    private final EnergyRateRuleRepository energyRateRuleRepository;
 
     @PostConstruct
     public void init() {
         initSystemUserAndRoles();
         initBuildingFloorsAndRooms();
+        initEnergyRateRules();
         log.info("数据初始化完成");
     }
 
@@ -139,6 +144,45 @@ public class DataInitializer {
             }
 
             log.info("初始化房间完成");
+        }
+    }
+
+    private void initEnergyRateRules() {
+        createEnergyRateRuleIfMissing("ELECTRICITY", new BigDecimal("1.00"), "默认电费单价");
+        createEnergyRateRuleIfMissing("WATER", new BigDecimal("4.00"), "默认水费单价");
+        createEnergyRateRuleIfMissing("GAS", new BigDecimal("3.00"), "默认煤气单价");
+    }
+
+    private void createEnergyRateRuleIfMissing(String energyType, BigDecimal unitPrice, String remark) {
+        List<EnergyRateRule> rules = energyRateRuleRepository.findByEnergyTypeOrderByUpdatedTimeDesc(energyType);
+        EnergyRateRule defaultRule = rules
+                .stream()
+                .filter(rule -> remark.equals(rule.getRemark()))
+                .findFirst()
+                .orElse(null);
+
+        if (defaultRule == null) {
+            defaultRule = new EnergyRateRule();
+            defaultRule.setEnergyType(energyType);
+            defaultRule.setUnitPrice(unitPrice);
+            defaultRule.setStatus("ACTIVE");
+            defaultRule.setRemark(remark);
+            defaultRule.setDefaultRule(true);
+            defaultRule = energyRateRuleRepository.save(defaultRule);
+            log.info("初始化能耗计费规则: {} {}", energyType, unitPrice);
+        }
+
+        for (EnergyRateRule rule : rules) {
+            boolean shouldBeDefault = rule.getId().equals(defaultRule.getId());
+            if (Boolean.TRUE.equals(rule.getDefaultRule()) != shouldBeDefault) {
+                rule.setDefaultRule(shouldBeDefault);
+                energyRateRuleRepository.save(rule);
+            }
+        }
+
+        if (!Boolean.TRUE.equals(defaultRule.getDefaultRule())) {
+            defaultRule.setDefaultRule(true);
+            energyRateRuleRepository.save(defaultRule);
         }
     }
 }

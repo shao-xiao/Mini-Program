@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface BillRepository extends JpaRepository<Bill, Long> {
 
@@ -22,6 +23,8 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
     List<Bill> findByStatusAndDueDateBefore(String status, LocalDate date);
 
     boolean existsByBillNumber(String billNumber);
+
+    Optional<Bill> findByBillNumber(String billNumber);
 
     boolean existsByContractIdAndBillTypeAndPeriodStart(Long contractId, String billType, LocalDate periodStart);
 

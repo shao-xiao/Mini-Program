@@ -13,13 +13,19 @@ public class ContractCreateRequest {
 
     private String contractName;
 
-    @NotNull(message = "租户ID不能为空")
     private Long tenantId;
+
+    private String tenantName;
+
+    private String contactPerson;
+
+    private String contactPhone;
+
+    private String contactEmail;
 
     @NotNull(message = "房间ID不能为空")
     private Long roomId;
 
-    @NotNull(message = "租约ID不能为空")
     private Long leaseId;
 
     @NotNull(message = "开始日期不能为空")
@@ -42,6 +48,8 @@ public class ContractCreateRequest {
     private Integer dueDay;
 
     private String paymentTerms;
+
+    private Integer billingLeadDays;
 
     private String billingRule;
 

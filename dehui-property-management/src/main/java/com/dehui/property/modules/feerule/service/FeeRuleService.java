@@ -39,6 +39,10 @@ public class FeeRuleService {
     }
 
     public Result<FeeRuleResponse> create(FeeRuleCreateRequest request) {
+        if ("RENT".equals(request.getFeeType()) || "PROPERTY".equals(request.getFeeType())) {
+            return Result.error("租金和物业费请在合同台账中设置，由合同自动出账；收费规则仅用于附加周期费用");
+        }
+
         FeeRule rule = new FeeRule();
         rule.setRuleName(request.getRuleName());
         rule.setTenantId(request.getTenantId());
@@ -68,6 +72,10 @@ public class FeeRuleService {
 
         if (rule.getAmount() == null || rule.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             return Result.error("收费金额必须大于0");
+        }
+
+        if ("RENT".equals(rule.getFeeType()) || "PROPERTY".equals(rule.getFeeType())) {
+            return Result.error("租金和物业费请通过合同台账自动出账");
         }
 
         Contract contract = contractRepository.findById(rule.getContractId()).orElse(null);

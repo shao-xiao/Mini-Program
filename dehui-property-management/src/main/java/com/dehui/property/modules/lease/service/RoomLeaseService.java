@@ -3,6 +3,8 @@ package com.dehui.property.modules.lease.service;
 import com.dehui.property.common.Result;
 import com.dehui.property.modules.building.entity.Room;
 import com.dehui.property.modules.building.repository.RoomRepository;
+import com.dehui.property.modules.contract.entity.Contract;
+import com.dehui.property.modules.contract.repository.ContractRepository;
 import com.dehui.property.modules.lease.dto.RoomLeaseCreateRequest;
 import com.dehui.property.modules.lease.dto.RoomLeaseResponse;
 import com.dehui.property.modules.lease.entity.RoomLease;
@@ -22,6 +24,7 @@ public class RoomLeaseService {
     private final RoomLeaseRepository roomLeaseRepository;
     private final RoomRepository roomRepository;
     private final TenantRepository tenantRepository;
+    private final ContractRepository contractRepository;
 
     @Transactional
     public Result<RoomLeaseResponse> checkin(Long roomId, RoomLeaseCreateRequest request) {
@@ -35,6 +38,23 @@ public class RoomLeaseService {
         // 2. 校验租户存在
         if (!tenantRepository.existsById(request.getTenantId())) {
             return Result.error("租户不存在");
+        }
+
+        Contract contract = null;
+        if (request.getContractId() != null) {
+            contract = contractRepository.findById(request.getContractId()).orElse(null);
+            if (contract == null) {
+                return Result.error("合同不存在");
+            }
+            if (!"ACTIVE".equals(contract.getStatus())) {
+                return Result.error("合同未生效，无法办理入驻");
+            }
+            if (contract.getLeaseId() != null) {
+                return Result.error("该合同已办理入驻");
+            }
+            if (!request.getTenantId().equals(contract.getTenantId()) || !roomId.equals(contract.getRoomId())) {
+                return Result.error("入驻租户或房间与合同不一致");
+            }
         }
 
         // 3. 校验房间状态为 AVAILABLE
@@ -57,6 +77,11 @@ public class RoomLeaseService {
         lease.setStatus("ACTIVE");
         lease.setRemark(request.getRemark());
         RoomLease saved = roomLeaseRepository.save(lease);
+
+        if (contract != null) {
+            contract.setLeaseId(saved.getId());
+            contractRepository.save(contract);
+        }
 
         // 6. 更新房间状态为 RENTED
         room.setStatus("RENTED");

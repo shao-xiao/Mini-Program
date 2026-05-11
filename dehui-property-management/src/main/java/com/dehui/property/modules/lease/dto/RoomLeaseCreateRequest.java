@@ -6,6 +6,8 @@ import java.time.LocalDate;
 
 @Data
 public class RoomLeaseCreateRequest {
+    private Long contractId;
+
     @NotNull(message = "租户ID不能为空")
     private Long tenantId;
 

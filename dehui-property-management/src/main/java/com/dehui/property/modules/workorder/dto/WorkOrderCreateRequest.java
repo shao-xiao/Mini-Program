@@ -27,4 +27,6 @@ public class WorkOrderCreateRequest {
     private String priority;
 
     private Long reporterId;
+
+    private Long tenantId;
 }

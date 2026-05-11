@@ -97,6 +97,15 @@ public class MobileBillService {
         if ("UTILITY".equals(billType)) {
             return "水电煤";
         }
+        if ("WATER".equals(billType)) {
+            return "水";
+        }
+        if ("ELECTRICITY".equals(billType)) {
+            return "电";
+        }
+        if ("GAS".equals(billType)) {
+            return "煤";
+        }
         if ("PARKING".equals(billType)) {
             return "停车费";
         }

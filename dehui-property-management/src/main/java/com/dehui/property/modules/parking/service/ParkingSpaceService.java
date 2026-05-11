@@ -14,6 +14,8 @@ public class ParkingSpaceService {
     private final ParkingSpaceRepository parkingSpaceRepository;
 
     public ParkingSpace create(ParkingSpace parkingSpace) {
+        validateArea(parkingSpace.getArea());
+
         if (parkingSpace.getStatus() == null || parkingSpace.getStatus().isBlank()) {
             parkingSpace.setStatus("AVAILABLE");
         }
@@ -25,6 +27,37 @@ public class ParkingSpaceService {
         return parkingSpaceRepository.save(parkingSpace);
     }
 
+    public ParkingSpace update(Long id, ParkingSpace request) {
+        ParkingSpace space = get(id);
+        validateArea(request.getArea());
+
+        space.setSpaceCode(request.getSpaceCode());
+        space.setArea(request.getArea());
+        space.setSpaceType(request.getSpaceType());
+        space.setStatus(request.getStatus());
+        space.setTenantId(request.getTenantId());
+        space.setPlateNumber(request.getPlateNumber());
+        space.setRemark(request.getRemark());
+
+        if (space.getSpaceType() == null || space.getSpaceType().isBlank()) {
+            space.setSpaceType("FIXED");
+        }
+        if (space.getStatus() == null || space.getStatus().isBlank()) {
+            space.setStatus(space.getPlateNumber() == null || space.getPlateNumber().isBlank()
+                    ? "AVAILABLE"
+                    : "OCCUPIED");
+        }
+        if (!"OCCUPIED".equals(space.getStatus())) {
+            space.setTenantId(null);
+            space.setPlateNumber(null);
+            if ("VIP".equals(space.getSpaceType())) {
+                space.setSpaceType("FIXED");
+            }
+        }
+
+        return parkingSpaceRepository.save(space);
+    }
+
     public List<ParkingSpace> list() {
         return parkingSpaceRepository.findAll();
     }
@@ -34,7 +67,7 @@ public class ParkingSpaceService {
                 .orElseThrow(() -> new RuntimeException("车位不存在"));
     }
 
-    public ParkingSpace bindToTenant(Long id, Long tenantId, String plateNumber) {
+    public ParkingSpace bindToTenant(Long id, Long tenantId, Boolean vip, String plateNumber) {
         ParkingSpace space = get(id);
 
         if ("DISABLED".equals(space.getStatus())) {
@@ -45,16 +78,21 @@ public class ParkingSpaceService {
             throw new RuntimeException("该车位已被占用，请先释放后再绑定");
         }
 
-        if (tenantId == null || tenantId <= 0) {
-            throw new RuntimeException("租户ID不能为空");
+        boolean bindVip = Boolean.TRUE.equals(vip);
+
+        if (!bindVip && (tenantId == null || tenantId <= 0)) {
+            throw new RuntimeException("请选择租户或VIP");
         }
 
         if (plateNumber == null || plateNumber.isBlank()) {
             throw new RuntimeException("车牌号不能为空");
         }
 
-        space.setTenantId(tenantId);
+        space.setTenantId(bindVip ? null : tenantId);
         space.setPlateNumber(plateNumber.trim());
+        if (bindVip) {
+            space.setSpaceType("VIP");
+        }
         space.setStatus("OCCUPIED");
 
         return parkingSpaceRepository.save(space);
@@ -66,6 +104,9 @@ public class ParkingSpaceService {
         space.setTenantId(null);
         space.setPlateNumber(null);
         space.setStatus("AVAILABLE");
+        if ("VIP".equals(space.getSpaceType())) {
+            space.setSpaceType("FIXED");
+        }
 
         return parkingSpaceRepository.save(space);
     }
@@ -83,6 +124,11 @@ public class ParkingSpaceService {
     public Long countOccupied() {
         return parkingSpaceRepository.countByStatus("OCCUPIED");
     }
+
+    public void delete(Long id) {
+        ParkingSpace space = get(id);
+        parkingSpaceRepository.delete(space);
+    }
     
     public java.util.Map<String, Object> stats() {
     Long total = parkingSpaceRepository.count();
@@ -99,5 +145,14 @@ public class ParkingSpaceService {
             "disabled", disabled,
             "occupancyRate", occupancyRate
         );
+    }
+
+    private void validateArea(String area) {
+        if (area == null || area.isBlank()) {
+            throw new RuntimeException("车位区域不能为空");
+        }
+        if (!List.of("A", "B", "C", "D").contains(area)) {
+            throw new RuntimeException("车位区域只能是A、B、C、D");
+        }
     }
 }

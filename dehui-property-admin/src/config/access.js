@@ -71,7 +71,6 @@ export const menuSections = [
     roles: ['ADMIN', 'FINANCE', 'MANAGER'],
     children: [
       { title: '账单管理', path: '/bills' },
-      { title: '收费规则', path: '/feerules' },
       { title: '财务看板', path: '/finance/dashboard' }
     ]
   },

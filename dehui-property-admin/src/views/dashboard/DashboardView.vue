@@ -142,11 +142,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import request from '../../utils/request'
 
-const loading = ref(false)
-const report = ref({})
-const bills = ref([])
-const parkingBills = ref([])
-const contracts = ref([])
+  const loading = ref(false)
+  const report = ref({})
+  const bills = ref([])
+  const contracts = ref([])
 
 const revenueTrendRef = ref(null)
 const billSourceRef = ref(null)
@@ -154,7 +153,34 @@ const roomStatusRef = ref(null)
 const overdueRiskRef = ref(null)
 
 const charts = []
-const currentMonth = new Date().toISOString().slice(0, 7)
+
+function todayText() {
+  const date = new Date()
+  return localDateText(date)
+}
+
+function localDateText(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+  function monthText(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+  }
+
+  function formatBillType(type) {
+    return {
+      RENT: '租金',
+      PROPERTY: '物业费',
+      MEETING: '会议',
+      MEETING_ROOM: '会议',
+      WATER: '水',
+      ELECTRICITY: '电',
+      GAS: '煤',
+      PARKING: '停车',
+      OTHER: '其它',
+      UTILITY: '水电煤'
+    }[type] || type || '其它'
+  }
 
 function money(value) {
   const n = Number(value || 0)
@@ -176,35 +202,21 @@ function formatShortMoney(value) {
   return formatMoney(n)
 }
 
-function normalizeBill(item) {
-  return {
-    ...item,
-    source: 'RENT',
-    sourceName: '租赁',
-    paidAmount: money(item.paidAmount)
+  function normalizeBill(item) {
+    return {
+      ...item,
+      source: item.billType || 'OTHER',
+      sourceName: formatBillType(item.billType),
+      paidAmount: money(item.paidAmount)
+    }
   }
-}
 
-function normalizeParkingBill(item) {
-  const amount = money(item.amount)
-
-  return {
-    ...item,
-    source: 'PARKING',
-    sourceName: '停车',
-    contractId: '-',
-    paidAmount: item.status === 'PAID' ? amount : 0
-  }
-}
-
-const allBills = computed(() => {
-  return [
-    ...bills.value.map(normalizeBill),
-    ...parkingBills.value.map(normalizeParkingBill)
-  ]
-})
+  const allBills = computed(() => {
+    return bills.value.map(normalizeBill)
+  })
 
 const monthBills = computed(() => {
+  const currentMonth = monthText(new Date())
   return allBills.value.filter(item => String(item.periodStart || '').startsWith(currentMonth))
 })
 
@@ -213,23 +225,22 @@ function isOverdue(row) {
     return false
   }
 
-  const today = new Date().toISOString().slice(0, 10)
-  return String(row.dueDate) < today
+  return String(row.dueDate) < todayText()
 }
 
 const expiringContracts = computed(() => {
   const today = new Date()
-  const todayText = today.toISOString().slice(0, 10)
+  const startText = localDateText(today)
 
   const limit = new Date(today)
   limit.setDate(limit.getDate() + 30)
-  const limitText = limit.toISOString().slice(0, 10)
+  const limitText = localDateText(limit)
 
   return contracts.value
     .filter(item => {
       return item.status === 'ACTIVE'
         && item.endDate
-        && String(item.endDate) >= todayText
+        && String(item.endDate) >= startText
         && String(item.endDate) <= limitText
     })
     .sort((a, b) => String(a.endDate || '').localeCompare(String(b.endDate || '')))
@@ -357,12 +368,12 @@ const roomRentRate = computed(() => {
 })
 
 const monthlyTrend = computed(() => {
+  const endMonth = latestTrendMonth.value
   const months = []
-  const today = new Date()
 
   for (let i = 5; i >= 0; i -= 1) {
-    const date = new Date(today.getFullYear(), today.getMonth() - i, 1)
-    months.push(date.toISOString().slice(0, 7))
+    const date = new Date(endMonth.getFullYear(), endMonth.getMonth() - i, 1)
+    months.push(monthText(date))
   }
 
   return months.map(month => {
@@ -375,18 +386,37 @@ const monthlyTrend = computed(() => {
   })
 })
 
-const billSourceData = computed(() => {
-  const rent = bills.value.reduce((sum, item) => sum + money(item.amount), 0)
-  const parking = parkingBills.value.reduce((sum, item) => sum + money(item.amount), 0)
+const latestTrendMonth = computed(() => {
+  const current = new Date()
+  const latest = new Date(current.getFullYear(), current.getMonth(), 1)
 
-  return [
-    { name: '租赁账单', value: rent },
-    { name: '停车账单', value: parking }
-  ].filter(item => item.value > 0)
+  allBills.value.forEach(item => {
+    const month = String(item.periodStart || '').slice(0, 7)
+    if (!/^\d{4}-\d{2}$/.test(month)) return
+
+    const [year, monthNumber] = month.split('-').map(Number)
+    const billMonth = new Date(year, monthNumber - 1, 1)
+    if (billMonth > latest) {
+      latest.setFullYear(billMonth.getFullYear(), billMonth.getMonth(), 1)
+    }
+  })
+
+  return latest
+})
+
+const billSourceData = computed(() => {
+  const map = new Map()
+
+  allBills.value.forEach(item => {
+    const key = formatBillType(item.billType || 'OTHER')
+    map.set(key, (map.get(key) || 0) + money(item.amount))
+  })
+
+  return Array.from(map.entries()).map(([name, value]) => ({ name, value }))
 })
 
 const overdueRiskData = computed(() => {
-  const today = new Date().toISOString().slice(0, 10)
+  const currentDate = todayText()
 
   const result = {
     '已逾期': 0,
@@ -397,14 +427,14 @@ const overdueRiskData = computed(() => {
   allBills.value.forEach(item => {
     if (item.status === 'PAID' || item.status === 'CANCELLED') return
 
-    if (String(item.dueDate || '') < today) {
+    if (String(item.dueDate || '') < currentDate) {
       result['已逾期'] += 1
       return
     }
 
     const limit = new Date()
     limit.setDate(limit.getDate() + 7)
-    const limitText = limit.toISOString().slice(0, 10)
+    const limitText = localDateText(limit)
 
     if (item.dueDate && String(item.dueDate) <= limitText) {
       result['7天内到期'] += 1
@@ -433,29 +463,49 @@ function renderCharts() {
   const overdueRisk = createChart(overdueRiskRef)
 
   revenueTrend?.setOption({
+    animation: false,
     color: ['#d93025', '#555555'],
-    tooltip: { trigger: 'axis' },
-    legend: { top: 0 },
-    grid: { left: 36, right: 20, top: 44, bottom: 28 },
+    tooltip: {
+      trigger: 'axis',
+      valueFormatter: value => `¥ ${formatMoney(value)}`
+    },
+    legend: { top: 0, data: ['应收金额', '实收金额'] },
+    grid: { left: 58, right: 24, top: 44, bottom: 28 },
     xAxis: { type: 'category', data: monthlyTrend.value.map(item => item.month) },
-    yAxis: { type: 'value' },
+    yAxis: {
+      type: 'value',
+      axisLabel: {
+        formatter: value => formatShortMoney(value)
+      }
+    },
     series: [
       {
-        name: '应收',
+        name: '应收金额',
         type: 'bar',
         data: monthlyTrend.value.map(item => item.receivable),
-        barMaxWidth: 28
+        barMaxWidth: 28,
+        label: {
+          show: true,
+          position: 'top',
+          formatter: params => (money(params.value) > 0 ? formatShortMoney(params.value) : '')
+        }
       },
       {
-        name: '实收',
+        name: '实收金额',
         type: 'line',
         smooth: true,
+        symbolSize: 8,
+        label: {
+          show: true,
+          formatter: params => (money(params.value) > 0 ? formatShortMoney(params.value) : '')
+        },
         data: monthlyTrend.value.map(item => item.received)
       }
     ]
   })
 
   billSource?.setOption({
+    animation: false,
     color: ['#d93025', '#4a4a4a'],
     tooltip: { trigger: 'item' },
     legend: { bottom: 0 },
@@ -470,6 +520,7 @@ function renderCharts() {
   })
 
   roomStatus?.setOption({
+    animation: false,
     color: ['#d93025', '#9ca3af'],
     tooltip: { trigger: 'item' },
     series: [
@@ -485,6 +536,7 @@ function renderCharts() {
   })
 
   overdueRisk?.setOption({
+    animation: false,
     color: ['#d93025', '#e6a23c', '#67c23a'],
     tooltip: { trigger: 'axis' },
     grid: { left: 80, right: 20, top: 18, bottom: 24 },
@@ -523,15 +575,6 @@ async function loadBills() {
   }
 }
 
-async function loadParkingBills() {
-  try {
-    const data = await request.get('/parking/bills', { silent: true })
-    parkingBills.value = Array.isArray(data) ? data : []
-  } catch {
-    parkingBills.value = []
-  }
-}
-
 async function loadContracts() {
   try {
     const data = await request.get('/contracts', { silent: true })
@@ -548,7 +591,6 @@ async function loadDashboard() {
     await Promise.allSettled([
       loadReport(),
       loadBills(),
-      loadParkingBills(),
       loadContracts()
     ])
   } finally {

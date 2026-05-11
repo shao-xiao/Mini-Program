@@ -22,6 +22,12 @@ public class EnergyRecord extends BaseEntity {
     private BigDecimal reading;
     
     private BigDecimal consumption;
+
+    private BigDecimal unitPrice;
+
+    private BigDecimal amount;
+
+    private Long billId;
     
     private Long buildingId;
     

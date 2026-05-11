@@ -57,26 +57,29 @@
 
     <el-dialog v-model="dialogVisible" title="办理入住" width="520px">
       <el-form :model="form" label-width="100px">
-        <el-form-item label="租户">
-          <el-select v-model="form.tenantId" filterable placeholder="请选择租户" style="width: 100%">
+        <el-form-item label="合同">
+          <el-select
+            v-model="form.contractId"
+            filterable
+            placeholder="请选择已生效且未入驻合同"
+            style="width: 100%"
+            @change="handleContractChange"
+          >
             <el-option
-              v-for="tenant in activeTenants"
-              :key="tenant.id"
-              :label="tenantLabel(tenant)"
-              :value="tenant.id"
+              v-for="contract in pendingContracts"
+              :key="contract.id"
+              :label="contractLabel(contract)"
+              :value="contract.id"
             />
           </el-select>
         </el-form-item>
 
+        <el-form-item label="租户">
+          <el-input :model-value="tenantName(form.tenantId)" disabled />
+        </el-form-item>
+
         <el-form-item label="房间">
-          <el-select v-model="form.roomId" filterable placeholder="请选择可用房间" style="width: 100%">
-            <el-option
-              v-for="room in availableRooms"
-              :key="room.id"
-              :label="roomLabel(room)"
-              :value="room.id"
-            />
-          </el-select>
+          <el-input :model-value="roomName(form.roomId)" disabled />
         </el-form-item>
 
         <el-form-item label="开始日期">
@@ -111,7 +114,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 
@@ -119,6 +122,7 @@ const leases = ref([])
 const dialogVisible = ref(false)
 const tenants = ref([])
 const rooms = ref([])
+const pendingContracts = ref([])
 const BUILDING_ID = 1
 
 const query = reactive({
@@ -126,6 +130,7 @@ const query = reactive({
 })
 
 const form = reactive({
+  contractId: null,
   roomId: null,
   tenantId: null,
   startDate: '',
@@ -134,6 +139,7 @@ const form = reactive({
 })
 
 const resetForm = () => {
+  form.contractId = null
   form.roomId = null
   form.tenantId = null
   form.startDate = ''
@@ -143,22 +149,16 @@ const resetForm = () => {
 
 const openCreateDialog = () => {
   resetForm()
+  loadPendingContracts()
   dialogVisible.value = true
 }
-
-const activeTenants = computed(() => {
-  return tenants.value.filter(item => item.status !== 'INACTIVE')
-})
-
-const availableRooms = computed(() => {
-  return rooms.value.filter(item => item.status === 'AVAILABLE')
-})
 
 function tenantLabel(tenant) {
   return `${tenant.tenantName}（ID:${tenant.id}）`
 }
 
 function tenantName(tenantId) {
+  if (!tenantId) return ''
   const tenant = tenants.value.find(item => item.id === tenantId)
   return tenant ? `${tenant.tenantName}（ID:${tenant.id}）` : `租户ID:${tenantId}`
 }
@@ -168,8 +168,13 @@ function roomLabel(room) {
 }
 
 function roomName(roomId) {
+  if (!roomId) return ''
   const room = rooms.value.find(item => item.id === roomId)
   return room ? roomLabel(room) : `房间ID:${roomId}`
+}
+
+function contractLabel(contract) {
+  return `${contract.contractNumber || '合同'}｜${tenantName(contract.tenantId)}｜${roomName(contract.roomId)}`
 }
 
 async function loadTenants() {
@@ -190,6 +195,22 @@ async function loadRooms() {
   rooms.value = result
 }
 
+async function loadPendingContracts() {
+  const data = await request.get('/contracts/pending-checkin')
+  pendingContracts.value = data || []
+}
+
+function handleContractChange(contractId) {
+  const contract = pendingContracts.value.find(item => item.id === contractId)
+  if (!contract) return
+
+  form.tenantId = contract.tenantId
+  form.roomId = contract.roomId
+  form.startDate = contract.startDate || ''
+  form.endDate = contract.endDate || ''
+  form.remark = contract.contractName || ''
+}
+
 const loadTenantLeases = async () => {
   if (!query.tenantId) {
     ElMessage.warning('请输入租户ID')
@@ -201,12 +222,13 @@ const loadTenantLeases = async () => {
 }
 
 const checkin = async () => {
-  if (!form.roomId || !form.tenantId || !form.startDate) {
-    ElMessage.warning('请选择房间、租户和开始日期')
+  if (!form.contractId || !form.roomId || !form.tenantId || !form.startDate) {
+    ElMessage.warning('请选择合同')
     return
   }
 
   await request.post(`/rooms/${form.roomId}/lease`, {
+    contractId: Number(form.contractId),
     tenantId: Number(form.tenantId),
     startDate: form.startDate,
     endDate: form.endDate || null,
@@ -217,7 +239,7 @@ const checkin = async () => {
   dialogVisible.value = false
 
   query.tenantId = form.tenantId
-  await Promise.all([loadTenantLeases(), loadRooms()])
+  await Promise.all([loadTenantLeases(), loadRooms(), loadPendingContracts()])
 }
 
 const checkout = async (row) => {
@@ -231,7 +253,7 @@ const checkout = async (row) => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadTenants(), loadRooms()])
+  await Promise.all([loadTenants(), loadRooms(), loadPendingContracts()])
 })
 </script>
 

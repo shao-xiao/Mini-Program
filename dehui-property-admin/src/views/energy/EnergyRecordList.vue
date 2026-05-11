@@ -5,9 +5,12 @@
         <div class="page-header">
           <div>
             <div class="page-title">能耗抄表</div>
-            <div class="page-subtitle">记录水、电、燃气等能耗抄表数据</div>
+            <div class="page-subtitle">记录水、电、煤等能耗抄表数据</div>
           </div>
-          <el-button type="primary" @click="openCreateDialog">新增抄表</el-button>
+          <div class="header-actions">
+            <el-button @click="openRuleDialog">计费规则</el-button>
+            <el-button type="primary" @click="openCreateDialog">新增抄表</el-button>
+          </div>
         </div>
       </template>
 
@@ -16,7 +19,7 @@
           <el-select v-model="queryForm.energyType" placeholder="全部" clearable style="width: 150px">
             <el-option label="电" value="ELECTRICITY" />
             <el-option label="水" value="WATER" />
-            <el-option label="燃气" value="GAS" />
+            <el-option label="煤" value="GAS" />
             <el-option label="其他" value="OTHER" />
           </el-select>
         </el-form-item>
@@ -44,11 +47,37 @@
         <el-table-column prop="recordDate" label="抄表日期" width="130" align="center" />
         <el-table-column prop="reading" label="本次读数" width="120" align="right" />
         <el-table-column prop="consumption" label="本期用量" width="120" align="right" />
-        <el-table-column prop="buildingId" label="楼宇ID" width="100" align="center" />
-        <el-table-column prop="roomId" label="房间ID" width="100" align="center" />
+        <el-table-column prop="unitPrice" label="单价" width="100" align="right">
+          <template #default="{ row }">{{ row.unitPrice ?? '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="amount" label="结算金额" width="120" align="right">
+          <template #default="{ row }">{{ row.amount ?? '-' }}</template>
+        </el-table-column>
+        <el-table-column label="房间" min-width="130">
+          <template #default="{ row }">{{ roomText(row.roomId) }}</template>
+        </el-table-column>
+        <el-table-column label="账单" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.billId" type="success">已生成</el-tag>
+            <el-tag v-else type="warning">未生成</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="创建时间" min-width="160">
           <template #default="{ row }">
             {{ formatTime(row.createdTime) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              v-if="!row.billId"
+              size="small"
+              type="primary"
+              @click="generateBill(row)"
+            >
+              生成账单
+            </el-button>
+            <el-button v-else size="small" disabled>已入账</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -74,7 +103,7 @@
           <el-select v-model="form.energyType" style="width: 100%" @change="calculateConsumption">
             <el-option label="电" value="ELECTRICITY" />
             <el-option label="水" value="WATER" />
-            <el-option label="燃气" value="GAS" />
+            <el-option label="煤" value="GAS" />
             <el-option label="其他" value="OTHER" />
           </el-select>
         </el-form-item>
@@ -119,12 +148,36 @@
           />
         </el-form-item>
 
-        <el-form-item label="楼宇ID">
-          <el-input-number v-model="form.buildingId" :min="1" :precision="0" style="width: 100%" />
+        <el-form-item label="楼层">
+          <el-select
+            v-model="form.floorId"
+            placeholder="请选择楼层"
+            style="width: 100%"
+            @change="handleFloorChange"
+          >
+            <el-option
+              v-for="floor in floors"
+              :key="floor.id"
+              :label="floor.floorName"
+              :value="floor.id"
+            />
+          </el-select>
         </el-form-item>
 
-        <el-form-item label="房间ID">
-          <el-input-number v-model="form.roomId" :min="1" :precision="0" style="width: 100%" />
+        <el-form-item label="房间号" prop="roomId">
+          <el-select
+            v-model="form.roomId"
+            filterable
+            placeholder="请选择房间"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="room in currentRooms"
+              :key="room.id"
+              :label="roomLabel(room)"
+              :value="room.id"
+            />
+          </el-select>
         </el-form-item>
       </el-form>
 
@@ -133,19 +186,104 @@
         <el-button type="primary" :loading="saving" @click="submitForm">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="ruleDialogVisible" title="能耗计费规则" width="860px" class="rule-dialog">
+      <el-table
+        :data="rateRules"
+        border
+        height="280"
+        class="rule-table"
+      >
+        <el-table-column label="类型" width="100">
+          <template #default="{ row }">{{ formatEnergyType(row.energyType) }}</template>
+        </el-table-column>
+        <el-table-column prop="unitPrice" label="单价" width="110" align="right" />
+        <el-table-column label="默认项" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.defaultRule" type="success">默认</el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'info'">
+              {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="remark" label="备注" min-width="260" show-overflow-tooltip />
+        <el-table-column label="操作" width="160" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button size="small" @click="editRateRule(row)">编辑</el-button>
+            <el-button
+              size="small"
+              type="danger"
+              :disabled="row.defaultRule"
+              @click="deleteRateRule(row)"
+            >
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="rule-form-header">
+        <span>{{ ruleForm.id ? `正在编辑：${formatEnergyType(ruleForm.energyType)}规则` : '新增计费规则' }}</span>
+        <el-button v-if="ruleForm.id" class="cancel-edit-button" @click="resetRuleForm">取消编辑</el-button>
+      </div>
+
+      <el-form :model="ruleForm" label-width="72px" class="rule-form">
+        <el-form-item label="类型">
+          <el-select v-model="ruleForm.energyType" style="width: 100%">
+            <el-option label="电" value="ELECTRICITY" />
+            <el-option label="水" value="WATER" />
+            <el-option label="煤" value="GAS" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="单价">
+          <el-input-number
+            v-model="ruleForm.unitPrice"
+            :min="0.01"
+            :precision="4"
+            :step="0.1"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="ruleForm.status" style="width: 100%">
+            <el-option label="启用" value="ACTIVE" />
+            <el-option label="停用" value="INACTIVE" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="ruleForm.remark" placeholder="例如：2026年度园区电价" />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="ruleDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="saveRateRule">
+          {{ ruleForm.id ? '保存修改' : '保存规则' }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 
 const loading = ref(false)
 const saving = ref(false)
 const dialogVisible = ref(false)
+const ruleDialogVisible = ref(false)
 const formRef = ref(null)
 const records = ref([])
+const rateRules = ref([])
+const floors = ref([])
+const rooms = ref([])
 const lastReading = ref(0)
 
 const queryForm = reactive({
@@ -164,15 +302,24 @@ const form = reactive({
   recordDate: '',
   reading: 0,
   consumption: 0,
-  buildingId: null,
+  floorId: null,
   roomId: null
+})
+
+const ruleForm = reactive({
+  id: null,
+  energyType: 'ELECTRICITY',
+  unitPrice: 1,
+  status: 'ACTIVE',
+  remark: ''
 })
 
 const rules = {
   meterNumber: [{ required: true, message: '请输入表号', trigger: 'blur' }],
   energyType: [{ required: true, message: '请选择能耗类型', trigger: 'change' }],
   recordDate: [{ required: true, message: '请选择抄表日期', trigger: 'change' }],
-  reading: [{ required: true, message: '请输入本次读数', trigger: 'blur' }]
+  reading: [{ required: true, message: '请输入本次读数', trigger: 'blur' }],
+  roomId: [{ required: true, message: '请选择房间', trigger: 'change' }]
 }
 
 const filteredRecords = computed(() => {
@@ -186,6 +333,10 @@ const filteredRecords = computed(() => {
 const pagedRecords = computed(() => {
   const start = (pagination.currentPage - 1) * pagination.pageSize
   return filteredRecords.value.slice(start, start + pagination.pageSize)
+})
+
+const currentRooms = computed(() => {
+  return rooms.value.filter(room => room.floorId === form.floorId)
 })
 
 function unwrap(res) {
@@ -208,13 +359,38 @@ async function loadRecords() {
   }
 }
 
+async function loadRateRules() {
+  try {
+    const res = await request.get('/energy/rate-rules')
+    rateRules.value = unwrap(res) || []
+  } catch (e) {
+    ElMessage.error(e.message || '计费规则加载失败')
+  }
+}
+
+async function loadFloorsAndRooms() {
+  try {
+    const floorData = await request.get('/buildings/1/floors')
+    floors.value = unwrap(floorData) || []
+    const roomGroups = await Promise.all(
+      floors.value.map(async floor => {
+        const roomData = await request.get(`/buildings/1/floors/${floor.id}/rooms`)
+        return unwrap(roomData) || []
+      })
+    )
+    rooms.value = roomGroups.flat()
+  } catch (e) {
+    ElMessage.error(e.message || '房间数据加载失败')
+  }
+}
+
 function resetForm() {
   form.meterNumber = ''
   form.energyType = 'ELECTRICITY'
   form.recordDate = ''
   form.reading = 0
   form.consumption = 0
-  form.buildingId = null
+  form.floorId = null
   form.roomId = null
   lastReading.value = 0
 }
@@ -222,6 +398,20 @@ function resetForm() {
 function openCreateDialog() {
   resetForm()
   dialogVisible.value = true
+}
+
+async function openRuleDialog() {
+  resetRuleForm()
+  await loadRateRules()
+  ruleDialogVisible.value = true
+}
+
+function resetRuleForm() {
+  ruleForm.id = null
+  ruleForm.energyType = 'ELECTRICITY'
+  ruleForm.unitPrice = 1
+  ruleForm.status = 'ACTIVE'
+  ruleForm.remark = ''
 }
 
 function calculateConsumption() {
@@ -257,7 +447,6 @@ async function submitForm() {
         recordDate: form.recordDate,
         reading: form.reading,
         consumption: form.consumption,
-        buildingId: form.buildingId,
         roomId: form.roomId
       }
 
@@ -275,6 +464,69 @@ async function submitForm() {
   })
 }
 
+async function saveRateRule() {
+  if (!ruleForm.unitPrice || Number(ruleForm.unitPrice) <= 0) {
+    ElMessage.warning('单价必须大于0')
+    return
+  }
+
+  try {
+    const payload = {
+      energyType: ruleForm.energyType,
+      unitPrice: ruleForm.unitPrice,
+      status: ruleForm.status,
+      remark: ruleForm.remark
+    }
+    if (ruleForm.id) {
+      await request.put(`/energy/rate-rules/${ruleForm.id}`, payload)
+    } else {
+      await request.post('/energy/rate-rules', payload)
+    }
+    ElMessage.success('计费规则已保存')
+    resetRuleForm()
+    await loadRateRules()
+  } catch (e) {
+    ElMessage.error(e.message || '计费规则保存失败')
+  }
+}
+
+function editRateRule(row) {
+  ruleForm.id = row.id
+  ruleForm.energyType = row.energyType
+  ruleForm.unitPrice = Number(row.unitPrice || 0)
+  ruleForm.status = row.status || 'ACTIVE'
+  ruleForm.remark = row.remark || ''
+}
+
+async function deleteRateRule(row) {
+  if (row.defaultRule) {
+    ElMessage.warning('默认计费规则不可删除')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(`确定删除「${formatEnergyType(row.energyType)}」计费规则吗？`, '删除确认', {
+      type: 'warning'
+    })
+    await request.delete(`/energy/rate-rules/${row.id}`)
+    ElMessage.success('已删除')
+    await loadRateRules()
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error(e?.response?.data?.message || e.message || '删除失败')
+    }
+  }
+}
+
+async function generateBill(row) {
+  try {
+    await request.post(`/energy/records/${row.id}/generate-bill`)
+    ElMessage.success('能耗账单已生成')
+    await loadRecords()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || e.message || '账单生成失败')
+  }
+}
+
 function handleSearch() {
   pagination.currentPage = 1
 }
@@ -283,6 +535,23 @@ function resetSearch() {
   queryForm.energyType = ''
   queryForm.meterNumber = ''
   pagination.currentPage = 1
+}
+
+function handleFloorChange() {
+  form.roomId = null
+}
+
+function roomLabel(room) {
+  const area = room.area ? ` | ${room.area}㎡` : ''
+  return `${room.roomNumber}${area}`
+}
+
+function roomText(roomId) {
+  if (!roomId) return '-'
+  const room = rooms.value.find(item => item.id === roomId)
+  if (!room) return `房间 ${roomId}`
+  const floor = floors.value.find(item => item.id === room.floorId)
+  return `${floor?.floorName || ''} ${room.roomNumber}`.trim()
 }
 
 
@@ -295,7 +564,7 @@ function formatEnergyType(type) {
   return {
     ELECTRICITY: '电',
     WATER: '水',
-    GAS: '燃气',
+    GAS: '煤',
     OTHER: '其他'
   }[type] || type || '-'
 }
@@ -309,7 +578,10 @@ function getEnergyTagType(type) {
   }[type] || 'info'
 }
 
-onMounted(loadRecords)
+onMounted(()=>{
+  loadRecords()
+  loadFloorsAndRooms()
+})
 </script>
 
 <style scoped>
@@ -321,6 +593,11 @@ onMounted(loadRecords)
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .page-title {
@@ -342,5 +619,46 @@ onMounted(loadRecords)
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+.rule-table {
+  width: 100%;
+  margin-bottom: 18px;
+}
+
+.rule-form {
+  padding-top: 2px;
+}
+
+.rule-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  margin-bottom: 10px;
+  color: #303133;
+  font-weight: 600;
+}
+
+.cancel-edit-button {
+  color: #d93025;
+  border-color: #f1b4ae;
+  background: #fff;
+  font-weight: 600;
+}
+
+.cancel-edit-button:hover,
+.cancel-edit-button:focus {
+  color: #b42318;
+  border-color: #d93025;
+  background: #fff5f4;
+}
+
+:deep(.rule-dialog .el-dialog__body) {
+  padding-top: 12px;
+}
+
+:deep(.rule-dialog .el-form-item) {
+  margin-bottom: 16px;
 }
 </style>

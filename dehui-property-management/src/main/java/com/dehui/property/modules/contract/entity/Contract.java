@@ -41,6 +41,8 @@ public class Contract extends BaseEntity {
 
     private String paymentTerms;
 
+    private Integer billingLeadDays;
+
     private String billingRule;
     
     private String status;
