@@ -53,7 +53,7 @@
               </el-button>
 
               <el-button
-                v-if="row.status === 'ACTIVE'"
+                v-if="row.status === 'ACTIVE' && !isSuperAdmin(row)"
                 size="small"
                 type="danger"
                 @click="changeUserStatus(row, 'DISABLED')"
@@ -62,7 +62,7 @@
               </el-button>
 
               <el-button
-                v-else
+                v-else-if="!isSuperAdmin(row)"
                 size="small"
                 type="primary"
                 @click="changeUserStatus(row, 'ACTIVE')"
@@ -314,6 +314,11 @@ async function assignRole() {
 }
 
 async function changeUserStatus(row, status) {
+  if (isSuperAdmin(row) && status === 'DISABLED') {
+    ElMessage.warning('超级管理员 admin 不允许禁用')
+    return
+  }
+
   try {
     const actionText = status === 'ACTIVE' ? '启用' : '禁用'
 

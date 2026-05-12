@@ -187,6 +187,10 @@ public class SystemUserService {
             throw new RuntimeException("非法状态");
         }
 
+        if ("admin".equals(user.getUsername()) && "DISABLED".equals(status)) {
+            throw new RuntimeException("超级管理员 admin 不允许禁用");
+        }
+
         user.setStatus(status);
         return sysUserRepository.save(user);
     }
