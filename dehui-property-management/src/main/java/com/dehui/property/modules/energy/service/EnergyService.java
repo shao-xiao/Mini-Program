@@ -118,12 +118,17 @@ public class EnergyService {
                     bill.setContractId(null);
                     bill.setBillType(toBillType(record.getEnergyType()));
                     LocalDate periodDate = record.getRecordDate() == null ? LocalDate.now() : record.getRecordDate();
+                    bill.setTitle(periodDate.getYear() + "年" + periodDate.getMonthValue() + "月" + toEnergyTypeText(record.getEnergyType()) + "账单");
                     bill.setPeriodStart(periodDate);
                     bill.setPeriodEnd(periodDate);
                     bill.setAmount(amount);
                     bill.setPaidAmount(BigDecimal.ZERO);
                     bill.setDueDate(periodDate.plusDays(7));
                     bill.setStatus("UNPAID");
+                    bill.setAuditStatus("PENDING");
+                    bill.setSourceType("ENERGY");
+                    bill.setSourceId(record.getId());
+                    bill.setRemark("抄表用量 " + record.getConsumption() + " × 单价 " + rule.getUnitPrice());
 
                     Bill savedBill = billRepository.save(bill);
                     record.setUnitPrice(rule.getUnitPrice());
@@ -146,5 +151,18 @@ public class EnergyService {
             return "GAS";
         }
         return "OTHER";
+    }
+
+    private String toEnergyTypeText(String energyType) {
+        if ("ELECTRICITY".equals(energyType)) {
+            return "电费";
+        }
+        if ("WATER".equals(energyType)) {
+            return "水费";
+        }
+        if ("GAS".equals(energyType)) {
+            return "燃气费";
+        }
+        return "能耗";
     }
 }

@@ -33,8 +33,10 @@ public class AuthInterceptor implements HandlerInterceptor {
         System.out.println(">>> AuthInterceptor URI = " + uri + ", METHOD = " + method);
 
         if (uri.contains("/login")
+                || uri.startsWith("/api/ping")
                 || uri.startsWith("/api/system/login")
                 || uri.startsWith("/api/mobile/auth/dev-login")
+                || uri.startsWith("/api/mobile/dev/fixtures")
                 || ("GET".equalsIgnoreCase(method) && uri.startsWith("/api/uploads/"))
                 || ("GET".equalsIgnoreCase(method) && uri.startsWith("/api/mobile/announcements"))
                 || uri.startsWith("/api/mobile/investment")
@@ -110,6 +112,11 @@ public class AuthInterceptor implements HandlerInterceptor {
             if ("GET".equalsIgnoreCase(method)) {
                 if (!systemUserService.hasPermission(token, "bill:view")) {
                     writeForbidden(response, "无账单查看权限");
+                    return false;
+                }
+            } else if ("POST".equalsIgnoreCase(method) && (uri.contains("/approve") || uri.contains("/reject"))) {
+                if (!systemUserService.hasPermission(token, "bill:audit")) {
+                    writeForbidden(response, "无账单审核权限");
                     return false;
                 }
             } else if ("POST".equalsIgnoreCase(method) && uri.contains("/pay")) {

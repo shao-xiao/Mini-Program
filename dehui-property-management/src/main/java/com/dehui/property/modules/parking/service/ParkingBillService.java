@@ -108,6 +108,7 @@ public class ParkingBillService {
         }
 
         Bill bill = null;
+        boolean newUnifiedBill = false;
         if (parkingBill.getBillId() != null) {
             bill = billRepository.findById(parkingBill.getBillId()).orElse(null);
         }
@@ -120,16 +121,24 @@ public class ParkingBillService {
         if (bill == null) {
             bill = new Bill();
             bill.setBillNumber(unifiedBillNumber);
+            bill.setAuditStatus("PENDING");
+            newUnifiedBill = true;
         }
 
         bill.setTenantId(Boolean.TRUE.equals(parkingBill.getVip()) ? null : parkingBill.getTenantId());
         bill.setContractId(null);
         bill.setBillType("PARKING");
+        bill.setTitle("停车费账单 - " + parkingBill.getBillNumber());
         bill.setPeriodStart(parkingBill.getPeriodStart());
         bill.setPeriodEnd(parkingBill.getPeriodEnd());
         bill.setAmount(parkingBill.getAmount());
         bill.setDueDate(parkingBill.getDueDate());
         bill.setStatus(parkingBill.getStatus());
+        bill.setSourceType("PARKING");
+        bill.setSourceId(parkingBill.getId());
+        if (newUnifiedBill) {
+            bill.setRemark("停车模块生成，审核通过后租户可见");
+        }
         bill.setPaidAmount("PAID".equals(parkingBill.getStatus())
                 ? parkingBill.getAmount()
                 : BigDecimal.ZERO);

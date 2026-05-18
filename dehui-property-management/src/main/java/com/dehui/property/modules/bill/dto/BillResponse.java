@@ -15,12 +15,25 @@ public class BillResponse {
     private String contractNumber;
     private String contractName;
     private String billType;
+    private String billTypeText;
+    private String title;
     private LocalDate periodStart;
     private LocalDate periodEnd;
     private BigDecimal amount;
     private BigDecimal paidAmount;
     private LocalDate dueDate;
     private String status;
+    private String statusText;
+    private String auditStatus;
+    private String auditStatusText;
+    private String auditRemark;
+    private String approvedBy;
+    private LocalDateTime approvedTime;
+    private String sourceType;
+    private String sourceTypeText;
+    private Long sourceId;
+    private String remark;
+    private Boolean overdue;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
 }

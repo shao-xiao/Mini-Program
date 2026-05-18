@@ -12,6 +12,11 @@
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="visitorName" label="访客姓名" width="120" />
         <el-table-column prop="visitorPhone" label="手机号" width="130" />
+        <el-table-column prop="carPlateNo" label="车牌号" width="120">
+          <template #default="{ row }">
+            {{ row.carPlateNo || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column label="租户" width="130">
           <template #default="{ row }">
             {{ tenantName(row.tenantId) }}
@@ -95,6 +100,10 @@
           <el-input v-model="form.idCardNo" />
         </el-form-item>
 
+        <el-form-item label="车牌号">
+          <el-input v-model="form.carPlateNo" placeholder="可选" />
+        </el-form-item>
+
         <el-form-item label="租户ID">
           <el-input-number v-model="form.tenantId" :min="1" style="width: 100%" />
         </el-form-item>
@@ -146,6 +155,7 @@ const defaultForm = () => ({
   visitorName: '',
   visitorPhone: '',
   idCardNo: '',
+  carPlateNo: '',
   tenantId: null,
   visitedPerson: '',
   visitReason: '',
@@ -210,6 +220,7 @@ async function save() {
       visitorName: form.visitorName,
       visitorPhone: form.visitorPhone,
       idCardNo: form.idCardNo,
+      carPlateNo: form.carPlateNo,
       tenantId: form.tenantId,
       visitedPerson: form.visitedPerson,
       visitReason: form.visitReason,

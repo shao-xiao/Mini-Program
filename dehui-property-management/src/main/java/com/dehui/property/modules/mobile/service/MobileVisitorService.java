@@ -52,9 +52,10 @@ public class MobileVisitorService {
         record.setVisitedPerson(request.getVisitedPerson());
         record.setVisitReason(request.getVisitReason());
         record.setVisitTime(request.getVisitTime());
+        record.setCarPlateNo(request.getCarPlateNo());
         record.setStatus("REGISTERED");
         record.setSource("MINIPROGRAM");
-        record.setRemark(buildRemark(request));
+        record.setRemark(request.getRemark());
 
         return Result.success(toResponse(visitorRecordRepository.save(record)));
     }
@@ -81,17 +82,6 @@ public class MobileVisitorService {
         return Result.success(toResponse(visitorRecordRepository.save(record)));
     }
 
-    private String buildRemark(MobileVisitorRequest request) {
-        StringBuilder remark = new StringBuilder();
-        if (request.getCarPlateNo() != null && !request.getCarPlateNo().isBlank()) {
-            remark.append("车牌：").append(request.getCarPlateNo()).append("；");
-        }
-        if (request.getRemark() != null && !request.getRemark().isBlank()) {
-            remark.append(request.getRemark());
-        }
-        return remark.toString();
-    }
-
     private MobileVisitorResponse toResponse(VisitorRecord record) {
         MobileVisitorResponse response = new MobileVisitorResponse();
         response.setId(record.getId());
@@ -108,6 +98,8 @@ public class MobileVisitorService {
         response.setLeaveTime(record.getLeaveTime());
         response.setStatus(record.getStatus());
         response.setStatusText(toStatusText(record.getStatus()));
+        response.setSource(record.getSource());
+        response.setCarPlateNo(record.getCarPlateNo());
         response.setRemark(record.getRemark());
         response.setCreatedTime(record.getCreatedTime());
         return response;

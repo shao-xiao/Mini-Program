@@ -107,12 +107,17 @@ public class ContractBillGenerationService {
         bill.setTenantId(contract.getTenantId());
         bill.setContractId(contract.getId());
         bill.setBillType(billType);
+        bill.setTitle(periodStart.format(DateTimeFormatter.ofPattern("yyyy年MM月")) + toBillTypeText(billType) + "账单");
         bill.setPeriodStart(periodStart);
         bill.setPeriodEnd(periodEnd);
         bill.setAmount(monthlyAmount.multiply(BigDecimal.valueOf(periodMonths)));
         bill.setPaidAmount(BigDecimal.ZERO);
         bill.setDueDate(periodStart);
         bill.setStatus("UNPAID");
+        bill.setAuditStatus("PENDING");
+        bill.setSourceType("CONTRACT");
+        bill.setSourceId(contract.getId());
+        bill.setRemark("合同自动出账，审核通过后租户可见");
         billRepository.save(bill);
         return 1;
     }
@@ -129,6 +134,16 @@ public class ContractBillGenerationService {
 
     private String buildBillNumber(Contract contract, String billType, LocalDate periodStart) {
         return String.format("CT%s-%s-%s", contract.getId(), billType, periodStart.format(PERIOD_FORMATTER));
+    }
+
+    private String toBillTypeText(String billType) {
+        if ("RENT".equals(billType)) {
+            return "租金";
+        }
+        if ("PROPERTY".equals(billType)) {
+            return "物业费";
+        }
+        return "费用";
     }
 
     private int paymentMonths(String paymentCycle) {

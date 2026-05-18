@@ -287,12 +287,17 @@ function formatBillType(type) {
     PROPERTY: '物业费',
     MEETING: '会议',
     MEETING_ROOM: '会议',
-    WATER: '水',
-    ELECTRICITY: '电',
-    GAS: '煤',
+    WATER: '水费',
+    ELECTRICITY: '电费',
+    GAS: '燃气费',
     PARKING: '停车费',
     ENERGY: '能耗费',
     UTILITY: '水电煤',
+    WORK_ORDER: '维修/工单服务费',
+    CLEANING: '保洁费',
+    DEPOSIT: '押金',
+    LATE_FEE: '滞纳金',
+    ADJUSTMENT: '调账补差',
     OTHER: '其它'
   }[type] || type || '-'
 }

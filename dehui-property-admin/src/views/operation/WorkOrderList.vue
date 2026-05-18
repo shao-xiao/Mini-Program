@@ -48,7 +48,7 @@
         </el-table-column>
         <el-table-column label="来源" width="100">
           <template #default="{row}">
-            <el-tag v-if="row.mobileUserId" type="success">小程序</el-tag>
+            <el-tag v-if="row.mobileUserId" type="success">小程序提交</el-tag>
             <el-tag v-else type="info">后台</el-tag>
           </template>
         </el-table-column>

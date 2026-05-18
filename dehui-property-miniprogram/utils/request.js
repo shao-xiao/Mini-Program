@@ -1,7 +1,8 @@
-const { baseURL } = require('../config/env')
+const { getBaseURL } = require('../config/env')
 
 function request(options) {
   const token = wx.getStorageSync('token')
+  const silent = options.silent === true
   const header = {
     'content-type': 'application/json',
     ...(options.header || {})
@@ -13,7 +14,7 @@ function request(options) {
 
   return new Promise((resolve, reject) => {
     wx.request({
-      url: `${baseURL}${options.url}`,
+      url: `${getBaseURL()}${options.url}`,
       method: options.method || 'GET',
       data: options.data || {},
       header,
@@ -26,10 +27,12 @@ function request(options) {
             return
           }
 
-          wx.showToast({
-            title: data.message || '请求失败',
-            icon: 'none'
-          })
+          if (!silent) {
+            wx.showToast({
+              title: data.message || '请求失败',
+              icon: 'none'
+            })
+          }
           reject(data)
           return
         }
@@ -39,17 +42,21 @@ function request(options) {
           return
         }
 
-        wx.showToast({
-          title: '网络请求失败',
-          icon: 'none'
-        })
+        if (!silent) {
+          wx.showToast({
+            title: '网络请求失败',
+            icon: 'none'
+          })
+        }
         reject(res)
       },
       fail(error) {
-        wx.showToast({
-          title: '网络不可用',
-          icon: 'none'
-        })
+        if (!silent) {
+          wx.showToast({
+            title: '网络不可用',
+            icon: 'none'
+          })
+        }
         reject(error)
       }
     })
@@ -66,7 +73,7 @@ module.exports = {
     const token = wx.getStorageSync('token')
     return new Promise((resolve, reject) => {
       wx.uploadFile({
-        url: `${baseURL}${url}`,
+        url: `${getBaseURL()}${url}`,
         filePath,
         name,
         header: token ? { Authorization: token } : {},
@@ -99,5 +106,6 @@ module.exports = {
         }
       })
     })
-  }
+  },
+  getBaseURL
 }

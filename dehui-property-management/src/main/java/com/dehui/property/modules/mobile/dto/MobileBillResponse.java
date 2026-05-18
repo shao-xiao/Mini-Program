@@ -12,6 +12,7 @@ public class MobileBillResponse {
     private String billNumber;
     private String billType;
     private String billTypeText;
+    private String title;
     private LocalDate periodStart;
     private LocalDate periodEnd;
     private BigDecimal amount;
@@ -21,5 +22,8 @@ public class MobileBillResponse {
     private String status;
     private String statusText;
     private Boolean overdue;
+    private String sourceType;
+    private String sourceTypeText;
+    private String remark;
     private LocalDateTime createdTime;
 }

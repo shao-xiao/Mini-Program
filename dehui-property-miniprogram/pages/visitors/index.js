@@ -100,7 +100,7 @@ Page({
 
     this.setData({ submitting: true })
     try {
-      await api.post('/mobile/visitors', {
+      const created = await api.post('/mobile/visitors', {
         visitorName: form.visitorName,
         visitorPhone: form.visitorPhone,
         tenantId: form.tenantId ? Number(form.tenantId) : null,
@@ -110,7 +110,11 @@ Page({
         carPlateNo: form.carPlateNo,
         remark: form.remark
       })
-      wx.showToast({ title: '预约成功', icon: 'success' })
+      wx.showModal({
+        title: '预约成功',
+        content: `访客记录ID：${created.id}`,
+        showCancel: false
+      })
       this.setData({ form: initialForm() })
       this.loadVisitors()
     } finally {
@@ -129,7 +133,7 @@ Page({
       success: async (res) => {
         if (!res.confirm) return
         try {
-          await api.patch(`/mobile/visitors/${id}/cancel`)
+          await api.post(`/mobile/visitors/${id}/cancel`)
           wx.showToast({ title: '已取消', icon: 'success' })
           this.loadVisitors()
         } catch (error) {

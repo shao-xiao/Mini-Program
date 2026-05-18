@@ -12,7 +12,9 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -30,13 +32,24 @@ public class MobileBillService {
             return Result.error(403, "请先绑定租户身份后查看账单");
         }
 
-        List<MobileBillResponse> bills = billRepository.findByTenantIdOrderByCreatedTimeDesc(profile.getBoundTenantId())
+        List<MobileBillResponse> bills = billRepository.findApprovedByTenantIdOrderByCreatedTimeDesc(profile.getBoundTenantId())
                 .stream()
                 .map(this::toResponse)
-                .filter(item -> status == null || status.isBlank() || status.equals(item.getStatus()))
+                .filter(item -> matchesStatus(item, status))
                 .toList();
 
         return Result.success(new MobileBillListResponse(profile, summarize(bills), bills));
+    }
+
+    private boolean matchesStatus(MobileBillResponse item, String status) {
+        if (status == null || status.isBlank()) {
+            return true;
+        }
+        String normalized = status.trim().toUpperCase(Locale.ROOT);
+        if ("OVERDUE".equals(normalized)) {
+            return Boolean.TRUE.equals(item.getOverdue());
+        }
+        return normalized.equals(item.getStatus());
     }
 
     private MobileBillSummaryResponse summarize(List<MobileBillResponse> bills) {
@@ -68,6 +81,7 @@ public class MobileBillService {
         response.setBillNumber(bill.getBillNumber());
         response.setBillType(bill.getBillType());
         response.setBillTypeText(toBillTypeText(bill.getBillType()));
+        response.setTitle(defaultTitle(bill));
         response.setPeriodStart(bill.getPeriodStart());
         response.setPeriodEnd(bill.getPeriodEnd());
         response.setAmount(defaultAmount(bill.getAmount()));
@@ -77,10 +91,24 @@ public class MobileBillService {
         response.setStatus(bill.getStatus());
         response.setStatusText(toStatusText(bill.getStatus()));
         response.setOverdue(!"PAID".equals(bill.getStatus())
+                && !"CANCELLED".equals(bill.getStatus())
                 && bill.getDueDate() != null
                 && bill.getDueDate().isBefore(LocalDate.now()));
+        response.setSourceType(bill.getSourceType());
+        response.setSourceTypeText(toSourceTypeText(bill.getSourceType()));
+        response.setRemark(bill.getRemark());
         response.setCreatedTime(bill.getCreatedTime());
         return response;
+    }
+
+    private String defaultTitle(Bill bill) {
+        if (bill.getTitle() != null && !bill.getTitle().isBlank()) {
+            return bill.getTitle();
+        }
+        String month = bill.getPeriodStart() == null
+                ? ""
+                : bill.getPeriodStart().format(DateTimeFormatter.ofPattern("yyyy年MM月")) + " ";
+        return month + toBillTypeText(bill.getBillType()) + "账单";
     }
 
     private BigDecimal defaultAmount(BigDecimal value) {
@@ -98,13 +126,13 @@ public class MobileBillService {
             return "水电煤";
         }
         if ("WATER".equals(billType)) {
-            return "水";
+            return "水费";
         }
         if ("ELECTRICITY".equals(billType)) {
-            return "电";
+            return "电费";
         }
         if ("GAS".equals(billType)) {
-            return "煤";
+            return "燃气费";
         }
         if ("PARKING".equals(billType)) {
             return "停车费";
@@ -112,15 +140,33 @@ public class MobileBillService {
         if ("MEETING".equals(billType) || "MEETING_ROOM".equals(billType)) {
             return "会议室";
         }
+        if ("WORK_ORDER".equals(billType) || "REPAIR".equals(billType)) {
+            return "维修/工单服务费";
+        }
+        if ("CLEANING".equals(billType)) {
+            return "保洁费";
+        }
+        if ("DEPOSIT".equals(billType)) {
+            return "押金";
+        }
+        if ("LATE_FEE".equals(billType)) {
+            return "滞纳金";
+        }
+        if ("ADJUSTMENT".equals(billType)) {
+            return "调账补差";
+        }
+        if ("OTHER".equals(billType)) {
+            return "其他";
+        }
         return billType == null || billType.isBlank() ? "账单" : billType;
     }
 
     private String toStatusText(String status) {
         if ("PAID".equals(status)) {
-            return "已支付";
+            return "已缴";
         }
         if ("UNPAID".equals(status)) {
-            return "待支付";
+            return "待缴";
         }
         if ("OVERDUE".equals(status)) {
             return "已逾期";
@@ -129,6 +175,34 @@ public class MobileBillService {
             return "已取消";
         }
         return status == null || status.isBlank() ? "未知" : status;
+    }
+
+    private String toSourceTypeText(String sourceType) {
+        if ("MANUAL".equals(sourceType)) {
+            return "手工账单";
+        }
+        if ("CONTRACT".equals(sourceType)) {
+            return "合同自动出账";
+        }
+        if ("FEE_RULE".equals(sourceType)) {
+            return "周期收费";
+        }
+        if ("ENERGY".equals(sourceType)) {
+            return "能耗抄表";
+        }
+        if ("PARKING".equals(sourceType)) {
+            return "停车账单";
+        }
+        if ("MEETING_ROOM".equals(sourceType)) {
+            return "会议室预约";
+        }
+        if ("WORK_ORDER".equals(sourceType)) {
+            return "工单服务";
+        }
+        if ("DEV_FIXTURE".equals(sourceType)) {
+            return "开发测试";
+        }
+        return sourceType == null || sourceType.isBlank() ? "历史账单" : sourceType;
     }
 
     private interface AmountGetter {

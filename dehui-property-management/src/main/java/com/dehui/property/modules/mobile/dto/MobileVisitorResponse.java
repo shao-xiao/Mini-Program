@@ -17,6 +17,8 @@ public class MobileVisitorResponse {
     private LocalDateTime leaveTime;
     private String status;
     private String statusText;
+    private String source;
+    private String carPlateNo;
     private String remark;
     private LocalDateTime createdTime;
 }

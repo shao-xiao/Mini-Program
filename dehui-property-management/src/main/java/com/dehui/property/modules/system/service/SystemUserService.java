@@ -134,6 +134,8 @@ public class SystemUserService {
                     roles.stream().anyMatch(r -> List.of("MANAGER", "FINANCE").contains(r));
             case "bill:add" ->
                     roles.stream().anyMatch(r -> List.of("MANAGER", "FINANCE").contains(r));
+            case "bill:audit" ->
+                    roles.stream().anyMatch(r -> List.of("FINANCE").contains(r));
             case "bill:pay" ->
                     roles.stream().anyMatch(r -> List.of("FINANCE").contains(r));
 

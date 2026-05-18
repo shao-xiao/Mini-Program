@@ -1,7 +1,7 @@
 <view class="page">
   <view class="section card">
     <view class="title">账单中心</view>
-    <view class="subtitle">{{tenantName || '租户'}}的租金、水电煤、停车、会议室等账单</view>
+    <view class="subtitle">{{tenantName || '租户'}}已发布的租金、物业、水电燃气、停车、会议室、维修等账单</view>
   </view>
 
   <view wx:if="{{errorMessage}}" class="card section">
@@ -12,7 +12,7 @@
 
   <view wx:if="{{!errorMessage}}" class="summary-grid section">
     <view class="summary-card">
-      <view class="summary-label">待支付</view>
+      <view class="summary-label">待缴</view>
       <view class="summary-value primary">¥ {{summary.unpaidAmount}}</view>
       <view class="summary-desc">{{summary.unpaidCount}} 笔</view>
     </view>
@@ -22,7 +22,7 @@
       <view class="summary-desc">{{summary.overdueCount}} 笔</view>
     </view>
     <view class="summary-card">
-      <view class="summary-label">已支付</view>
+      <view class="summary-label">已缴</view>
       <view class="summary-value">¥ {{summary.paidAmount}}</view>
       <view class="summary-desc">{{summary.paidCount}} 笔</view>
     </view>
@@ -48,33 +48,42 @@
   <view wx:if="{{loading}}" class="card muted">正在加载账单...</view>
 
   <view wx:elif="{{!errorMessage && bills.length === 0}}" class="card muted">
-    暂无账单数据
+    暂无已发布账单
   </view>
 
   <view wx:else class="section">
     <view wx:for="{{bills}}" wx:key="id" class="bill-card">
       <view class="bill-head">
-        <view>
-          <view class="bill-title">{{item.billTypeText}}</view>
+        <view class="bill-main">
+          <view class="bill-title">{{item.displayTitle}}</view>
           <view class="bill-number">{{item.billNumber}}</view>
         </view>
-        <view class="bill-status {{item.statusClass}}">{{item.overdue ? '已逾期' : item.statusText}}</view>
+        <view class="bill-status {{item.statusClass}}">{{item.statusDisplay}}</view>
+      </view>
+
+      <view class="bill-tags">
+        <view class="bill-tag">{{item.billTypeText}}</view>
+        <view class="bill-tag">{{item.sourceTypeText || '历史账单'}}</view>
       </view>
 
       <view class="bill-money">¥ {{item.unpaidAmountText}}</view>
+      <view class="bill-meta">应收：¥ {{item.amountText}}　已缴：¥ {{item.paidAmountText}}</view>
       <view class="bill-meta">账期：{{item.periodText}}</view>
       <view class="bill-meta">到期日：{{item.dueDateText}}</view>
+      <view wx:if="{{item.remark}}" class="bill-remark">{{item.remark}}</view>
 
       <view class="bill-footer">
-        <view class="bill-paid">已付 ¥ {{item.paidAmountText}}</view>
+        <view class="bill-paid">{{item.status === 'PAID' ? '物业已确认收款' : '请按物业通知线下缴费'}}</view>
         <button
-          wx:if="{{item.status !== 'PAID'}}"
+          wx:if="{{item.status !== 'PAID' && item.status !== 'CANCELLED'}}"
           class="pay-button"
           size="mini"
-          data-id="{{item.id}}"
-          bindtap="handlePay"
+          data-number="{{item.billNumber}}"
+          data-title="{{item.displayTitle}}"
+          data-amount="{{item.unpaidAmountText}}"
+          bindtap="showPaymentGuide"
         >
-          去支付
+          缴费说明
         </button>
       </view>
     </view>

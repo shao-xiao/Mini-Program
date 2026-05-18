@@ -14,6 +14,9 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
     List<Bill> findByTenantIdOrderByCreatedTimeDesc(Long tenantId);
 
+    @Query("select b from Bill b where b.tenantId = :tenantId and (b.auditStatus is null or b.auditStatus = 'APPROVED') order by b.createdTime desc")
+    List<Bill> findApprovedByTenantIdOrderByCreatedTimeDesc(@Param("tenantId") Long tenantId);
+
     List<Bill> findByContractId(Long contractId);
 
     List<Bill> findByStatusOrderByDueDateAsc(String status);

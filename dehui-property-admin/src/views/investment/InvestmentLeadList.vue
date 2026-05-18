@@ -17,6 +17,12 @@
           </template>
         </el-table-column>
         <el-table-column prop="companyName" label="公司名称" min-width="150" />
+        <el-table-column label="来源" width="120">
+          <template #default="{ row }">
+            <el-tag v-if="row.source === 'MINIPROGRAM'" type="success">小程序</el-tag>
+            <el-tag v-else type="info">{{ row.source || '后台' }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="意向房源" min-width="120">
           <template #default="{ row }">
             {{ row.roomNumber || '-' }}

@@ -97,6 +97,26 @@ public class FeeRuleBillScheduler {
         YearMonth currentMonth = YearMonth.from(today);
         int effectiveGenerateDay = Math.min(configuredDay, currentMonth.lengthOfMonth());
 
-        return today.getDayOfMonth() == effectiveGenerateDay;
+        return today.getDayOfMonth() == effectiveGenerateDay && isAlignedCycleMonth(rule, today);
+    }
+
+    private boolean isAlignedCycleMonth(FeeRule rule, LocalDate today) {
+        if (rule.getStartDate() == null) {
+            return true;
+        }
+        int months = cycleMonths(rule.getCycle());
+        int offset = (today.getYear() - rule.getStartDate().getYear()) * 12
+                + today.getMonthValue() - rule.getStartDate().getMonthValue();
+        return offset >= 0 && offset % months == 0;
+    }
+
+    private int cycleMonths(String cycle) {
+        if ("YEARLY".equals(cycle)) {
+            return 12;
+        }
+        if ("QUARTERLY".equals(cycle)) {
+            return 3;
+        }
+        return 1;
     }
 }

@@ -16,6 +16,13 @@
             {{ applicantText(row) }}
           </template>
         </el-table-column>
+        <el-table-column label="来源类型" width="110">
+          <template #default="{ row }">
+            <el-tag v-if="row.applicantType === 'INTERNAL'" type="primary">内部员工</el-tag>
+            <el-tag v-else-if="row.applicantType === 'TENANT'" type="success">租户</el-tag>
+            <el-tag v-else type="info">外部客户</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="departmentName" label="部门" width="120" />
         <el-table-column label="时间" min-width="240">
           <template #default="{ row }">

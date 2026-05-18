@@ -1,123 +1,155 @@
 <template>
   <div class="page-container">
-    <el-card>
+    <el-card shadow="never">
       <template #header>
-        <div class="card-header">
-          <span>账单管理</span>
-
-          <el-button
-            v-if="hasPermission('bill:add')"
-            type="primary"
-            @click="openCreateDialog"
-          >
+        <div class="page-header">
+          <div>
+            <div class="page-title">账单管理</div>
+            <div class="page-subtitle">后台创建或自动生成的账单需审核发布后，租户小程序才可见。</div>
+          </div>
+          <el-button v-if="hasPermission('bill:add')" type="primary" @click="openCreateDialog">
             新增账单
           </el-button>
         </div>
       </template>
 
-      <el-empty
-        v-if="!hasPermission('bill:view')"
-        description="当前角色无权查看账单"
-      />
+      <el-empty v-if="!hasPermission('bill:view')" description="当前角色无权查看账单" />
 
-      <el-table
-        v-else
-        v-loading="loading"
-        :data="bills"
-        border
-        style="width: 100%"
-      >
-        <el-table-column prop="id" label="ID" width="70" />
-        <el-table-column prop="billNumber" label="账单编号" min-width="170" />
-        <el-table-column label="租户" min-width="150">
-          <template #default="{ row }">
-            {{ row.tenantName || tenantName(row.tenantId) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="合同" min-width="180">
-          <template #default="{ row }">
-            {{ row.contractNumber || contractLabelById(row.contractId) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="类型" width="100">
-          <template #default="{ row }">
-            {{ billTypeText(row.billType) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="periodStart" label="账期开始" width="120" />
-        <el-table-column prop="periodEnd" label="账期结束" width="120" />
-        <el-table-column prop="amount" label="应收金额" width="110" />
-        <el-table-column prop="paidAmount" label="已收金额" width="110" />
-        <el-table-column prop="dueDate" label="到期日" width="120" />
+      <template v-else>
+        <el-form :inline="true" :model="queryForm" class="query-form">
+          <el-form-item label="租户">
+            <el-select v-model="queryForm.tenantId" clearable filterable placeholder="全部租户" style="width: 180px">
+              <el-option
+                v-for="tenant in tenants"
+                :key="tenant.id"
+                :label="tenantLabel(tenant)"
+                :value="tenant.id"
+              />
+            </el-select>
+          </el-form-item>
 
-        <el-table-column label="状态" width="110">
-          <template #default="{ row }">
-            <el-tag v-if="row.status === 'PAID'" type="success">
-              已支付
-            </el-tag>
+          <el-form-item label="账单类型">
+            <el-select v-model="queryForm.billType" clearable placeholder="全部类型" style="width: 150px">
+              <el-option
+                v-for="type in billTypeOptions"
+                :key="type.value"
+                :label="type.label"
+                :value="type.value"
+              />
+            </el-select>
+          </el-form-item>
 
-            <el-tag
-              v-else-if="isOverdue(row)"
-              type="danger"
-            >
-              已逾期
-            </el-tag>
+          <el-form-item label="审核状态">
+            <el-select v-model="queryForm.auditStatus" clearable placeholder="全部" style="width: 130px">
+              <el-option label="待审核" value="PENDING" />
+              <el-option label="已发布" value="APPROVED" />
+              <el-option label="已驳回" value="REJECTED" />
+            </el-select>
+          </el-form-item>
 
-            <el-tag
-              v-else-if="row.status === 'UNPAID'"
-              type="warning"
-            >
-              未支付
-            </el-tag>
+          <el-form-item label="收款状态">
+            <el-select v-model="queryForm.status" clearable placeholder="全部" style="width: 130px">
+              <el-option label="待缴" value="UNPAID" />
+              <el-option label="已缴" value="PAID" />
+              <el-option label="已逾期" value="OVERDUE" />
+              <el-option label="已取消" value="CANCELLED" />
+            </el-select>
+          </el-form-item>
 
-            <el-tag v-else type="info">
-              {{ row.status }}
-            </el-tag>
-          </template>
-        </el-table-column>
+          <el-form-item>
+            <el-button type="primary" @click="loadBills">查询</el-button>
+            <el-button @click="resetQuery">重置</el-button>
+          </el-form-item>
+        </el-form>
 
-        <el-table-column label="操作" width="130" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              v-if="
-                row.status !== 'PAID' &&
-                hasPermission('bill:pay')
-              "
-              size="small"
-              type="success"
-              @click="payBill(row)"
-            >
-              收款
-            </el-button>
-
-            <el-button
-              v-else
-              size="small"
-              disabled
-            >
-              已结清
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        <el-table v-loading="loading" :data="bills" border stripe style="width: 100%">
+          <el-table-column prop="id" label="ID" width="70" />
+          <el-table-column label="账单" min-width="230">
+            <template #default="{ row }">
+              <div class="strong-text">{{ row.title || billTypeText(row.billType) }}</div>
+              <div class="sub-text">{{ row.billNumber }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="租户" min-width="150">
+            <template #default="{ row }">{{ row.tenantName || tenantName(row.tenantId) }}</template>
+          </el-table-column>
+          <el-table-column label="合同" min-width="150">
+            <template #default="{ row }">{{ row.contractNumber || contractLabelById(row.contractId) }}</template>
+          </el-table-column>
+          <el-table-column label="类型" width="120">
+            <template #default="{ row }">{{ row.billTypeText || billTypeText(row.billType) }}</template>
+          </el-table-column>
+          <el-table-column label="来源" width="130">
+            <template #default="{ row }">{{ row.sourceTypeText || sourceTypeText(row.sourceType) }}</template>
+          </el-table-column>
+          <el-table-column label="账期" min-width="190">
+            <template #default="{ row }">{{ row.periodStart || '-' }} 至 {{ row.periodEnd || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="金额" width="130" align="right">
+            <template #default="{ row }">
+              <div>应收 {{ money(row.amount) }}</div>
+              <div class="sub-text">已收 {{ money(row.paidAmount) }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="dueDate" label="到期日" width="120" />
+          <el-table-column label="审核" width="110">
+            <template #default="{ row }">
+              <el-tag :type="auditTagType(row.auditStatus)">
+                {{ row.auditStatusText || auditStatusText(row.auditStatus) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="110">
+            <template #default="{ row }">
+              <el-tag :type="statusTagType(row)">
+                {{ row.overdue && row.status !== 'PAID' ? '已逾期' : (row.statusText || statusText(row.status)) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="审核信息" min-width="160">
+            <template #default="{ row }">
+              <div>{{ row.approvedBy || '-' }}</div>
+              <div class="sub-text">{{ formatTime(row.approvedTime) }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="备注" min-width="180">
+            <template #default="{ row }">{{ row.remark || row.auditRemark || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="230" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                v-if="hasPermission('bill:audit') && row.auditStatus !== 'APPROVED' && row.status !== 'CANCELLED'"
+                size="small"
+                type="primary"
+                @click="approveBill(row)"
+              >
+                审核通过
+              </el-button>
+              <el-button
+                v-if="hasPermission('bill:audit') && row.auditStatus !== 'REJECTED' && row.status !== 'PAID'"
+                size="small"
+                @click="rejectBill(row)"
+              >
+                驳回
+              </el-button>
+              <el-button
+                v-if="row.auditStatus === 'APPROVED' && row.status !== 'PAID' && row.status !== 'CANCELLED' && hasPermission('bill:pay')"
+                size="small"
+                type="success"
+                @click="payBill(row)"
+              >
+                确认收款
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
     </el-card>
 
-    <el-dialog
-      v-model="dialogVisible"
-      title="新增账单"
-      width="560px"
-    >
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="formRules"
-        label-width="110px"
-      >
-        <el-form-item label="账单编号" prop="billNumber">
-          <el-input
-            v-model="form.billNumber"
-            placeholder="请输入账单编号"
-          />
+    <el-dialog v-model="dialogVisible" title="新增账单" width="620px" destroy-on-close>
+      <el-form ref="formRef" :model="form" :rules="formRules" label-width="110px">
+        <el-form-item label="账单编号">
+          <el-input v-model="form.billNumber" placeholder="留空则系统自动生成" />
         </el-form-item>
 
         <el-form-item label="租户" prop="tenantId">
@@ -137,11 +169,12 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="合同" prop="contractId">
+        <el-form-item label="合同">
           <el-select
             v-model="form.contractId"
+            clearable
             filterable
-            placeholder="请选择已生效合同"
+            placeholder="可不选，适用于手工费用"
             style="width: 100%"
             @change="handleContractChange"
           >
@@ -155,11 +188,7 @@
         </el-form-item>
 
         <el-form-item label="账单类型" prop="billType">
-          <el-select
-            v-model="form.billType"
-            style="width: 100%"
-            @change="handleBillTypeChange"
-          >
+          <el-select v-model="form.billType" style="width: 100%" @change="handleBillTypeChange">
             <el-option
               v-for="type in billTypeOptions"
               :key="type.value"
@@ -169,62 +198,41 @@
           </el-select>
         </el-form-item>
 
+        <el-form-item label="标题">
+          <el-input v-model="form.title" placeholder="留空则按账期和类型生成" />
+        </el-form-item>
+
         <el-form-item label="账期开始" prop="periodStart">
-          <el-date-picker
-            v-model="form.periodStart"
-            type="date"
-            value-format="YYYY-MM-DD"
-            style="width: 100%"
-          />
+          <el-date-picker v-model="form.periodStart" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
         </el-form-item>
 
         <el-form-item label="账期结束" prop="periodEnd">
-          <el-date-picker
-            v-model="form.periodEnd"
-            type="date"
-            value-format="YYYY-MM-DD"
-            style="width: 100%"
-          />
+          <el-date-picker v-model="form.periodEnd" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
         </el-form-item>
 
         <el-form-item label="金额" prop="amount">
-          <el-input-number
-            v-model="form.amount"
-            :min="0.01"
-            :precision="2"
-            style="width: 100%"
-          />
+          <el-input-number v-model="form.amount" :min="0.01" :precision="2" style="width: 100%" />
         </el-form-item>
 
         <el-form-item label="到期日" prop="dueDate">
-          <el-date-picker
-            v-model="form.dueDate"
-            type="date"
-            value-format="YYYY-MM-DD"
-            style="width: 100%"
-          />
+          <el-date-picker v-model="form.dueDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+        </el-form-item>
+
+        <el-form-item label="备注">
+          <el-input v-model="form.remark" type="textarea" :rows="3" placeholder="费用说明、线下缴费说明等" />
         </el-form-item>
       </el-form>
 
       <template #footer>
-        <el-button @click="dialogVisible = false">
-          取消
-        </el-button>
-
-        <el-button
-          type="primary"
-          :loading="saving"
-          @click="createBill"
-        >
-          保存
-        </el-button>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="createBill">保存为待审核</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 import { hasPermission } from '../../utils/permission'
@@ -237,15 +245,24 @@ const saving = ref(false)
 const dialogVisible = ref(false)
 const formRef = ref(null)
 
+const queryForm = reactive({
+  tenantId: null,
+  billType: '',
+  auditStatus: '',
+  status: ''
+})
+
 const defaultForm = () => ({
   billNumber: '',
   tenantId: null,
   contractId: null,
-  billType: 'RENT',
+  billType: 'PROPERTY',
+  title: '',
   periodStart: '',
   periodEnd: '',
   amount: null,
-  dueDate: ''
+  dueDate: '',
+  remark: ''
 })
 
 const form = reactive(defaultForm())
@@ -253,69 +270,26 @@ const form = reactive(defaultForm())
 const billTypeOptions = [
   { label: '租金', value: 'RENT' },
   { label: '物业费', value: 'PROPERTY' },
-  { label: '会议', value: 'MEETING_ROOM' },
-  { label: '停车', value: 'PARKING' },
-  { label: '水', value: 'WATER' },
-  { label: '电', value: 'ELECTRICITY' },
-  { label: '煤', value: 'GAS' },
-  { label: '其它', value: 'OTHER' }
+  { label: '水费', value: 'WATER' },
+  { label: '电费', value: 'ELECTRICITY' },
+  { label: '燃气费', value: 'GAS' },
+  { label: '停车费', value: 'PARKING' },
+  { label: '会议室', value: 'MEETING_ROOM' },
+  { label: '维修/工单服务费', value: 'WORK_ORDER' },
+  { label: '保洁费', value: 'CLEANING' },
+  { label: '押金', value: 'DEPOSIT' },
+  { label: '滞纳金', value: 'LATE_FEE' },
+  { label: '调账补差', value: 'ADJUSTMENT' },
+  { label: '其他', value: 'OTHER' }
 ]
 
 const formRules = {
-  billNumber: [
-    {
-      required: true,
-      message: '请输入账单编号',
-      trigger: 'blur'
-    }
-  ],
-
-  tenantId: [
-    {
-      required: true,
-      message: '请选择租户',
-      trigger: 'change'
-    }
-  ],
-
-  contractId: [
-    {
-      required: true,
-      message: '请选择合同',
-      trigger: 'change'
-    }
-  ],
-
-  billType: [
-    {
-      required: true,
-      message: '请选择账单类型',
-      trigger: 'change'
-    }
-  ],
-
-  periodStart: [
-    {
-      required: true,
-      message: '请选择账期开始日期',
-      trigger: 'change'
-    }
-  ],
-
-  periodEnd: [
-    {
-      required: true,
-      message: '请选择账期结束日期',
-      trigger: 'change'
-    }
-  ],
-
+  tenantId: [{ required: true, message: '请选择租户', trigger: 'change' }],
+  billType: [{ required: true, message: '请选择账单类型', trigger: 'change' }],
+  periodStart: [{ required: true, message: '请选择账期开始日期', trigger: 'change' }],
+  periodEnd: [{ required: true, message: '请选择账期结束日期', trigger: 'change' }],
   amount: [
-    {
-      required: true,
-      message: '请输入金额',
-      trigger: 'change'
-    },
+    { required: true, message: '请输入金额', trigger: 'change' },
     {
       validator: (_rule, value, callback) => {
         if (!value || value <= 0) {
@@ -327,43 +301,26 @@ const formRules = {
       trigger: 'change'
     }
   ],
-
-  dueDate: [
-    {
-      required: true,
-      message: '请选择到期日',
-      trigger: 'change'
-    }
-  ]
+  dueDate: [{ required: true, message: '请选择到期日', trigger: 'change' }]
 }
 
 const activeTenants = computed(() => tenants.value.filter(item => item.status !== 'INACTIVE'))
 
 const selectableContracts = computed(() => {
-  return contracts.value.filter(item => {
-    return item.status === 'ACTIVE' && (!form.tenantId || item.tenantId === form.tenantId)
-  })
+  return contracts.value.filter(item => item.status === 'ACTIVE' && (!form.tenantId || item.tenantId === form.tenantId))
 })
 
-function resetForm() {
-  Object.assign(form, defaultForm())
-  formRef.value?.clearValidate()
-}
-
 async function loadBills() {
-  if (!hasPermission('bill:view')) {
-    return
-  }
-
+  if (!hasPermission('bill:view')) return
   loading.value = true
-
   try {
-    const data = await request.get('/bills')
+    const params = Object.fromEntries(
+      Object.entries(queryForm).filter(([, value]) => value !== null && value !== '')
+    )
+    const data = await request.get('/bills', { params })
     bills.value = Array.isArray(data) ? data : []
   } catch (error) {
-    ElMessage.error(
-      error?.response?.data?.message || '账单加载失败'
-    )
+    ElMessage.error(error?.response?.data?.message || error?.message || '账单加载失败')
   } finally {
     loading.value = false
   }
@@ -379,37 +336,103 @@ async function loadContracts() {
   contracts.value = Array.isArray(data) ? data : []
 }
 
-function tenantLabel(tenant) {
-  return `${tenant.tenantName}（ID:${tenant.id}）`
+function resetQuery() {
+  queryForm.tenantId = null
+  queryForm.billType = ''
+  queryForm.auditStatus = ''
+  queryForm.status = ''
+  loadBills()
 }
 
-function tenantName(tenantId) {
-  const tenant = tenants.value.find(item => item.id === tenantId)
-  return tenant ? tenant.tenantName : `租户ID:${tenantId || '-'}`
+function resetForm() {
+  Object.assign(form, defaultForm())
+  formRef.value?.clearValidate()
 }
 
-function contractOptionLabel(contract) {
-  const name = contract.contractName ? `｜${contract.contractName}` : ''
-  const rent = contract.rentAmount ? `｜租金${contract.rentAmount}` : ''
-  const propertyFee = contract.propertyFeeAmount ? `｜物业费${contract.propertyFeeAmount}` : ''
-  return `${contract.contractNumber}${name}${rent}${propertyFee}`
+function openCreateDialog() {
+  if (!hasPermission('bill:add')) {
+    ElMessage.warning('无新增账单权限')
+    return
+  }
+  resetForm()
+  dialogVisible.value = true
 }
 
-function contractLabelById(contractId) {
-  if (!contractId) return '无合同关联'
-  const contract = contracts.value.find(item => item.id === contractId)
-  return contract ? contract.contractNumber : `合同ID:${contractId}`
+async function createBill() {
+  if (!hasPermission('bill:add')) {
+    ElMessage.warning('无新增账单权限')
+    return
+  }
+  await formRef.value.validate()
+  saving.value = true
+  try {
+    await request.post('/bills', {
+      billNumber: form.billNumber?.trim() || null,
+      tenantId: Number(form.tenantId),
+      contractId: form.contractId ? Number(form.contractId) : null,
+      billType: form.billType,
+      title: form.title?.trim() || null,
+      periodStart: form.periodStart,
+      periodEnd: form.periodEnd,
+      amount: form.amount,
+      dueDate: form.dueDate,
+      remark: form.remark?.trim() || null
+    })
+    ElMessage.success('账单已保存为待审核')
+    dialogVisible.value = false
+    resetForm()
+    await loadBills()
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || error?.message || '账单创建失败')
+  } finally {
+    saving.value = false
+  }
 }
 
-function billTypeText(value) {
-  const type = billTypeOptions.find(item => item.value === value)
-  if (type) return type.label
+async function approveBill(row) {
+  try {
+    await ElMessageBox.confirm(`确定发布账单「${row.billNumber}」给租户吗？`, '审核通过确认', { type: 'warning' })
+    await request.post(`/bills/${row.id}/approve`, { auditRemark: '后台审核通过' })
+    ElMessage.success('账单已发布，租户小程序可见')
+    await loadBills()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.response?.data?.message || error?.message || '审核失败')
+    }
+  }
+}
 
-  if (value === 'MEETING') return '会议'
-  if (value === 'PARKING') return '停车'
-  if (value === 'UTILITY') return '水电煤'
+async function rejectBill(row) {
+  try {
+    const result = await ElMessageBox.prompt('请输入驳回原因', `驳回账单 ${row.billNumber}`, {
+      confirmButtonText: '驳回',
+      cancelButtonText: '取消',
+      inputType: 'textarea',
+      inputPlaceholder: '例如：金额或账期需调整'
+    })
+    await request.post(`/bills/${row.id}/reject`, { auditRemark: result.value || '后台驳回' })
+    ElMessage.success('账单已驳回')
+    await loadBills()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.response?.data?.message || error?.message || '驳回失败')
+    }
+  }
+}
 
-  return value || '-'
+async function payBill(row) {
+  try {
+    await ElMessageBox.confirm(`确定已线下收取账单「${row.billNumber}」的款项 ${money(row.amount)} 元吗？`, '确认收款', {
+      type: 'warning'
+    })
+    await request.post(`/bills/${row.id}/pay`)
+    ElMessage.success('收款确认成功')
+    await loadBills()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.response?.data?.message || error?.message || '收款失败')
+    }
+  }
 }
 
 function handleTenantChange() {
@@ -419,9 +442,7 @@ function handleTenantChange() {
 function handleContractChange(contractId) {
   const contract = contracts.value.find(item => item.id === contractId)
   if (!contract) return
-
   form.tenantId = contract.tenantId
-
   if (form.billType === 'RENT' && contract.rentAmount) {
     form.amount = Number(contract.rentAmount)
   } else if (form.billType === 'PROPERTY' && contract.propertyFeeAmount) {
@@ -433,97 +454,92 @@ function handleBillTypeChange() {
   handleContractChange(form.contractId)
 }
 
-function openCreateDialog() {
-  if (!hasPermission('bill:add')) {
-    ElMessage.warning('无新增账单权限')
-    return
-  }
-
-  resetForm()
-  dialogVisible.value = true
+function tenantLabel(tenant) {
+  return `${tenant.tenantName}（ID:${tenant.id}）`
 }
 
-async function createBill() {
-  if (!hasPermission('bill:add')) {
-    ElMessage.warning('无新增账单权限')
-    return
-  }
-
-  await formRef.value.validate()
-
-  saving.value = true
-
-  try {
-    await request.post('/bills', {
-      billNumber: form.billNumber,
-      tenantId: Number(form.tenantId),
-      contractId: Number(form.contractId),
-      billType: form.billType,
-      periodStart: form.periodStart,
-      periodEnd: form.periodEnd,
-      amount: form.amount,
-      dueDate: form.dueDate
-    })
-
-    ElMessage.success('账单创建成功')
-
-    dialogVisible.value = false
-
-    resetForm()
-
-    await loadBills()
-  } catch (error) {
-    ElMessage.error(
-      error?.response?.data?.message || '账单创建失败'
-    )
-  } finally {
-    saving.value = false
-  }
+function tenantName(tenantId) {
+  const tenant = tenants.value.find(item => item.id === tenantId)
+  return tenant ? tenant.tenantName : `租户ID:${tenantId || '-'}`
 }
 
-function isOverdue(row) {
-  if (!row || row.status === 'PAID' || !row.dueDate) {
-    return false
-  }
-
-  const today = new Date().toISOString().slice(0, 10)
-
-  return String(row.dueDate) < today
+function contractOptionLabel(contract) {
+  const name = contract.contractName ? ` | ${contract.contractName}` : ''
+  const rent = contract.rentAmount ? ` | 租金${contract.rentAmount}` : ''
+  const propertyFee = contract.propertyFeeAmount ? ` | 物业费${contract.propertyFeeAmount}` : ''
+  return `${contract.contractNumber}${name}${rent}${propertyFee}`
 }
 
-async function payBill(row) {
-  if (!hasPermission('bill:pay')) {
-    ElMessage.warning('无账单收款权限')
-    return
-  }
+function contractLabelById(contractId) {
+  if (!contractId) return '无合同'
+  const contract = contracts.value.find(item => item.id === contractId)
+  return contract ? contract.contractNumber : `合同ID:${contractId}`
+}
 
-  try {
-    await ElMessageBox.confirm(
-      `确定收取账单「${row.billNumber}」的全额款项 ${row.amount} 元吗？`,
-      '确认收款',
-      { type: 'warning' }
-    )
+function billTypeText(value) {
+  return billTypeOptions.find(item => item.value === value)?.label || value || '-'
+}
 
-    await request.post(`/bills/${row.id}/pay`)
+function sourceTypeText(value) {
+  return {
+    MANUAL: '手工账单',
+    CONTRACT: '合同自动出账',
+    FEE_RULE: '周期收费',
+    ENERGY: '能耗抄表',
+    PARKING: '停车账单',
+    MEETING_ROOM: '会议室预约',
+    WORK_ORDER: '工单服务',
+    DEV_FIXTURE: '开发测试'
+  }[value] || value || '历史账单'
+}
 
-    ElMessage.success('收款成功')
+function statusText(value) {
+  return {
+    UNPAID: '待缴',
+    PAID: '已缴',
+    OVERDUE: '已逾期',
+    CANCELLED: '已取消'
+  }[value] || value || '-'
+}
 
-    await loadBills()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(
-        error?.response?.data?.message || '收款失败'
-      )
-    }
-  }
+function auditStatusText(value) {
+  return {
+    PENDING: '待审核',
+    APPROVED: '已发布',
+    REJECTED: '已驳回'
+  }[value] || '已发布'
+}
+
+function auditTagType(value) {
+  return {
+    PENDING: 'warning',
+    APPROVED: 'success',
+    REJECTED: 'danger'
+  }[value] || 'success'
+}
+
+function statusTagType(row) {
+  if (row.status === 'PAID') return 'success'
+  if (row.status === 'CANCELLED') return 'info'
+  if (row.overdue) return 'danger'
+  return 'warning'
+}
+
+function money(value) {
+  return Number(value || 0).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
+function formatTime(value) {
+  if (!value) return '-'
+  return String(value).replace('T', ' ').slice(0, 16)
 }
 
 onMounted(async () => {
-  await Promise.all([
-    loadBills(),
-    loadTenants(),
-    loadContracts()
-  ])
+  await Promise.all([loadTenants(), loadContracts()])
+  await loadBills()
 })
 </script>
 
@@ -532,9 +548,36 @@ onMounted(async () => {
   padding: 20px;
 }
 
-.card-header {
+.page-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-title {
+  font-weight: 600;
+  color: #303133;
+}
+
+.page-subtitle {
+  margin-top: 6px;
+  color: #909399;
+  font-size: 13px;
+}
+
+.query-form {
+  margin-bottom: 12px;
+}
+
+.strong-text {
+  font-weight: 600;
+  color: #303133;
+}
+
+.sub-text {
+  margin-top: 4px;
+  color: #909399;
+  font-size: 12px;
 }
 </style>

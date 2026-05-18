@@ -60,7 +60,7 @@ Page({
       })
       wx.showModal({
         title: '已提交预约',
-        content: result && result.message ? result.message : '招商顾问会尽快与您联系',
+        content: result && result.id ? `线索ID：${result.id}\n${result.message || '招商顾问会尽快与您联系'}` : '招商顾问会尽快与您联系',
         showCancel: false
       })
       this.setData({

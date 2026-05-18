@@ -83,9 +83,11 @@ export function hasPermission(permissionCode) {
     FINANCE: [
       'bill:view',
       'bill:add',
+      'bill:audit',
       'bill:pay',
       'feerule:view',
       'feerule:add',
+      'feerule:generate',
       'finance:view',
       'parking-bill:view',
       'parking-bill:add',

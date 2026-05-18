@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -22,6 +23,8 @@ public class Bill extends BaseEntity {
     @Column(nullable = false)
     private String billType;
 
+    private String title;
+
     private LocalDate periodStart;
 
     private LocalDate periodEnd;
@@ -33,4 +36,18 @@ public class Bill extends BaseEntity {
     private LocalDate dueDate;
 
     private String status;
+
+    private String auditStatus;
+
+    private String auditRemark;
+
+    private String approvedBy;
+
+    private LocalDateTime approvedTime;
+
+    private String sourceType;
+
+    private Long sourceId;
+
+    private String remark;
 }

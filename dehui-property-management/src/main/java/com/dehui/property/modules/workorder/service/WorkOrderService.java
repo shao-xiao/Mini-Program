@@ -240,7 +240,8 @@ public class WorkOrderService {
                     bill.setBillNumber("WO-" + wo.getOrderNumber());
                     bill.setTenantId(wo.getTenantId());
                     bill.setContractId(null);
-                    bill.setBillType("OTHER");
+                    bill.setBillType("WORK_ORDER");
+                    bill.setTitle("工单服务费 - " + wo.getOrderNumber());
                     LocalDate today = LocalDate.now();
                     bill.setPeriodStart(today);
                     bill.setPeriodEnd(today);
@@ -248,6 +249,10 @@ public class WorkOrderService {
                     bill.setPaidAmount(BigDecimal.ZERO);
                     bill.setDueDate(today);
                     bill.setStatus("UNPAID");
+                    bill.setAuditStatus("PENDING");
+                    bill.setSourceType("WORK_ORDER");
+                    bill.setSourceId(wo.getId());
+                    bill.setRemark(wo.getChargeRemark());
 
                     Bill savedBill = billRepository.save(bill);
                     wo.setBillId(savedBill.getId());

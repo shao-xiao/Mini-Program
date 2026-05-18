@@ -15,11 +15,12 @@ public class BillCreateRequest {
     @NotNull(message = "租户ID不能为空")
     private Long tenantId;
 
-    @NotNull(message = "合同ID不能为空")
     private Long contractId;
 
     @NotBlank(message = "账单类型不能为空")
     private String billType;
+
+    private String title;
 
     @NotNull(message = "账期开始日期不能为空")
     private LocalDate periodStart;
@@ -33,4 +34,6 @@ public class BillCreateRequest {
 
     @NotNull(message = "到期日期不能为空")
     private LocalDate dueDate;
+
+    private String remark;
 }

@@ -1,1 +1,94 @@
+.input {
+  height: 88rpx;
+  border: 1rpx solid #dcdfe6;
+  border-radius: 8rpx;
+  padding: 0 20rpx;
+  margin-top: 18rpx;
+  box-sizing: border-box;
+  background: #fff;
+}
 
+.textarea {
+  width: 100%;
+  min-height: 150rpx;
+  border: 1rpx solid #dcdfe6;
+  border-radius: 8rpx;
+  padding: 20rpx;
+  margin-top: 18rpx;
+  box-sizing: border-box;
+  background: #fff;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 18rpx;
+}
+
+.chip-row {
+  display: flex;
+  gap: 14rpx;
+}
+
+.chip {
+  padding: 14rpx 24rpx;
+  border: 1rpx solid #dcdfe6;
+  border-radius: 8rpx;
+  color: #606266;
+  font-size: 26rpx;
+}
+
+.chip.active {
+  border-color: #d93025;
+  color: #d93025;
+  background: #fff1f0;
+}
+
+.location-row {
+  display: flex;
+  gap: 14rpx;
+}
+
+.location-input {
+  flex: 1;
+}
+
+.location-button {
+  margin-top: 18rpx;
+}
+
+.submit-button {
+  margin-top: 22rpx;
+}
+
+.checkin-card {
+  margin-bottom: 18rpx;
+  padding: 24rpx;
+  background: #fff;
+  border-radius: 10rpx;
+  box-shadow: 0 8rpx 24rpx rgba(31, 27, 27, 0.06);
+}
+
+.checkin-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.checkin-type {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.checkin-time,
+.checkin-meta,
+.checkin-remark,
+.empty-desc {
+  color: #73767a;
+  font-size: 24rpx;
+}
+
+.checkin-meta,
+.checkin-remark {
+  margin-top: 10rpx;
+}

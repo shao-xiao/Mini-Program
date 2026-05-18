@@ -30,7 +30,7 @@ public class MobileWorkOrderController {
         return mobileWorkOrderService.create(normalizeToken(token), request);
     }
 
-    @PatchMapping("/{id}/cancel")
+    @RequestMapping(value = "/{id}/cancel", method = {RequestMethod.PATCH, RequestMethod.POST})
     public Result<MobileWorkOrderResponse> cancel(
             @RequestHeader("Authorization") String token,
             @PathVariable Long id) {
@@ -45,7 +45,7 @@ public class MobileWorkOrderController {
         return mobileWorkOrderService.uploadImage(normalizeToken(token), id, file);
     }
 
-    @PatchMapping("/{id}/evaluation")
+    @RequestMapping(value = "/{id}/evaluation", method = {RequestMethod.PATCH, RequestMethod.POST})
     public Result<MobileWorkOrderResponse> evaluate(
             @RequestHeader("Authorization") String token,
             @PathVariable Long id,

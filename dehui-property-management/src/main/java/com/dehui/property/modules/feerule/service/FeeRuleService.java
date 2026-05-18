@@ -91,14 +91,10 @@ public class FeeRuleService {
             return Result.error("收费规则租户与合同租户不匹配");
         }
 
-        int stepMonths = "QUARTERLY".equals(rule.getCycle()) ? 3 : 1;
+        int stepMonths = cycleMonths(rule.getCycle());
 
         LocalDate today = LocalDate.now();
-        LocalDate cursor = today.withDayOfMonth(1);
-
-        if (rule.getStartDate() != null && cursor.isBefore(rule.getStartDate().withDayOfMonth(1))) {
-            cursor = rule.getStartDate().withDayOfMonth(1);
-        }
+        LocalDate cursor = resolveCurrentPeriodStart(rule, today, stepMonths);
 
         LocalDate endLimit = rule.getEndDate();
 
@@ -127,12 +123,17 @@ public class FeeRuleService {
                 bill.setTenantId(rule.getTenantId());
                 bill.setContractId(rule.getContractId());
                 bill.setBillType(rule.getFeeType());
+                bill.setTitle(periodStart.format(DateTimeFormatter.ofPattern("yyyy年MM月")) + feeTypeText(rule.getFeeType()) + "账单");
                 bill.setPeriodStart(periodStart);
                 bill.setPeriodEnd(periodEnd);
                 bill.setAmount(rule.getAmount());
                 bill.setPaidAmount(BigDecimal.ZERO);
                 bill.setDueDate(dueDate);
                 bill.setStatus("UNPAID");
+                bill.setAuditStatus("PENDING");
+                bill.setSourceType("FEE_RULE");
+                bill.setSourceId(rule.getId());
+                bill.setRemark(rule.getRemark());
 
                 Bill saved = billRepository.save(bill);
                 return Result.success(toBillResponse(saved));
@@ -147,6 +148,52 @@ public class FeeRuleService {
     private String buildBillNumber(FeeRule rule, LocalDate periodStart) {
         String ym = periodStart.format(DateTimeFormatter.ofPattern("yyyyMM"));
         return "AUTO-" + rule.getContractId() + "-" + rule.getFeeType() + "-" + ym;
+    }
+
+    private int cycleMonths(String cycle) {
+        if ("YEARLY".equals(cycle)) {
+            return 12;
+        }
+        if ("QUARTERLY".equals(cycle)) {
+            return 3;
+        }
+        return 1;
+    }
+
+    private LocalDate resolveCurrentPeriodStart(FeeRule rule, LocalDate today, int stepMonths) {
+        LocalDate cursor = rule.getStartDate() == null
+                ? today.withDayOfMonth(1)
+                : rule.getStartDate().withDayOfMonth(1);
+        LocalDate currentMonth = today.withDayOfMonth(1);
+        while (cursor.plusMonths(stepMonths).minusDays(1).isBefore(currentMonth)) {
+            cursor = cursor.plusMonths(stepMonths);
+        }
+        return cursor;
+    }
+
+    private String feeTypeText(String feeType) {
+        if ("WATER".equals(feeType)) {
+            return "水费";
+        }
+        if ("ELECTRICITY".equals(feeType)) {
+            return "电费";
+        }
+        if ("GAS".equals(feeType)) {
+            return "燃气费";
+        }
+        if ("MEETING_ROOM".equals(feeType)) {
+            return "会议室";
+        }
+        if ("CLEANING".equals(feeType)) {
+            return "保洁费";
+        }
+        if ("PARKING".equals(feeType)) {
+            return "停车费";
+        }
+        if ("OTHER".equals(feeType)) {
+            return "其他";
+        }
+        return feeType == null || feeType.isBlank() ? "费用" : feeType;
     }
 
     private FeeRuleResponse toResponse(FeeRule rule) {

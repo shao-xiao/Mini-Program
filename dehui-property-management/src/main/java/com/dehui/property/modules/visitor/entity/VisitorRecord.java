@@ -32,6 +32,8 @@ public class VisitorRecord extends BaseEntity {
 
     private LocalDateTime leaveTime;
 
+    private String carPlateNo;
+
     private String status; // REGISTERED / ENTERED / LEFT / CANCELLED
 
     private String source; // ADMIN / MINIPROGRAM

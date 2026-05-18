@@ -179,12 +179,17 @@ public class MeetingService {
             bill.setTenantId(booking.getTenantId());
             bill.setContractId(null);
             bill.setBillType("MEETING_ROOM");
+            bill.setTitle("会议室预约账单 - " + booking.getApplicantName());
             bill.setPeriodStart(booking.getStartTime().toLocalDate());
             bill.setPeriodEnd(booking.getEndTime().toLocalDate());
             bill.setAmount(booking.getCalculatedAmount());
             bill.setPaidAmount(BigDecimal.ZERO);
             bill.setDueDate(LocalDate.now().plusDays(7));
             bill.setStatus("UNPAID");
+            bill.setAuditStatus("PENDING");
+            bill.setSourceType("MEETING_ROOM");
+            bill.setSourceId(booking.getId());
+            bill.setRemark("会议室预约确认后生成，审核通过后租户可见");
             Bill savedBill = billRepository.save(bill);
             booking.setBillId(savedBill.getId());
         }
@@ -202,6 +207,15 @@ public class MeetingService {
             return Result.error("已完成的预约不能取消");
         }
         booking.setStatus("CANCELLED");
+        if (booking.getBillId() != null) {
+            billRepository.findById(booking.getBillId()).ifPresent(bill -> {
+                if (!"PAID".equals(bill.getStatus())) {
+                    bill.setStatus("CANCELLED");
+                    bill.setRemark(appendRemark(bill.getRemark(), "会议预约已取消"));
+                    billRepository.save(bill);
+                }
+            });
+        }
         return Result.success(toBookingResponse(meetingBookingRepository.save(booking)));
     }
 
@@ -276,6 +290,13 @@ public class MeetingService {
 
     private String generateBillNumber() {
         return "BILL-MR-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+    }
+
+    private String appendRemark(String current, String addition) {
+        if (current == null || current.isBlank()) {
+            return addition;
+        }
+        return current + "；" + addition;
     }
 
     private MeetingRoomResponse toRoomResponse(MeetingRoom room) {

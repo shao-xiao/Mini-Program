@@ -254,6 +254,8 @@ const feeTypeOptions = [
   { label: '电', value: 'ELECTRICITY' },
   { label: '煤', value: 'GAS' },
   { label: '会议', value: 'MEETING_ROOM' },
+  { label: '保洁费', value: 'CLEANING' },
+  { label: '停车费', value: 'PARKING' },
   { label: '其它', value: 'OTHER' }
 ]
 
