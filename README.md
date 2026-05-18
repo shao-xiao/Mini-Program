@@ -14,36 +14,36 @@ https://github.com/shao-xiao/Mini-Program
 main
 ```
 
-## 1. 绝对路径标准
+## 1. dehui_ 工作区路径标准
 
-本地开发路径以当前电脑实际目录为准：
+以下路径均以 `dehui_` 文件夹为根目录，GitHub 文档不再写本机用户目录前缀。
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode
+dehui-property-vscode
 ```
 
 本地后台管理前端：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin
+dehui-property-vscode\dehui-property-admin
 ```
 
 本地 Spring Boot 后端：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management
+dehui-property-vscode\dehui-property-management
 ```
 
 本地微信小程序：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram
+dehui-property-vscode\dehui-property-miniprogram
 ```
 
 原始独立微信小程序工作目录：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-miniprogram
+dehui-property-miniprogram
 ```
 
 推荐服务器部署路径：
@@ -70,12 +70,12 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-miniprogram
 /opt/projects/Mini-Program/dehui-property-miniprogram
 ```
 
-说明：所有运行、部署、排查命令都应先进入对应绝对路径，避免在错误目录执行 `mvn spring-boot:run` 或 `npm run build`。
+说明：本地命令默认先进入 `dehui_` 文件夹，再进入对应项目目录，避免在错误目录执行 `mvn spring-boot:run` 或 `npm run build`。
 
 ## 2. 项目结构
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode
+dehui-property-vscode
 ├── dehui-property-admin
 │   ├── src
 │   │   ├── views
@@ -107,7 +107,7 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode
 后台管理前端：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin
+dehui-property-vscode\dehui-property-admin
 ```
 
 用途：
@@ -120,7 +120,7 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin
 Spring Boot 后端：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management
+dehui-property-vscode\dehui-property-management
 ```
 
 用途：
@@ -137,7 +137,7 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-manag
 微信小程序：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram
+dehui-property-vscode\dehui-property-miniprogram
 ```
 
 用途：
@@ -180,7 +180,7 @@ https://wuye.mingda.com.cn/api/ping
 小程序生产接口地址配置文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\config\env.js
+dehui-property-vscode\dehui-property-miniprogram\config\env.js
 ```
 
 生产地址：
@@ -194,7 +194,7 @@ https://wuye.mingda.com.cn/api
 运行后端：
 
 ```powershell
-cd C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management
+cd dehui-property-vscode\dehui-property-management
 mvn spring-boot:run
 ```
 
@@ -207,7 +207,7 @@ http://localhost:8080/api
 运行后台管理前端：
 
 ```powershell
-cd C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin
+cd dehui-property-vscode\dehui-property-admin
 npm install
 npm run dev
 ```
@@ -221,7 +221,7 @@ http://localhost:5173
 打开微信小程序：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram
+dehui-property-vscode\dehui-property-miniprogram
 ```
 
 使用微信开发者工具导入该目录。
@@ -290,8 +290,8 @@ npm run build
 文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\common\HealthController.java
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\config\WebConfig.java
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\common\HealthController.java
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\config\WebConfig.java
 ```
 
 作用：
@@ -305,7 +305,7 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-manag
 主要文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\bill
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\bill
 ```
 
 作用：
@@ -319,7 +319,7 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-manag
 新增审核请求对象：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\bill\dto\BillAuditRequest.java
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\bill\dto\BillAuditRequest.java
 ```
 
 ### 7.3 权限调整
@@ -327,8 +327,8 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-manag
 文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\config\AuthInterceptor.java
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\system\service\SystemUserService.java
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\config\AuthInterceptor.java
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\system\service\SystemUserService.java
 ```
 
 作用：
@@ -342,16 +342,16 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-manag
 后端文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\mobile\controller\MobileCheckinController.java
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\mobile\service\MobileCheckinService.java
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\mobile\entity\StaffCheckin.java
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\mobile\repository\StaffCheckinRepository.java
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\mobile\controller\MobileCheckinController.java
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\mobile\service\MobileCheckinService.java
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\mobile\entity\StaffCheckin.java
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\mobile\repository\StaffCheckinRepository.java
 ```
 
 小程序文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\checkin
+dehui-property-vscode\dehui-property-miniprogram\pages\checkin
 ```
 
 作用：
@@ -367,9 +367,9 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-minip
 文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\config\env.js
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\utils\request.js
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\me
+dehui-property-vscode\dehui-property-miniprogram\config\env.js
+dehui-property-vscode\dehui-property-miniprogram\utils\request.js
+dehui-property-vscode\dehui-property-miniprogram\pages\me
 ```
 
 作用：
@@ -385,10 +385,10 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-minip
 文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\mobile\controller
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\meeting
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\visitors
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\workorders
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\mobile\controller
+dehui-property-vscode\dehui-property-miniprogram\pages\meeting
+dehui-property-vscode\dehui-property-miniprogram\pages\visitors
+dehui-property-vscode\dehui-property-miniprogram\pages\workorders
 ```
 
 作用：
@@ -402,9 +402,9 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-minip
 文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\visitor\entity\VisitorRecord.java
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\mobile\service\MobileVisitorService.java
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin\src\views\operation\VisitorList.vue
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\visitor\entity\VisitorRecord.java
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\mobile\service\MobileVisitorService.java
+dehui-property-vscode\dehui-property-admin\src\views\operation\VisitorList.vue
 ```
 
 作用：
@@ -419,11 +419,11 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin
 文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin\src\views\tenant\BillList.vue
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin\src\views\finance\FinanceDashboard.vue
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin\src\views\investment\InvestmentLeadList.vue
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin\src\views\meeting\MeetingBookingList.vue
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin\src\views\operation\WorkOrderList.vue
+dehui-property-vscode\dehui-property-admin\src\views\tenant\BillList.vue
+dehui-property-vscode\dehui-property-admin\src\views\finance\FinanceDashboard.vue
+dehui-property-vscode\dehui-property-admin\src\views\investment\InvestmentLeadList.vue
+dehui-property-vscode\dehui-property-admin\src\views\meeting\MeetingBookingList.vue
+dehui-property-vscode\dehui-property-admin\src\views\operation\WorkOrderList.vue
 ```
 
 作用：
@@ -477,7 +477,7 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin
 已在本机验证后台管理前端构建：
 
 ```powershell
-cd C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin
+cd dehui-property-vscode\dehui-property-admin
 npm run build
 ```
 
@@ -502,10 +502,10 @@ curl https://wuye.mingda.com.cn/api/ping
 
 ## 10. Git 操作标准
 
-本地进入仓库根目录：
+本地从 `dehui_` 文件夹进入仓库根目录：
 
 ```powershell
-cd C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode
+cd dehui-property-vscode
 ```
 
 查看状态：
@@ -539,12 +539,12 @@ git pull origin main
 以下内容不应提交到 GitHub：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin\node_modules
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-admin\dist
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\target
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\data
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-management\uploads
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\project.private.config.json
+dehui-property-vscode\dehui-property-admin\node_modules
+dehui-property-vscode\dehui-property-admin\dist
+dehui-property-vscode\dehui-property-management\target
+dehui-property-vscode\dehui-property-management\data
+dehui-property-vscode\dehui-property-management\uploads
+dehui-property-vscode\dehui-property-miniprogram\project.private.config.json
 ```
 
 原因：

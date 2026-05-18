@@ -5,13 +5,13 @@
 仓库根目录：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode
+dehui-property-vscode
 ```
 
 小程序目录：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram
+dehui-property-vscode\dehui-property-miniprogram
 ```
 
 GitHub 仓库：
@@ -22,22 +22,22 @@ https://github.com/shao-xiao/Mini-Program
 
 ## 1. 打开方式
 
-使用微信开发者工具导入以下绝对路径：
+使用微信开发者工具导入以下项目目录：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram
+dehui-property-vscode\dehui-property-miniprogram
 ```
 
 小程序 AppID 配置在：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\project.config.json
+dehui-property-vscode\dehui-property-miniprogram\project.config.json
 ```
 
 本机私有配置不提交：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\project.private.config.json
+dehui-property-vscode\dehui-property-miniprogram\project.private.config.json
 ```
 
 ## 2. 接口地址
@@ -45,7 +45,7 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-minip
 接口配置文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\config\env.js
+dehui-property-vscode\dehui-property-miniprogram\config\env.js
 ```
 
 生产接口地址：
@@ -63,21 +63,21 @@ https://wuye.mingda.com.cn/api/ping
 小程序所有请求必须通过：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\utils\request.js
+dehui-property-vscode\dehui-property-miniprogram\utils\request.js
 ```
 
 ## 3. 页面目录
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\home
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\me
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\announcements
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\bills
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\meeting
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\visitors
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\workorders
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\investment
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\checkin
+dehui-property-vscode\dehui-property-miniprogram\pages\home
+dehui-property-vscode\dehui-property-miniprogram\pages\me
+dehui-property-vscode\dehui-property-miniprogram\pages\announcements
+dehui-property-vscode\dehui-property-miniprogram\pages\bills
+dehui-property-vscode\dehui-property-miniprogram\pages\meeting
+dehui-property-vscode\dehui-property-miniprogram\pages\visitors
+dehui-property-vscode\dehui-property-miniprogram\pages\workorders
+dehui-property-vscode\dehui-property-miniprogram\pages\investment
+dehui-property-vscode\dehui-property-miniprogram\pages\checkin
 ```
 
 页面用途：
@@ -99,9 +99,9 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-minip
 文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\config\env.js
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\utils\request.js
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\me
+dehui-property-vscode\dehui-property-miniprogram\config\env.js
+dehui-property-vscode\dehui-property-miniprogram\utils\request.js
+dehui-property-vscode\dehui-property-miniprogram\pages\me
 ```
 
 作用：
@@ -117,8 +117,8 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-minip
 文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\checkin
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\app.json
+dehui-property-vscode\dehui-property-miniprogram\pages\checkin
+dehui-property-vscode\dehui-property-miniprogram\app.json
 ```
 
 作用：
@@ -135,7 +135,7 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-minip
 文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\bills
+dehui-property-vscode\dehui-property-miniprogram\pages\bills
 ```
 
 作用：
@@ -150,9 +150,9 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-minip
 文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\meeting
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\visitors
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\workorders
+dehui-property-vscode\dehui-property-miniprogram\pages\meeting
+dehui-property-vscode\dehui-property-miniprogram\pages\visitors
+dehui-property-vscode\dehui-property-miniprogram\pages\workorders
 ```
 
 作用：
@@ -168,7 +168,7 @@ C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-minip
 文件：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\pages\investment\index.js
+dehui-property-vscode\dehui-property-miniprogram\pages\investment\index.js
 ```
 
 作用：
@@ -222,10 +222,10 @@ downloadFile 合法域名：https://wuye.mingda.com.cn
 不要提交：
 
 ```text
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\project.private.config.json
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\node_modules
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\miniprogram_npm
-C:\Users\Administrator\Desktop\dehui_\dehui-property-vscode\dehui-property-miniprogram\dist
+dehui-property-vscode\dehui-property-miniprogram\project.private.config.json
+dehui-property-vscode\dehui-property-miniprogram\node_modules
+dehui-property-vscode\dehui-property-miniprogram\miniprogram_npm
+dehui-property-vscode\dehui-property-miniprogram\dist
 ```
 
 原因：
