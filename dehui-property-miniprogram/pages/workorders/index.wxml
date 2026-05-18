@@ -1,0 +1,222 @@
+<view class="page">
+  <view class="section card">
+    <view class="title">报修服务</view>
+    <view class="subtitle">{{identityText || '登录后'}}提交报修并查看处理进度</view>
+  </view>
+
+  <view wx:if="{{errorMessage}}" class="card section">
+    <view class="empty-title">暂时无法提交报修</view>
+    <view class="empty-desc">{{errorMessage}}</view>
+    <button class="button-primary bind-button" bindtap="goProfile">去登录或绑定身份</button>
+  </view>
+
+  <view wx:if="{{!errorMessage}}" class="section card">
+    <view class="section-title">报修信息</view>
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="报修标题，如 空调不制冷"
+      value="{{form.title}}"
+      data-field="title"
+      bindinput="onInput"
+    />
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="报修位置，如 B座 205"
+      value="{{form.location}}"
+      data-field="location"
+      bindinput="onInput"
+    />
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="联系电话"
+      value="{{form.contactPhone}}"
+      data-field="contactPhone"
+      bindinput="onInput"
+    />
+
+    <view class="field-title">报修类别</view>
+    <view class="chip-row">
+      <view
+        wx:for="{{categories}}"
+        wx:key="value"
+        class="chip {{form.category === item.value ? 'active' : ''}}"
+        data-value="{{item.value}}"
+        bindtap="selectCategory"
+      >
+        {{item.label}}
+      </view>
+    </view>
+
+    <view class="field-title">紧急程度</view>
+    <view class="chip-row">
+      <view
+        wx:for="{{priorities}}"
+        wx:key="value"
+        class="chip {{form.priority === item.value ? 'active' : ''}}"
+        data-value="{{item.value}}"
+        bindtap="selectPriority"
+      >
+        {{item.label}}
+      </view>
+    </view>
+
+    <textarea
+      class="textarea"
+      placeholder-class="input-placeholder"
+      placeholder="请描述问题现象、影响范围或方便上门时间"
+      value="{{form.description}}"
+      data-field="description"
+      bindinput="onInput"
+    />
+    <view class="field-title">现场照片</view>
+    <view class="image-tip">{{imageTip}}，可点右上角删除误传照片</view>
+    <view class="image-grid">
+      <view
+        wx:for="{{selectedImages}}"
+        wx:key="*this"
+        class="image-item"
+        data-url="{{item}}"
+        bindtap="previewSelectedImage"
+      >
+        <image class="image-thumb" src="{{item}}" mode="aspectFill" />
+        <view
+          class="image-remove"
+          data-index="{{index}}"
+          catchtap="removeSelectedImage"
+        >
+          ×
+        </view>
+      </view>
+      <view wx:if="{{selectedImages.length < maxImageCount}}" class="image-add" bindtap="chooseImages">
+        <view class="image-add-icon">+</view>
+        <view class="image-add-text">添加照片</view>
+      </view>
+      <view wx:else class="image-limit">
+        <view class="image-limit-count">{{selectedImages.length}}/{{maxImageCount}}</view>
+        <view class="image-limit-text">已达上限</view>
+      </view>
+    </view>
+    <button class="button-primary submit-button" loading="{{submitting}}" bindtap="submitWorkOrder">
+      提交报修
+    </button>
+  </view>
+
+  <view wx:if="{{loading}}" class="card muted">正在加载报修记录...</view>
+
+  <view wx:if="{{!errorMessage && !loading && workOrders.length === 0}}" class="card muted">
+    暂无报修记录
+  </view>
+
+  <view wx:if="{{!errorMessage && workOrders.length > 0}}" class="section">
+    <view class="section-title">我的报修</view>
+    <view wx:for="{{workOrders}}" wx:key="id" class="workorder-card">
+      <view class="workorder-head">
+        <view>
+          <view class="workorder-title">{{item.title}}</view>
+          <view class="workorder-number">{{item.orderNumber}}</view>
+        </view>
+        <view class="status {{item.statusClass}}">{{item.statusText}}</view>
+      </view>
+      <view class="workorder-meta">{{item.categoryText}} · {{item.priorityText}}</view>
+      <view class="workorder-meta">位置：{{item.location}}</view>
+      <view class="workorder-desc">{{item.description}}</view>
+      <view wx:if="{{item.handlingResult}}" class="result-box">
+        <view class="result-title">处理结果</view>
+        <view class="result-content">{{item.handlingResult}}</view>
+      </view>
+      <view wx:if="{{item.rating}}" class="evaluation-box">
+        <view class="result-title">我的评价</view>
+        <view class="star-row small">
+          <view
+            wx:for="{{item.ratingStars}}"
+            wx:key="value"
+            class="star {{item.active ? 'active' : ''}}"
+          >
+            ★
+          </view>
+        </view>
+        <view wx:if="{{item.evaluationContent}}" class="result-content">{{item.evaluationContent}}</view>
+      </view>
+      <view wx:if="{{item.imageUrls.length}}" class="uploaded-images">
+        <image
+          wx:for="{{item.imageUrls}}"
+          wx:for-item="image"
+          wx:key="*this"
+          class="uploaded-thumb"
+          src="{{image}}"
+          mode="aspectFill"
+          data-url="{{image}}"
+          data-urls="{{item.imageUrls}}"
+          bindtap="previewWorkOrderImage"
+        />
+      </view>
+      <view class="workorder-time">{{item.createdTimeText}}</view>
+      <view class="timeline">
+        <view
+          wx:for="{{item.timeline}}"
+          wx:key="label"
+          wx:for-item="step"
+          class="timeline-item {{step.active ? 'active' : ''}}"
+        >
+          <view class="timeline-dot"></view>
+          <view class="timeline-body">
+            <view class="timeline-label">{{step.label}}</view>
+            <view class="timeline-time">{{step.timeText || '待更新'}}</view>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{item.cancellable}}" class="workorder-actions">
+        <button
+          class="cancel-button"
+          size="mini"
+          data-id="{{item.id}}"
+          bindtap="cancelWorkOrder"
+        >
+          撤回报修
+        </button>
+      </view>
+      <view wx:if="{{item.evaluable}}" class="workorder-actions">
+        <button
+          class="evaluate-button"
+          size="mini"
+          data-id="{{item.id}}"
+          bindtap="openEvaluation"
+        >
+          评价服务
+        </button>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{evaluationVisible}}" class="modal-mask" catchtap="closeEvaluation">
+    <view class="modal-card" catchtap="noop">
+      <view class="modal-title">评价服务</view>
+      <view class="modal-subtitle">{{evaluationForm.title}}</view>
+      <view class="star-row">
+        <view
+          wx:for="{{ratingOptions}}"
+          wx:key="*this"
+          class="star {{item <= evaluationForm.rating ? 'active' : ''}}"
+          data-value="{{item}}"
+          bindtap="selectRating"
+        >
+          ★
+        </view>
+      </view>
+      <textarea
+        class="textarea evaluation-textarea"
+        placeholder-class="input-placeholder"
+        placeholder="可以写下维修服务体验或建议"
+        value="{{evaluationForm.content}}"
+        bindinput="onEvaluationInput"
+      />
+      <view class="modal-actions">
+        <button size="mini" bindtap="closeEvaluation">取消</button>
+        <button size="mini" class="button-primary modal-submit" bindtap="submitEvaluation">提交评价</button>
+      </view>
+    </view>
+  </view>
+</view>

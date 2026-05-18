@@ -1,0 +1,44 @@
+<view class="page">
+  <view class="section card">
+    <view class="brand-title">
+      <image class="brand-logo" src="/assets/dehui-logo.png" mode="aspectFit" />
+      <view class="title">德汇创新中心</view>
+    </view>
+    <view class="subtitle">租户服务、内部办公与招商入口</view>
+  </view>
+
+  <view class="section grid">
+    <navigator class="action" url="/pages/announcements/index">
+      <view class="action-title">公告通知</view>
+      <view class="action-desc">园区公告与运营提醒</view>
+    </navigator>
+    <navigator class="action" url="/pages/bills/index">
+      <view class="action-title">账单中心</view>
+      <view class="action-desc">租金、能耗、停车、会议账单</view>
+    </navigator>
+    <navigator class="action" url="/pages/meeting/index">
+      <view class="action-title">会议预约</view>
+      <view class="action-desc">查询会议室并发起预约</view>
+    </navigator>
+    <navigator class="action" url="/pages/workorders/index">
+      <view class="action-title">报修服务</view>
+      <view class="action-desc">提交报修并查看进度</view>
+    </navigator>
+    <navigator class="action" url="/pages/visitors/index">
+      <view class="action-title">访客预约</view>
+      <view class="action-desc">登记访客并查看到访状态</view>
+    </navigator>
+    <navigator class="action" url="/pages/investment/index">
+      <view class="action-title">招商中心</view>
+      <view class="action-desc">了解园区并预约看房</view>
+    </navigator>
+    <navigator class="action" url="/pages/checkin/index">
+      <view class="action-title">员工签到</view>
+      <view class="action-desc">内部员工移动打卡</view>
+    </navigator>
+    <navigator class="action" url="/pages/me/index">
+      <view class="action-title">我的身份</view>
+      <view class="action-desc">登录、绑定租户或内部账号</view>
+    </navigator>
+  </view>
+</view>

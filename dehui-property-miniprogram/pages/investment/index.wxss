@@ -1,0 +1,97 @@
+.hero {
+  padding: 34rpx 30rpx;
+  border-radius: 12rpx;
+  background: #d93025;
+  color: #ffffff;
+}
+
+.hero-title {
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+.hero-subtitle {
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.hero-address {
+  margin-top: 22rpx;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.section-title {
+  margin: 4rpx 0 18rpx;
+  color: #1f1b1b;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.highlight-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14rpx;
+}
+
+.highlight-item,
+.policy-item {
+  border-radius: 8rpx;
+  background: #f5f6f8;
+  color: #606266;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.highlight-item {
+  min-height: 76rpx;
+  padding: 18rpx;
+  box-sizing: border-box;
+}
+
+.policy-item {
+  margin-top: 12rpx;
+  padding: 16rpx 18rpx;
+}
+
+.form-tip {
+  margin-bottom: 16rpx;
+  color: #73767a;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 18rpx;
+  padding: 0 18rpx;
+  border-radius: 8rpx;
+  background: #f5f6f8;
+  color: #1f1b1b;
+  font-size: 26rpx;
+}
+
+.input {
+  height: 72rpx;
+  line-height: 72rpx;
+}
+
+.textarea {
+  min-height: 150rpx;
+  padding-top: 18rpx;
+  padding-bottom: 18rpx;
+  line-height: 38rpx;
+}
+
+.input-placeholder {
+  color: #a8abb2;
+  font-size: 26rpx;
+}
+
+.submit-button {
+  margin-top: 24rpx;
+}

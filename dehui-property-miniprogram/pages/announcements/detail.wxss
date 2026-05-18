@@ -1,0 +1,17 @@
+.detail-type {
+  display: inline-block;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  background: #fdecea;
+  color: #d93025;
+  font-size: 24rpx;
+  margin-bottom: 20rpx;
+}
+
+.detail-content {
+  margin-top: 32rpx;
+  color: #303133;
+  font-size: 30rpx;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}

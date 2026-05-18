@@ -1,0 +1,11 @@
+.brand-title {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+}
+
+.brand-logo {
+  width: 72rpx;
+  height: 72rpx;
+  flex: none;
+}

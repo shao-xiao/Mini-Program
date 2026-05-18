@@ -1,0 +1,188 @@
+.form-card {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16rpx;
+}
+
+.form-row {
+  min-width: 0;
+}
+
+.form-label {
+  color: #73767a;
+  font-size: 24rpx;
+}
+
+.picker-value {
+  margin-top: 10rpx;
+  padding: 16rpx 12rpx;
+  border-radius: 8rpx;
+  background: #f5f6f8;
+  color: #1f1b1b;
+  font-size: 26rpx;
+  text-align: center;
+}
+
+.section-title {
+  margin: 4rpx 0 16rpx;
+  color: #1f1b1b;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.section-title.compact {
+  margin-top: 0;
+}
+
+.room-card,
+.booking-card {
+  background: #ffffff;
+  border-radius: 12rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 8rpx 24rpx rgba(31, 27, 27, 0.06);
+}
+
+.room-card.selected {
+  outline: 4rpx solid #d93025;
+}
+
+.room-card.disabled {
+  background: #f0f1f3;
+  color: #a8abb2;
+}
+
+.room-head,
+.booking-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.room-name,
+.booking-room {
+  color: #1f1b1b;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.room-card.disabled .room-name {
+  color: #909399;
+}
+
+.room-location,
+.booking-meta {
+  margin-top: 8rpx;
+  color: #73767a;
+  font-size: 24rpx;
+}
+
+.room-status,
+.booking-status {
+  flex: none;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  background: #e8f5e9;
+  color: #2e7d32;
+  font-size: 22rpx;
+}
+
+.room-card.disabled .room-status {
+  background: #ebeef5;
+  color: #909399;
+}
+
+.room-facilities {
+  margin-top: 16rpx;
+  color: #606266;
+  font-size: 26rpx;
+  line-height: 1.5;
+}
+
+.room-rates {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6rpx;
+  margin-top: 16rpx;
+  color: #909399;
+  font-size: 23rpx;
+}
+
+.room-reason {
+  margin-top: 12rpx;
+  color: #d93025;
+  font-size: 24rpx;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 18rpx;
+  padding: 0 18rpx;
+  border-radius: 8rpx;
+  background: #f5f6f8;
+  color: #1f1b1b;
+  font-size: 26rpx;
+  line-height: 1.4;
+}
+
+.input {
+  height: 72rpx;
+  line-height: 72rpx;
+}
+
+.textarea {
+  padding-top: 18rpx;
+  padding-bottom: 18rpx;
+  min-height: 150rpx;
+  line-height: 38rpx;
+}
+
+.input-placeholder {
+  color: #a8abb2;
+  font-size: 26rpx;
+  line-height: 72rpx;
+}
+
+.submit-button,
+.bind-button {
+  margin-top: 24rpx;
+}
+
+.booking-amount {
+  color: #d93025;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.booking-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 18rpx;
+}
+
+.cancel-button {
+  margin: 0;
+  border-radius: 8rpx;
+  background: #ffffff;
+  color: #d93025;
+  border: 1rpx solid #d93025;
+  font-size: 24rpx;
+}
+
+.empty-title {
+  color: #1f1b1b;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.empty-desc {
+  margin-top: 12rpx;
+  color: #73767a;
+  font-size: 26rpx;
+  line-height: 1.6;
+}

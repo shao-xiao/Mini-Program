@@ -1,0 +1,44 @@
+.announcement-card {
+  background: #ffffff;
+  border-radius: 12rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 8rpx 24rpx rgba(31, 27, 27, 0.06);
+}
+
+.announcement-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.announcement-title {
+  flex: 1;
+  font-size: 32rpx;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #1f1b1b;
+}
+
+.announcement-type {
+  flex: none;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  background: #fdecea;
+  color: #d93025;
+  font-size: 22rpx;
+}
+
+.announcement-content {
+  margin-top: 16rpx;
+  color: #606266;
+  font-size: 26rpx;
+  line-height: 1.6;
+}
+
+.announcement-time {
+  margin-top: 18rpx;
+  color: #a8abb2;
+  font-size: 24rpx;
+}

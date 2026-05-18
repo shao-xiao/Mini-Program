@@ -1,0 +1,13 @@
+.input {
+  height: 88rpx;
+  border: 1rpx solid #dcdfe6;
+  border-radius: 8rpx;
+  padding: 0 20rpx;
+  margin-top: 18rpx;
+  box-sizing: border-box;
+  background: #fff;
+}
+
+button {
+  margin-top: 22rpx;
+}

@@ -1,0 +1,22 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/me/index",
+    "pages/announcements/index",
+    "pages/announcements/detail",
+    "pages/bills/index",
+    "pages/meeting/index",
+    "pages/workorders/index",
+    "pages/visitors/index",
+    "pages/investment/index",
+    "pages/checkin/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "德汇创新中心",
+    "navigationBarBackgroundColor": "#d93025",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f5f6f8"
+  },
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}
