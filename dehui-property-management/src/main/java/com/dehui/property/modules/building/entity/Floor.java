@@ -4,6 +4,7 @@ import com.dehui.property.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import java.time.LocalDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -18,6 +19,14 @@ public class Floor extends BaseEntity {
     private Integer floorNumber;
     
     private String floorName;
+
+    private Integer sortOrder;
     
     private Double totalArea;
+
+    private String description;
+
+    private String status;
+
+    private LocalDateTime deletedAt;
 }

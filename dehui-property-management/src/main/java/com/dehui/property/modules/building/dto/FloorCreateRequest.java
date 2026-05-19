@@ -6,9 +6,19 @@ import lombok.Data;
 
 @Data
 public class FloorCreateRequest {
+    private Long buildingId;
+
     @NotNull(message = "楼层号不能为空")
     private Integer floorNumber;
+
     private String floorName;
+
+    private Integer sortOrder;
+
     @Min(value = 0, message = "总面积不能为负数")
     private Double totalArea;
+
+    private String description;
+
+    private String status;
 }

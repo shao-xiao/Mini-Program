@@ -8,6 +8,7 @@ import com.dehui.property.modules.contract.repository.ContractRepository;
 import com.dehui.property.modules.tenant.entity.Tenant;
 import com.dehui.property.modules.lease.repository.RoomLeaseRepository;
 import com.dehui.property.modules.tenant.repository.TenantRepository;
+import com.dehui.property.modules.tenant.service.TenantContactService;
 import com.dehui.property.modules.building.repository.RoomRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class ContractService {
     private final RoomRepository roomRepository;
     private final RoomLeaseRepository roomLeaseRepository;
     private final ContractBillGenerationService contractBillGenerationService;
+    private final TenantContactService tenantContactService;
 
     public Result<List<ContractResponse>> findAll() {
         List<ContractResponse> responses = contractRepository.findAll()
@@ -91,6 +93,7 @@ public class ContractService {
         contract.setStatus("DRAFT");
         contract.setRemark(request.getRemark());
         Contract saved = contractRepository.save(contract);
+        tenantContactService.syncPrimaryContact(tenantId, request.getContactPerson(), request.getContactPhone());
 
         return Result.success(toResponse(saved));
     }

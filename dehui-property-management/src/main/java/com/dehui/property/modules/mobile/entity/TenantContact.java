@@ -6,6 +6,8 @@ import jakarta.persistence.Table;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.time.LocalDateTime;
+
 @Data
 @Entity
 @Table(name = "tenant_contact")
@@ -23,4 +25,10 @@ public class TenantContact extends BaseEntity {
     private Boolean isPrimary;
 
     private String status;
+
+    private String password;
+
+    private Boolean requirePasswordReset;
+
+    private LocalDateTime lastBindTime;
 }

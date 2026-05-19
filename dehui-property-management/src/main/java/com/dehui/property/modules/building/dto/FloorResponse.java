@@ -17,7 +17,11 @@ public class FloorResponse {
     private Long buildingId;
     private Integer floorNumber;
     private String floorName;
+    private Integer sortOrder;
     private Double totalArea;
+    private String description;
+    private String status;
+    private LocalDateTime deletedAt;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
 }

@@ -20,6 +20,7 @@ public class BuildingResponse {
     private Integer totalFloors;
     private String description;
     private String status;
+    private LocalDateTime deletedAt;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
 }

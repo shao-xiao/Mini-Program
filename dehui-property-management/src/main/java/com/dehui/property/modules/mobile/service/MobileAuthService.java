@@ -14,10 +14,12 @@ import com.dehui.property.modules.system.entity.SysUser;
 import com.dehui.property.modules.system.repository.SysUserRepository;
 import com.dehui.property.modules.tenant.entity.Tenant;
 import com.dehui.property.modules.tenant.repository.TenantRepository;
+import com.dehui.property.modules.tenant.service.TenantContactService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,6 +31,7 @@ public class MobileAuthService {
     private final TenantContactRepository tenantContactRepository;
     private final SysUserRepository sysUserRepository;
     private final TenantRepository tenantRepository;
+    private final TenantContactService tenantContactService;
 
     private final ConcurrentHashMap<String, Long> tokenStore = new ConcurrentHashMap<>();
 
@@ -99,28 +102,57 @@ public class MobileAuthService {
             return Result.error(401, "未登录或登录已过期");
         }
 
+        TenantContact contact = resolveTenantContact(request);
+        if (contact == null) {
+            return Result.error("租户联系人不存在，或手机号/密码错误");
+        }
+        if (!"ACTIVE".equals(contact.getStatus())) {
+            return Result.error("租户联系人已停用，请联系物业");
+        }
+
+        wechatUser.setPhone(contact.getPhone());
+        wechatUser.setNickname(contact.getName());
+        wechatUser.setUserType("TENANT");
+        wechatUser.setBoundTenantId(contact.getTenantId());
+        wechatUser.setBoundSysUserId(null);
+
+        contact.setLastBindTime(LocalDateTime.now());
+        tenantContactRepository.save(contact);
+
+        WechatUser saved = wechatUserRepository.save(wechatUser);
+        return Result.success(new MobileAuthResponse(token, toProfile(saved)));
+    }
+
+    private TenantContact resolveTenantContact(MobileBindTenantRequest request) {
+        if (Boolean.TRUE.equals(request.getDevMode())) {
+            return resolveDevTenantContact(request);
+        }
+
+        TenantContact contact = tenantContactRepository.findByPhone(request.getPhone()).orElse(null);
+        if (contact == null || !tenantContactService.matchesPassword(contact, request.getPassword())) {
+            return null;
+        }
+        return contact;
+    }
+
+    private TenantContact resolveDevTenantContact(MobileBindTenantRequest request) {
+        if (request.getTenantId() == null) {
+            return null;
+        }
         Tenant tenant = tenantRepository.findById(request.getTenantId()).orElse(null);
         if (tenant == null) {
-            return Result.error("租户不存在");
+            return null;
         }
 
         TenantContact contact = tenantContactRepository.findByPhone(request.getPhone())
                 .orElseGet(TenantContact::new);
         contact.setTenantId(request.getTenantId());
-        contact.setName(request.getName());
-        contact.setPhone(request.getPhone());
-        contact.setRole(request.getRole() == null || request.getRole().isBlank() ? "联系人" : request.getRole());
+        contact.setName(isBlank(request.getName()) ? tenant.getTenantName() : request.getName().trim());
+        contact.setPhone(request.getPhone().trim());
+        contact.setRole(isBlank(request.getRole()) ? "开发联系人" : request.getRole().trim());
         contact.setIsPrimary(contact.getIsPrimary() != null && contact.getIsPrimary());
         contact.setStatus("ACTIVE");
-        tenantContactRepository.save(contact);
-
-        wechatUser.setPhone(request.getPhone());
-        wechatUser.setNickname(request.getName());
-        wechatUser.setUserType("TENANT");
-        wechatUser.setBoundTenantId(request.getTenantId());
-        wechatUser.setBoundSysUserId(null);
-        WechatUser saved = wechatUserRepository.save(wechatUser);
-        return Result.success(new MobileAuthResponse(token, toProfile(saved)));
+        return tenantContactRepository.save(contact);
     }
 
     private MobileAuthResponse issueToken(WechatUser user) {
@@ -163,5 +195,9 @@ public class MobileAuthService {
         }
 
         return profile;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

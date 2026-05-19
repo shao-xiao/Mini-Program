@@ -4,12 +4,12 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
 public class BillCreateRequest {
-    @NotBlank(message = "账单编号不能为空")
     private String billNumber;
 
     @NotNull(message = "租户ID不能为空")

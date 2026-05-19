@@ -4,6 +4,7 @@ import com.dehui.property.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import java.time.LocalDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -22,4 +23,6 @@ public class Building extends BaseEntity {
     private String description;
     
     private String status;
+
+    private LocalDateTime deletedAt;
 }
