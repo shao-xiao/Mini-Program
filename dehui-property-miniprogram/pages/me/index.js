@@ -21,6 +21,10 @@ Page({
       username: 'admin',
       password: ''
     },
+    tenantAccountForm: {
+      phone: '',
+      password: ''
+    },
     tenantForm: {
       tenantId: '1',
       name: '账单测试用户',
@@ -87,6 +91,13 @@ Page({
     const field = event.currentTarget.dataset.field
     this.setData({
       [`internalForm.${field}`]: event.detail.value
+    })
+  },
+
+  onTenantAccountInput(event) {
+    const field = event.currentTarget.dataset.field
+    this.setData({
+      [`tenantAccountForm.${field}`]: event.detail.value
     })
   },
 
@@ -221,6 +232,32 @@ Page({
     }
   },
 
+  async bindTenantAccount() {
+    if (!wx.getStorageSync('token')) {
+      wx.showToast({ title: '请先开发态登录', icon: 'none' })
+      return
+    }
+    if (!this.data.tenantAccountForm.phone || !this.data.tenantAccountForm.password) {
+      wx.showToast({ title: '请输入手机号和初始密码', icon: 'none' })
+      return
+    }
+
+    this.setData({ loading: true })
+    try {
+      const session = await api.post('/mobile/auth/bind-tenant', {
+        phone: this.data.tenantAccountForm.phone,
+        password: this.data.tenantAccountForm.password
+      })
+      setSession(session)
+      this.setData({ profile: session.profile || {} })
+      this.refreshIdentity()
+      this.checkBackend()
+      wx.showToast({ title: '绑定成功', icon: 'success' })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+
   async bindTenant() {
     if (!wx.getStorageSync('token')) {
       wx.showToast({ title: '请先开发态登录', icon: 'none' })
@@ -231,7 +268,8 @@ Page({
     try {
       const session = await api.post('/mobile/auth/bind-tenant', {
         ...this.data.tenantForm,
-        tenantId: Number(this.data.tenantForm.tenantId)
+        tenantId: Number(this.data.tenantForm.tenantId),
+        devMode: true
       })
       setSession(session)
       this.setData({ profile: session.profile || {} })

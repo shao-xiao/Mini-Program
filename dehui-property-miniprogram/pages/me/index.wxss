@@ -64,3 +64,8 @@ button {
   font-size: 24rpx;
   line-height: 1.7;
 }
+
+.dev-card {
+  border: 1rpx dashed #dcdfe6;
+  background: #fafafa;
+}

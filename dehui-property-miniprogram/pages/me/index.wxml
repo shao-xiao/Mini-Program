@@ -47,12 +47,20 @@
 
   <view class="section card">
     <view class="action-title">绑定租户联系人</view>
-    <view class="action-desc">开发阶段先用租户 ID 绑定，后续改为手机号授权与后台审核。</view>
+    <view class="action-desc">使用物业后台发放的手机号账号和 6 位初始密码绑定租户。</view>
+    <input class="input" placeholder="手机号账号" value="{{tenantAccountForm.phone}}" data-field="phone" bindinput="onTenantAccountInput" />
+    <input class="input" placeholder="初始密码" password value="{{tenantAccountForm.password}}" data-field="password" bindinput="onTenantAccountInput" />
+    <button class="button-primary" bindtap="bindTenantAccount" loading="{{loading}}">绑定租户账号</button>
+  </view>
+
+  <view class="section card dev-card">
+    <view class="action-title">开发调试：租户 ID 直绑</view>
+    <view class="action-desc">仅用于本地开发和演示，正式租户请使用手机号账号和初始密码绑定。</view>
     <input class="input" placeholder="租户ID" type="number" value="{{tenantForm.tenantId}}" data-field="tenantId" bindinput="onTenantInput" />
     <input class="input" placeholder="联系人姓名" value="{{tenantForm.name}}" data-field="name" bindinput="onTenantInput" />
     <input class="input" placeholder="手机号" value="{{tenantForm.phone}}" data-field="phone" bindinput="onTenantInput" />
     <input class="input" placeholder="角色，如行政/财务/负责人" value="{{tenantForm.role}}" data-field="role" bindinput="onTenantInput" />
-    <button class="button-primary" bindtap="bindTenant" loading="{{loading}}">绑定租户</button>
+    <button bindtap="bindTenant" loading="{{loading}}">开发直绑租户</button>
   </view>
 
   <view class="section">
