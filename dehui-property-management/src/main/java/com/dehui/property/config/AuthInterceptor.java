@@ -84,7 +84,10 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
 
         // ===== 基础资产：ADMIN / MANAGER / STAFF =====
-        if (uri.startsWith("/api/buildings")) {
+        if (uri.startsWith("/api/buildings")
+                || uri.startsWith("/api/floors")
+                || uri.startsWith("/api/rooms")
+                || uri.startsWith("/api/assets")) {
             if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "STAFF"))) {
                 writeForbidden(response, "无权限访问基础资产接口");
                 return false;

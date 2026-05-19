@@ -46,6 +46,12 @@ const routes = [
         component: () => import('../views/building/EquipmentList.vue'),
         meta: { title: '设备台账' }
       },
+      {
+        path: '/assets',
+        name: 'AssetList',
+        component: () => import('../views/building/AssetList.vue'),
+        meta: { title: '空间资产' }
+      },
 
       {
         path: '/tenants',

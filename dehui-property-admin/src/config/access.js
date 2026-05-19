@@ -12,6 +12,7 @@ export const menuSections = [
       { title: '楼宇管理', path: '/buildings' },
       { title: '楼层管理', path: '/floors' },
       { title: '房间管理', path: '/rooms' },
+      { title: '空间资产', path: '/assets' },
       { title: '设备台账', path: '/equipment' }
     ]
   },

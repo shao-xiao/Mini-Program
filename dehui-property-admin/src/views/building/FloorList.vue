@@ -16,9 +16,14 @@
           <template #header>
             <div class="card-header">
               <span>楼层管理（楼宇ID：{{ currentBuildingId || '-' }}）</span>
-              <el-button type="primary" :disabled="!currentBuildingId" @click="openCreateDialog">
-                新增楼层
-              </el-button>
+              <div class="header-actions">
+                <el-button :disabled="!currentBuildingId" @click="batchGenerateFloors">
+                  批量生成
+                </el-button>
+                <el-button type="primary" :disabled="!currentBuildingId" @click="openCreateDialog">
+                  新增楼层
+                </el-button>
+              </div>
             </div>
           </template>
 
@@ -51,6 +56,10 @@
 
         <el-form-item label="楼层名称">
           <el-input v-model="form.floorName" />
+        </el-form-item>
+
+        <el-form-item label="排序">
+          <el-input-number v-model="form.sortOrder" style="width: 100%" />
         </el-form-item>
 
         <el-form-item label="总面积">
@@ -88,6 +97,7 @@ const formRef = ref(null)
 const defaultForm = () => ({
   floorNumber: 1,
   floorName: '',
+  sortOrder: 1,
   totalArea: 0
 })
 
@@ -124,7 +134,9 @@ async function loadFloors(buildingId) {
 
   floorLoading.value = true
   try {
-    const data = await request.get(`/buildings/${buildingId}/floors`)
+    const data = await request.get('/floors', {
+      params: { building_id: buildingId }
+    })
     floors.value = Array.isArray(data) ? data : []
   } catch (error) {
     ElMessage.error(error?.response?.data?.message || '楼层列表加载失败')
@@ -151,6 +163,7 @@ function openEditDialog(row) {
   Object.assign(form, {
     floorNumber: row.floorNumber ?? 1,
     floorName: row.floorName || '',
+    sortOrder: row.sortOrder ?? row.floorNumber ?? 1,
     totalArea: row.totalArea ?? 0
   })
 
@@ -167,13 +180,16 @@ async function save() {
 
   saving.value = true
   try {
-    const payload = { ...form }
+    const payload = {
+      ...form,
+      buildingId: currentBuildingId.value
+    }
 
     if (isEdit.value && editingFloorId.value) {
-      await request.put(`/buildings/${currentBuildingId.value}/floors/${editingFloorId.value}`, payload)
+      await request.put(`/floors/${editingFloorId.value}`, payload)
       ElMessage.success('楼层更新成功')
     } else {
-      await request.post(`/buildings/${currentBuildingId.value}/floors`, payload)
+      await request.post('/floors', payload)
       ElMessage.success('楼层新增成功')
     }
 
@@ -195,12 +211,12 @@ async function deleteFloor(row) {
 
   try {
     await ElMessageBox.confirm(
-      `确定删除楼层「${row.floorName || row.floorNumber}」吗？如果该楼层下已有房间，后端可能会拒绝删除。`,
+      `确定停用/删除楼层「${row.floorName || row.floorNumber}」吗？系统会使用软删除保留历史数据。`,
       '删除确认',
       { type: 'warning' }
     )
 
-    await request.delete(`/buildings/${currentBuildingId.value}/floors/${row.id}`)
+    await request.delete(`/floors/${row.id}`)
     ElMessage.success('楼层删除成功')
     await loadFloors(currentBuildingId.value)
   } catch (error) {
@@ -210,7 +226,31 @@ async function deleteFloor(row) {
   }
 }
 
-onMounted(loadBuildings)
+async function batchGenerateFloors() {
+  if (!currentBuildingId.value) {
+    ElMessage.warning('请先选择楼宇')
+    return
+  }
+
+  await request.post('/floors/batch-generate', {
+    buildingId: currentBuildingId.value,
+    basementStart: 2,
+    basementEnd: 1,
+    aboveStart: 1,
+    aboveEnd: 9,
+    status: 'ACTIVE'
+  })
+  ElMessage.success('楼层批量生成完成')
+  await loadFloors(currentBuildingId.value)
+}
+
+onMounted(async () => {
+  await loadBuildings()
+  if (buildings.value.length > 0) {
+    currentBuildingId.value = buildings.value[0].id
+    await loadFloors(currentBuildingId.value)
+  }
+})
 </script>
 
 <style scoped>
@@ -222,5 +262,10 @@ onMounted(loadBuildings)
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
 }
 </style>

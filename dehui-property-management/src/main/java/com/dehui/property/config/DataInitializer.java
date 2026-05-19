@@ -152,6 +152,7 @@ public class DataInitializer {
                     room.setArea(100.0);
                     room.setRoomType("OFFICE");
                     room.setStatus("AVAILABLE");
+                    room.setBuilding(building);
                     room.setFloor(floor);
                     roomRepository.save(room);
                 }
@@ -159,6 +160,16 @@ public class DataInitializer {
 
             log.info("初始化房间完成");
         }
+
+        roomRepository.findAll().stream()
+                .filter(room -> room.getBuilding() == null && room.getFloor() != null)
+                .forEach(room -> {
+                    floorRepository.findWithBuildingById(room.getFloor().getId()).ifPresent(floor -> {
+                        room.setBuilding(floor.getBuilding());
+                        roomRepository.save(room);
+                        log.info("回填房间楼宇关系: roomId={}, buildingId={}", room.getId(), room.getBuilding().getId());
+                    });
+                });
     }
 
     private void initEnergyRateRules() {

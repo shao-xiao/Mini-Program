@@ -10,9 +10,19 @@ import java.util.List;
 public interface RoomRepository extends JpaRepository<Room, Long> {
     List<Room> findByFloorIdOrderByRoomNumberAsc(Long floorId);
 
-    @Query(value = "SELECT COUNT(*) FROM room WHERE floor_id = :floorId AND status = :status", nativeQuery = true)
+    List<Room> findByFloorIdAndDeletedAtIsNullOrderByRoomNumberAsc(Long floorId);
+
+    List<Room> findByBuildingIdAndDeletedAtIsNullOrderByRoomNumberAsc(Long buildingId);
+
+    List<Room> findByBuildingIdAndFloorIdAndDeletedAtIsNullOrderByRoomNumberAsc(Long buildingId, Long floorId);
+
+    List<Room> findByBuildingIdAndStatusAndDeletedAtIsNullOrderByRoomNumberAsc(Long buildingId, String status);
+
+    List<Room> findByBuildingIdAndFloorIdAndStatusAndDeletedAtIsNullOrderByRoomNumberAsc(Long buildingId, Long floorId, String status);
+
+    @Query(value = "SELECT COUNT(*) FROM room WHERE floor_id = :floorId AND status = :status AND deleted_at IS NULL", nativeQuery = true)
     Long countByFloorIdAndStatus(@Param("floorId") Long floorId, @Param("status") String status);
 
-    @Query(value = "SELECT COUNT(*) FROM room WHERE status = :status", nativeQuery = true)
+    @Query(value = "SELECT COUNT(*) FROM room WHERE status = :status AND deleted_at IS NULL", nativeQuery = true)
     Long countByStatus(@Param("status") String status);
 }
