@@ -117,6 +117,11 @@ public class AuthInterceptor implements HandlerInterceptor {
                     writeForbidden(response, "无账单查看权限");
                     return false;
                 }
+            } else if (uri.contains("/invoice") && ("POST".equalsIgnoreCase(method) || "DELETE".equalsIgnoreCase(method))) {
+                if (!systemUserService.hasPermission(token, "bill:pay")) {
+                    writeForbidden(response, "无发票管理权限");
+                    return false;
+                }
             } else if ("POST".equalsIgnoreCase(method) && (uri.contains("/approve") || uri.contains("/reject"))) {
                 if (!systemUserService.hasPermission(token, "bill:audit")) {
                     writeForbidden(response, "无账单审核权限");

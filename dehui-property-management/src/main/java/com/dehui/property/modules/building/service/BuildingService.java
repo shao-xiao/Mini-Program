@@ -20,6 +20,7 @@ import com.dehui.property.modules.building.entity.Room;
 import com.dehui.property.modules.building.repository.BuildingRepository;
 import com.dehui.property.modules.building.repository.FloorRepository;
 import com.dehui.property.modules.building.repository.RoomRepository;
+import com.dehui.property.modules.finance.service.FinanceMetricsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -40,6 +41,7 @@ public class BuildingService {
     private final FloorRepository floorRepository;
     private final RoomRepository roomRepository;
     private final AssetRepository assetRepository;
+    private final FinanceMetricsService financeMetricsService;
 
     public Page<BuildingResponse> findAll(int page, int size) {
         return buildingRepository.findByDeletedAtIsNull(PageRequest.of(page, size))
@@ -306,23 +308,16 @@ public class BuildingService {
         stats.setBuildingId(bId);
         stats.setBuildingName(building.getBuildingName());
         stats.setFloorCount(buildingRepository.countFloorsByBuildingId(bId));
-        stats.setRoomCount(buildingRepository.countRoomsByBuildingId(bId));
+        FinanceMetricsService.RoomRentalStats rentalStats = financeMetricsService.buildingRoomRentalStats(bId);
+        stats.setRoomCount(rentalStats.rentableRoomCount());
         stats.setTotalArea(buildingRepository.sumRoomAreaByBuildingId(bId));
-        stats.setAvailableCount(buildingRepository.countRoomsByBuildingIdAndStatus(bId, "AVAILABLE"));
-        stats.setRentedCount(buildingRepository.countRoomsByBuildingIdAndStatus(bId, "RENTED"));
+        stats.setAvailableCount(rentalStats.availableRoomCount());
+        stats.setRentedCount(rentalStats.rentedRoomCount());
         stats.setMaintenanceCount(buildingRepository.countRoomsByBuildingIdAndStatus(bId, "RENOVATING"));
         stats.setReservedCount(buildingRepository.countRoomsByBuildingIdAndStatus(bId, "RESERVED"));
         stats.setDisabledCount(buildingRepository.countRoomsByBuildingIdAndStatus(bId, "DISABLED"));
-        Long totalRooms = stats.getRoomCount();
-        Long rented = stats.getRentedCount();
-        Long available = stats.getAvailableCount();
-        if (totalRooms != null && totalRooms > 0) {
-            stats.setRentalRate(Math.round(rented * 10000.0 / totalRooms) / 100.0);
-            stats.setVacancyRate(Math.round(available * 10000.0 / totalRooms) / 100.0);
-        } else {
-            stats.setRentalRate(0.0);
-            stats.setVacancyRate(0.0);
-        }
+        stats.setRentalRate(rentalStats.rentalRate());
+        stats.setVacancyRate(rentalStats.vacancyRate());
         stats.setCreatedTime(building.getCreatedTime());
         stats.setUpdatedTime(building.getUpdatedTime());
         return Result.success(stats);

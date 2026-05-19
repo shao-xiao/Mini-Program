@@ -16,6 +16,9 @@ public class TenantContactResponse {
     private String status;
     private Boolean requirePasswordReset;
     private LocalDateTime lastBindTime;
+    private String lastBoundAt;
+    private LocalDateTime lastLoginAt;
+    private String lastLoginAtText;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
     private String initialPassword;

@@ -58,9 +58,12 @@
 
         <el-form-item label="类型">
           <el-select v-model="form.spaceType" style="width: 100%">
-            <el-option label="固定" value="FIXED"/>
-            <el-option label="临停" value="TEMP"/>
-            <el-option label="VIP" value="VIP"/>
+            <el-option
+              v-for="option in spaceTypeOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
           </el-select>
         </el-form-item>
 
@@ -142,12 +145,19 @@ const binding = ref(false)
 const bindFormRef = ref(null)
 const currentSpace = ref(null)
 const areaOptions = ['A', 'B', 'C', 'D']
+const spaceTypeOptions = [
+  { label: '普通车位', value: 'NORMAL' },
+  { label: '充电车位（快充）', value: 'CHARGING_FAST' },
+  { label: '充电车位（慢充）', value: 'CHARGING_SLOW' },
+  { label: '机械车位', value: 'MECHANICAL' },
+  { label: '临停车位', value: 'TEMPORARY' }
+]
 
 const form = reactive({
   id:null,
   spaceCode:'',
   area:'A',
-  spaceType:'FIXED',
+  spaceType:'NORMAL',
   status:'AVAILABLE',
   ownerKey:'',
   plateNumber:'',
@@ -206,6 +216,11 @@ const ownerText = (row)=>{
 }
 
 const spaceTypeText = (type)=>({
+  NORMAL: '普通车位',
+  CHARGING_FAST: '充电车位（快充）',
+  CHARGING_SLOW: '充电车位（慢充）',
+  MECHANICAL: '机械车位',
+  TEMPORARY: '临停车位',
   FIXED: '固定',
   TEMP: '临停',
   VIP: 'VIP'
@@ -215,7 +230,7 @@ const openDialog = ()=>{
   form.id=null
   form.spaceCode=''
   form.area='A'
-  form.spaceType='FIXED'
+  form.spaceType='NORMAL'
   form.status='AVAILABLE'
   form.ownerKey=''
   form.plateNumber=''
@@ -227,12 +242,19 @@ const edit = (row)=>{
   form.id = row.id
   form.spaceCode = row.spaceCode || ''
   form.area = row.area || 'A'
-  form.spaceType = row.spaceType || 'FIXED'
+  form.spaceType = normalizeSpaceType(row.spaceType)
   form.status = row.status || 'AVAILABLE'
   form.ownerKey = ownerKeyOf(row)
   form.plateNumber = row.plateNumber || ''
   form.remark = row.remark || ''
   visible.value = true
+}
+
+const normalizeSpaceType = (type)=>{
+  if (type === 'FIXED') return 'NORMAL'
+  if (type === 'TEMP') return 'TEMPORARY'
+  if (type === 'VIP') return 'NORMAL'
+  return type || 'NORMAL'
 }
 
 const buildPayload = ()=>{

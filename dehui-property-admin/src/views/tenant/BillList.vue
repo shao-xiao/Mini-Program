@@ -7,9 +7,12 @@
             <div class="page-title">账单管理</div>
             <div class="page-subtitle">后台创建或自动生成的账单需审核发布后，租户小程序才可见。</div>
           </div>
-          <el-button v-if="hasPermission('bill:add')" type="primary" @click="openCreateDialog">
-            新增账单
-          </el-button>
+          <div class="header-actions">
+            <el-button :loading="exporting" @click="exportBills">导出 Excel</el-button>
+            <el-button v-if="hasPermission('bill:add')" type="primary" @click="openCreateDialog">
+              新增账单
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -17,6 +20,16 @@
 
       <template v-else>
         <el-form :inline="true" :model="queryForm" class="query-form">
+          <el-form-item label="关键词">
+            <el-input
+              v-model="queryForm.keyword"
+              clearable
+              placeholder="账单编号/租户/合同/类型"
+              style="width: 220px"
+              @keyup.enter="loadBills"
+            />
+          </el-form-item>
+
           <el-form-item label="租户">
             <el-select v-model="queryForm.tenantId" clearable filterable placeholder="全部租户" style="width: 180px">
               <el-option
@@ -92,6 +105,19 @@
             </template>
           </el-table-column>
           <el-table-column prop="dueDate" label="到期日" width="120" />
+          <el-table-column label="逾期天数" width="100" align="center">
+            <template #default="{ row }">{{ row.overdueDays ?? 0 }}</template>
+          </el-table-column>
+          <el-table-column label="滞纳金" width="120" align="right">
+            <template #default="{ row }">{{ money(row.lateFee) }}</template>
+          </el-table-column>
+          <el-table-column label="是否已开票" width="120">
+            <template #default="{ row }">
+              <el-tag :type="isInvoiced(row) ? 'success' : 'info'">
+                {{ row.invoiceStatusText || invoiceStatusText(row.invoiceStatus) }}
+              </el-tag>
+            </template>
+          </el-table-column>
           <el-table-column label="审核" width="110">
             <template #default="{ row }">
               <el-tag :type="auditTagType(row.auditStatus)">
@@ -115,7 +141,7 @@
           <el-table-column label="备注" min-width="180">
             <template #default="{ row }">{{ row.remark || row.auditRemark || '-' }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="230" fixed="right">
+          <el-table-column label="操作" width="390" fixed="right">
             <template #default="{ row }">
               <el-button
                 v-if="hasPermission('bill:audit') && row.auditStatus !== 'APPROVED' && row.status !== 'CANCELLED'"
@@ -140,11 +166,42 @@
               >
                 确认收款
               </el-button>
+              <el-button
+                v-if="hasPermission('bill:pay')"
+                size="small"
+                @click="selectInvoiceFile(row)"
+              >
+                {{ isInvoiced(row) ? '替换发票' : '上传发票' }}
+              </el-button>
+              <el-button
+                v-if="isInvoiced(row)"
+                size="small"
+                @click="downloadInvoice(row)"
+              >
+                下载发票
+              </el-button>
+              <el-button
+                v-if="hasPermission('bill:pay') && isInvoiced(row)"
+                size="small"
+                type="danger"
+                plain
+                @click="deleteInvoice(row)"
+              >
+                删除发票
+              </el-button>
             </template>
           </el-table-column>
         </el-table>
       </template>
     </el-card>
+
+    <input
+      ref="invoiceInputRef"
+      type="file"
+      accept="application/pdf"
+      class="hidden-file-input"
+      @change="handleInvoiceFileChange"
+    />
 
     <el-dialog v-model="dialogVisible" title="新增账单" width="620px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="110px">
@@ -242,10 +299,14 @@ const tenants = ref([])
 const contracts = ref([])
 const loading = ref(false)
 const saving = ref(false)
+const exporting = ref(false)
 const dialogVisible = ref(false)
 const formRef = ref(null)
+const invoiceInputRef = ref(null)
+const currentInvoiceBill = ref(null)
 
 const queryForm = reactive({
+  keyword: '',
   tenantId: null,
   billType: '',
   auditStatus: '',
@@ -314,9 +375,7 @@ async function loadBills() {
   if (!hasPermission('bill:view')) return
   loading.value = true
   try {
-    const params = Object.fromEntries(
-      Object.entries(queryForm).filter(([, value]) => value !== null && value !== '')
-    )
+    const params = buildQueryParams()
     const data = await request.get('/bills', { params })
     bills.value = Array.isArray(data) ? data : []
   } catch (error) {
@@ -337,11 +396,18 @@ async function loadContracts() {
 }
 
 function resetQuery() {
+  queryForm.keyword = ''
   queryForm.tenantId = null
   queryForm.billType = ''
   queryForm.auditStatus = ''
   queryForm.status = ''
   loadBills()
+}
+
+function buildQueryParams() {
+  return Object.fromEntries(
+    Object.entries(queryForm).filter(([, value]) => value !== null && value !== '')
+  )
 }
 
 function resetForm() {
@@ -391,7 +457,11 @@ async function createBill() {
 
 async function approveBill(row) {
   try {
-    await ElMessageBox.confirm(`确定发布账单「${row.billNumber}」给租户吗？`, '审核通过确认', { type: 'warning' })
+    await ElMessageBox.confirm(
+      `确定发布账单「${row.billNumber}」给租户吗？发布后，该租户已绑定联系人可在小程序账单中心查看。`,
+      '审核通过确认',
+      { type: 'warning' }
+    )
     await request.post(`/bills/${row.id}/approve`, { auditRemark: '后台审核通过' })
     ElMessage.success('账单已发布，租户小程序可见')
     await loadBills()
@@ -433,6 +503,100 @@ async function payBill(row) {
       ElMessage.error(error?.response?.data?.message || error?.message || '收款失败')
     }
   }
+}
+
+async function exportBills() {
+  if (!hasPermission('bill:view')) {
+    ElMessage.warning('无账单查看权限')
+    return
+  }
+  exporting.value = true
+  try {
+    const blob = await request.get('/bills/export', {
+      params: buildQueryParams(),
+      responseType: 'blob'
+    })
+    downloadBlob(blob, `账单导出-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || error?.message || '导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
+
+function selectInvoiceFile(row) {
+  if (!hasPermission('bill:pay')) {
+    ElMessage.warning('无发票管理权限')
+    return
+  }
+  currentInvoiceBill.value = row
+  if (invoiceInputRef.value) {
+    invoiceInputRef.value.value = ''
+    invoiceInputRef.value.click()
+  }
+}
+
+async function handleInvoiceFileChange(event) {
+  const file = event.target.files?.[0]
+  const row = currentInvoiceBill.value
+  if (!file || !row) return
+
+  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+    ElMessage.error('只能上传 PDF 发票')
+    return
+  }
+
+  const formData = new FormData()
+  formData.append('file', file)
+  try {
+    await request.post(`/bills/${row.id}/invoice`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    ElMessage.success('发票已上传')
+    await loadBills()
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || error?.message || '发票上传失败')
+  } finally {
+    currentInvoiceBill.value = null
+    if (invoiceInputRef.value) invoiceInputRef.value.value = ''
+  }
+}
+
+async function downloadInvoice(row) {
+  try {
+    const blob = await request.get(`/bills/${row.id}/invoice/download`, {
+      responseType: 'blob'
+    })
+    downloadBlob(blob, row.invoiceFileName || `${row.billNumber}.pdf`)
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || error?.message || '发票下载失败')
+  }
+}
+
+async function deleteInvoice(row) {
+  try {
+    await ElMessageBox.confirm(`确定删除账单「${row.billNumber}」的发票吗？`, '删除发票确认', {
+      type: 'warning'
+    })
+    await request.delete(`/bills/${row.id}/invoice`)
+    ElMessage.success('发票已删除')
+    await loadBills()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.response?.data?.message || error?.message || '发票删除失败')
+    }
+  }
+}
+
+function downloadBlob(blob, filename) {
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
 }
 
 function handleTenantChange() {
@@ -510,6 +674,14 @@ function auditStatusText(value) {
   }[value] || '已发布'
 }
 
+function invoiceStatusText(value) {
+  return value === 'INVOICED' ? '已开票' : '未开票'
+}
+
+function isInvoiced(row) {
+  return row.invoiceStatus === 'INVOICED'
+}
+
 function auditTagType(value) {
   return {
     PENDING: 'warning',
@@ -555,6 +727,12 @@ onMounted(async () => {
   gap: 16px;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .page-title {
   font-weight: 600;
   color: #303133;
@@ -579,5 +757,9 @@ onMounted(async () => {
   margin-top: 4px;
   color: #909399;
   font-size: 12px;
+}
+
+.hidden-file-input {
+  display: none;
 }
 </style>

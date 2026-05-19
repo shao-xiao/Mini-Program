@@ -21,8 +21,9 @@ public class ParkingSpaceService {
         }
 
         if (parkingSpace.getSpaceType() == null || parkingSpace.getSpaceType().isBlank()) {
-            parkingSpace.setSpaceType("FIXED");
+            parkingSpace.setSpaceType("NORMAL");
         }
+        normalizeSpaceType(parkingSpace);
 
         return parkingSpaceRepository.save(parkingSpace);
     }
@@ -40,8 +41,9 @@ public class ParkingSpaceService {
         space.setRemark(request.getRemark());
 
         if (space.getSpaceType() == null || space.getSpaceType().isBlank()) {
-            space.setSpaceType("FIXED");
+            space.setSpaceType("NORMAL");
         }
+        normalizeSpaceType(space);
         if (space.getStatus() == null || space.getStatus().isBlank()) {
             space.setStatus(space.getPlateNumber() == null || space.getPlateNumber().isBlank()
                     ? "AVAILABLE"
@@ -51,7 +53,7 @@ public class ParkingSpaceService {
             space.setTenantId(null);
             space.setPlateNumber(null);
             if ("VIP".equals(space.getSpaceType())) {
-                space.setSpaceType("FIXED");
+                space.setSpaceType("NORMAL");
             }
         }
 
@@ -105,7 +107,7 @@ public class ParkingSpaceService {
         space.setPlateNumber(null);
         space.setStatus("AVAILABLE");
         if ("VIP".equals(space.getSpaceType())) {
-            space.setSpaceType("FIXED");
+            space.setSpaceType("NORMAL");
         }
 
         return parkingSpaceRepository.save(space);
@@ -153,6 +155,19 @@ public class ParkingSpaceService {
         }
         if (!List.of("A", "B", "C", "D").contains(area)) {
             throw new RuntimeException("车位区域只能是A、B、C、D");
+        }
+    }
+
+    private void normalizeSpaceType(ParkingSpace space) {
+        String type = space.getSpaceType();
+        if (type == null || type.isBlank()) {
+            space.setSpaceType("NORMAL");
+            return;
+        }
+        if ("FIXED".equals(type)) {
+            space.setSpaceType("NORMAL");
+        } else if ("TEMP".equals(type)) {
+            space.setSpaceType("TEMPORARY");
         }
     }
 }

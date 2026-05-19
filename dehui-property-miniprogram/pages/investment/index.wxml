@@ -6,6 +6,7 @@
   </view>
 
   <view wx:if="{{loading}}" class="card muted">正在加载招商信息...</view>
+  <view wx:if="{{errorMessage}}" class="card muted">{{errorMessage}}</view>
 
   <view wx:if="{{overview}}" class="section card">
     <view class="section-title">园区亮点</view>
@@ -24,8 +25,34 @@
   </view>
 
   <view class="section card">
+    <view class="section-title">可租房源</view>
+    <view class="form-tip">数据来源：/mobile/investment/rooms，仅展示后端当前可租房源。</view>
+    <view wx:if="{{roomsLoading}}" class="muted">正在加载房源...</view>
+    <view wx:elif="{{rooms.length === 0}}" class="muted">暂无可租房源</view>
+    <view wx:else>
+      <view
+        wx:for="{{rooms}}"
+        wx:key="id"
+        class="room-card {{leadForm.roomId === item.id ? 'selected' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="selectRoom"
+      >
+        <view class="room-head">
+          <view class="room-title">{{item.title || item.roomNumber}}</view>
+          <view class="room-status">{{item.statusText}}</view>
+        </view>
+        <view class="room-meta">{{item.areaText}} · {{item.typeText}}</view>
+      </view>
+    </view>
+    <view wx:if="{{selectedRoom}}" class="selected-room">
+      已选择：{{selectedRoom.title || selectedRoom.roomNumber}}
+      <text class="clear-room" bindtap="clearRoom">清除</text>
+    </view>
+  </view>
+
+  <view class="section card">
     <view class="section-title">预约看房</view>
-    <view class="form-tip">请留下意向面积和使用需求，招商顾问会根据实际房源情况与您联系。</view>
+    <view class="form-tip">请留下意向面积和使用需求，招商顾问会根据真实房源情况与您联系。</view>
     <input
       class="input"
       placeholder-class="input-placeholder"

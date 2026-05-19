@@ -58,19 +58,18 @@
             <div class="primary-text">{{ paymentMethodText(row.paymentCycle) }}</div>
             <div class="secondary-text">{{ billingRuleText(row) }}</div>
             <div class="status-tag">
-              <el-tag v-if="row.status === 'DRAFT'" type="info" effect="plain">草稿</el-tag>
-              <el-tag v-else-if="row.status === 'ACTIVE'" type="success">已生效</el-tag>
-              <el-tag v-else-if="row.status === 'TERMINATED'" type="danger">已终止</el-tag>
-              <el-tag v-else type="warning">{{ row.status }}</el-tag>
+              <el-tag :type="contractStatusTag(row.status)" effect="plain">{{ contractStatusText(row.status) }}</el-tag>
             </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="118" align="center">
+        <el-table-column label="操作" width="210" align="center">
           <template #default="{ row }">
             <div class="action-buttons">
-              <el-button size="small" :disabled="row.status !== 'DRAFT'" @click="activate(row)">生效</el-button>
+              <el-button size="small" :disabled="!['DRAFT', 'PENDING'].includes(row.status)" @click="activate(row)">生效</el-button>
+              <el-button size="small" :disabled="row.status !== 'ACTIVE'" @click="checkIn(row)">入驻</el-button>
               <el-button size="small" type="danger" :disabled="row.status !== 'ACTIVE'" @click="terminate(row)">终止</el-button>
+              <el-button size="small" :disabled="['ACTIVE', 'TERMINATED', 'CANCELLED'].includes(row.status)" @click="cancelContract(row)">作废</el-button>
             </div>
           </template>
         </el-table-column>
@@ -255,7 +254,7 @@ const loadContracts = async () => {
 const availableRooms = computed(() => {
   return rooms.value.filter(item => {
     const sameFloor = form.floorId ? item.floorId === form.floorId : true
-    return sameFloor && item.status === 'AVAILABLE'
+    return sameFloor && ['AVAILABLE', 'VACANT'].includes(item.status)
   })
 })
 
@@ -311,6 +310,30 @@ function paymentMethodText(value) {
     YEARLY: '年付'
   }
   return cycleMap[value] || value || '-'
+}
+
+function contractStatusText(status) {
+  const map = {
+    DRAFT: '草稿',
+    PENDING: '待生效',
+    ACTIVE: '履约中',
+    EXPIRED: '已到期',
+    TERMINATED: '已终止',
+    CANCELLED: '已作废'
+  }
+  return map[status] || status || '-'
+}
+
+function contractStatusTag(status) {
+  const map = {
+    DRAFT: 'info',
+    PENDING: 'warning',
+    ACTIVE: 'success',
+    EXPIRED: 'info',
+    TERMINATED: 'danger',
+    CANCELLED: 'info'
+  }
+  return map[status] || ''
 }
 
 function billingRuleText(row) {
@@ -389,15 +412,27 @@ const activate = async (row) => {
   loadContracts()
 }
 
+const checkIn = async (row) => {
+  await request.post(`/contracts/${row.id}/check-in`, { remark: '后台合同列表办理入驻' })
+  ElMessage.success('入住办理成功')
+  await Promise.all([loadContracts(), loadRooms()])
+}
+
 const terminate = async (row) => {
-  await request.post(`/contracts/${row.id}/terminate`)
+  await request.post(`/contracts/${row.id}/terminate`, { reason: '后台终止合同' })
   ElMessage.success('已终止')
-  loadContracts()
+  await Promise.all([loadContracts(), loadRooms()])
+}
+
+const cancelContract = async (row) => {
+  await request.post(`/contracts/${row.id}/cancel`, { reason: '后台作废合同' })
+  ElMessage.success('已作废')
+  await Promise.all([loadContracts(), loadRooms()])
 }
 
 const generateBills = async () => {
-  const count = await request.post('/contracts/generate-bills')
-  ElMessage.success(`已生成 ${count || 0} 张到期账单`)
+  const result = await request.post('/contracts/generate-bills')
+  ElMessage.success(`已生成 ${result?.generated || 0} 张，跳过 ${result?.skipped || 0} 张`)
 }
 
 onMounted(async () => {

@@ -51,6 +51,8 @@ public class ContractCreateRequest {
 
     private Integer billingLeadDays;
 
+    private Integer advanceBillDays;
+
     private String billingRule;
 
     private String remark;

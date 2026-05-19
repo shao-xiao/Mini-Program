@@ -20,6 +20,8 @@ public class Bill extends BaseEntity {
 
     private Long contractId;
 
+    private Long roomId;
+
     @Column(nullable = false)
     private String billType;
 
@@ -32,6 +34,8 @@ public class Bill extends BaseEntity {
     private BigDecimal amount;
 
     private BigDecimal paidAmount;
+
+    private LocalDateTime paidTime;
 
     private LocalDate dueDate;
 
@@ -48,6 +52,16 @@ public class Bill extends BaseEntity {
     private String sourceType;
 
     private Long sourceId;
+
+    private String invoiceStatus;
+
+    private String invoiceFilePath;
+
+    private String invoiceFileName;
+
+    private LocalDateTime invoiceUploadedAt;
+
+    private String invoiceUploadedBy;
 
     private String remark;
 }

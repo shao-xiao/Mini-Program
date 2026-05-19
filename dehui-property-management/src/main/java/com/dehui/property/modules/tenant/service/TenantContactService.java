@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -19,6 +20,7 @@ import java.util.List;
 public class TenantContactService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final TenantContactRepository tenantContactRepository;
     private final TenantRepository tenantRepository;
@@ -58,6 +60,7 @@ public class TenantContactService {
         }
 
         TenantContact saved = tenantContactRepository.save(contact);
+        enforceSinglePrimary(tenantId, saved);
         return Result.success(toResponse(saved, initialPassword));
     }
 
@@ -109,7 +112,9 @@ public class TenantContactService {
             contact.setRequirePasswordReset(Boolean.TRUE);
         }
 
-        return toResponse(tenantContactRepository.save(contact), initialPassword);
+        TenantContact saved = tenantContactRepository.save(contact);
+        enforceSinglePrimary(tenantId, saved);
+        return toResponse(saved, initialPassword);
     }
 
     public boolean matchesPassword(TenantContact contact, String password) {
@@ -131,6 +136,9 @@ public class TenantContactService {
         response.setStatus(contact.getStatus());
         response.setRequirePasswordReset(contact.getRequirePasswordReset());
         response.setLastBindTime(contact.getLastBindTime());
+        response.setLastBoundAt(formatDateTime(contact.getLastBindTime()));
+        response.setLastLoginAt(contact.getLastLoginAt());
+        response.setLastLoginAtText(formatDateTime(contact.getLastLoginAt()));
         response.setCreatedTime(contact.getCreatedTime());
         response.setUpdatedTime(contact.getUpdatedTime());
         response.setInitialPassword(initialPassword);
@@ -145,8 +153,32 @@ public class TenantContactService {
         return phone == null ? "" : phone.trim();
     }
 
+    private void enforceSinglePrimary(Long tenantId, TenantContact primary) {
+        if (!Boolean.TRUE.equals(primary.getIsPrimary())) {
+            return;
+        }
+        tenantContactRepository.findByTenantIdAndIsPrimary(tenantId, Boolean.TRUE)
+                .stream()
+                .filter(contact -> !contact.getId().equals(primary.getId()))
+                .forEach(contact -> {
+                    contact.setIsPrimary(Boolean.FALSE);
+                    tenantContactRepository.save(contact);
+                });
+    }
+
     private String defaultRole(String role) {
-        return isBlank(role) ? "联系人" : role.trim();
+        if (isBlank(role)) {
+            return "OWNER_CONTACT";
+        }
+        String value = role.trim();
+        return switch (value) {
+            case "OWNER_CONTACT", "FINANCE_CONTACT", "ADMIN_CONTACT", "MAINTAIN_CONTACT" -> value;
+            case "主联系人" -> "OWNER_CONTACT";
+            case "财务联系人" -> "FINANCE_CONTACT";
+            case "行政联系人" -> "ADMIN_CONTACT";
+            case "报修联系人" -> "MAINTAIN_CONTACT";
+            default -> "OWNER_CONTACT";
+        };
     }
 
     private String defaultStatus(String status) {
@@ -155,5 +187,9 @@ public class TenantContactService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String formatDateTime(java.time.LocalDateTime value) {
+        return value == null ? null : value.format(DATE_TIME_FORMATTER);
     }
 }

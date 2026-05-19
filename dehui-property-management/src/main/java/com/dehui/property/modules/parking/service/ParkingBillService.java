@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -142,6 +143,9 @@ public class ParkingBillService {
         bill.setPaidAmount("PAID".equals(parkingBill.getStatus())
                 ? parkingBill.getAmount()
                 : BigDecimal.ZERO);
+        bill.setPaidTime("PAID".equals(parkingBill.getStatus())
+                ? (parkingBill.getPaidDate() == null ? LocalDateTime.now() : parkingBill.getPaidDate().atStartOfDay())
+                : null);
 
         Bill savedBill = billRepository.save(bill);
         parkingBill.setBillId(savedBill.getId());

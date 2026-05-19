@@ -1,6 +1,8 @@
 <view class="page">
   <view wx:if="{{loading}}" class="card muted">正在加载公告...</view>
 
+  <view wx:elif="{{errorMessage}}" class="card muted">{{errorMessage}}</view>
+
   <view wx:elif="{{!announcement.id}}" class="card muted">公告不存在或已下线</view>
 
   <view wx:else class="card">

@@ -48,23 +48,13 @@
             {{ formatDateTime(row.createdTime) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="190">
+        <el-table-column label="操作" width="260">
           <template #default="{ row }">
-            <el-button
-              v-if="row.status === 'NEW'"
-              size="small"
-              type="primary"
-              @click="updateStatus(row, 'CONTACTED')"
-            >
-              标记已联系
-            </el-button>
-            <el-button
-              v-if="row.status !== 'CLOSED'"
-              size="small"
-              @click="updateStatus(row, 'CLOSED')"
-            >
-              关闭
-            </el-button>
+            <el-button v-if="row.status === 'NEW'" size="small" type="primary" @click="updateStatus(row, 'FOLLOWING')">跟进</el-button>
+            <el-button v-if="row.status !== 'CONVERTED'" size="small" @click="updateStatus(row, 'VIEWED')">已看房</el-button>
+            <el-button v-if="row.status !== 'CONVERTED'" size="small" @click="convertTenant(row)">转租户</el-button>
+            <el-button v-if="row.status !== 'CONVERTED'" size="small" type="success" @click="convertContract(row)">转合同</el-button>
+            <el-button v-if="!['CONVERTED', 'INVALID'].includes(row.status)" size="small" @click="updateStatus(row, 'INVALID')">无效</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -81,15 +71,21 @@ const leads = ref([])
 
 const statusText = (status) => {
   if (status === 'NEW') return '新线索'
-  if (status === 'CONTACTED') return '已联系'
-  if (status === 'CLOSED') return '已关闭'
+  if (status === 'FOLLOWING') return '跟进中'
+  if (status === 'VIEWED') return '已看房'
+  if (status === 'NEGOTIATING') return '洽谈中'
+  if (status === 'CONVERTED') return '已转化'
+  if (status === 'INVALID') return '无效'
+  if (status === 'CONTACTED') return '跟进中'
+  if (status === 'CLOSED') return '无效'
   return status || '-'
 }
 
 const statusTagType = (status) => {
   if (status === 'NEW') return 'danger'
-  if (status === 'CONTACTED') return 'warning'
-  if (status === 'CLOSED') return 'info'
+  if (['FOLLOWING', 'VIEWED', 'NEGOTIATING', 'CONTACTED'].includes(status)) return 'warning'
+  if (status === 'CONVERTED') return 'success'
+  if (['INVALID', 'CLOSED'].includes(status)) return 'info'
   return ''
 }
 
@@ -106,6 +102,18 @@ const load = async () => {
 const updateStatus = async (row, status) => {
   await request.patch(`/investment/leads/${row.id}/status`, { status })
   ElMessage.success('状态已更新')
+  await load()
+}
+
+const convertTenant = async (row) => {
+  await request.post(`/investment/leads/${row.id}/convert-tenant`)
+  ElMessage.success('已转为租户')
+  await load()
+}
+
+const convertContract = async (row) => {
+  await request.post(`/investment/leads/${row.id}/convert-contract`)
+  ElMessage.success('已生成合同草稿')
   await load()
 }
 

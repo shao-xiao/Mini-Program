@@ -23,8 +23,15 @@ public class ContractResponse {
     private Integer dueDay;
     private String paymentTerms;
     private Integer billingLeadDays;
+    private Integer advanceBillDays;
+    private LocalDate billGeneratedUntil;
     private String billingRule;
     private String status;
+    private String statusText;
+    private LocalDate terminationDate;
+    private String terminationReason;
+    private LocalDateTime terminatedAt;
+    private LocalDateTime cancelledAt;
     private String remark;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;

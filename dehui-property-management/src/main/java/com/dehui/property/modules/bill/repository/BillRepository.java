@@ -31,6 +31,10 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
     boolean existsByContractIdAndBillTypeAndPeriodStart(Long contractId, String billType, LocalDate periodStart);
 
+    boolean existsByContractIdAndBillTypeAndPeriodStartAndPeriodEnd(Long contractId, String billType, LocalDate periodStart, LocalDate periodEnd);
+
+    List<Bill> findByContractIdAndBillTypeOrderByPeriodStartDesc(Long contractId, String billType);
+
     @Query(value = "SELECT COUNT(*) FROM bill WHERE status = :status", nativeQuery = true)
     Long countByStatus(@Param("status") String status);
 

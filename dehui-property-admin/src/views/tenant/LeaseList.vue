@@ -87,6 +87,7 @@
             v-model="form.startDate"
             type="date"
             value-format="YYYY-MM-DD"
+            disabled
             style="width: 100%"
           />
         </el-form-item>
@@ -96,6 +97,7 @@
             v-model="form.endDate"
             type="date"
             value-format="YYYY-MM-DD"
+            disabled
             style="width: 100%"
           />
         </el-form-item>

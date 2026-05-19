@@ -8,15 +8,26 @@ function initialLeadForm() {
     desiredArea: '',
     intendedUse: '',
     preferredVisitTime: '',
+    roomId: null,
     remark: ''
   }
+}
+
+function roomTitle(room) {
+  const building = room.buildingName || ''
+  const floor = room.floorName || (room.floorNumber ? `${room.floorNumber}层` : '')
+  return [building, floor, room.roomNumber].filter(Boolean).join(' / ')
 }
 
 Page({
   data: {
     loading: false,
+    roomsLoading: false,
     submitting: false,
+    errorMessage: '',
     overview: null,
+    rooms: [],
+    selectedRoom: null,
     leadForm: initialLeadForm()
   },
 
@@ -25,19 +36,58 @@ Page({
   },
 
   async loadInvestment() {
-    this.setData({ loading: true })
-    try {
-      const overview = await api.get('/mobile/investment/overview')
-      this.setData({ overview })
-    } finally {
-      this.setData({ loading: false })
+    this.setData({ loading: true, roomsLoading: true, errorMessage: '' })
+    const [overviewResult, roomsResult] = await Promise.allSettled([
+      api.get('/mobile/investment/overview'),
+      api.get('/mobile/investment/rooms')
+    ])
+
+    if (overviewResult.status === 'fulfilled') {
+      this.setData({ overview: overviewResult.value })
+    } else {
+      this.setData({
+        overview: null,
+        errorMessage: overviewResult.reason && overviewResult.reason.message
+          ? overviewResult.reason.message
+          : '招商信息加载失败'
+      })
     }
+
+    if (roomsResult.status === 'fulfilled') {
+      const rooms = (roomsResult.value || []).map(room => ({
+        ...room,
+        title: roomTitle(room),
+        areaText: room.area ? `${room.area}㎡` : '面积待确认',
+        typeText: room.roomType || '房源'
+      }))
+      this.setData({ rooms })
+    } else {
+      this.setData({ rooms: [] })
+    }
+
+    this.setData({ loading: false, roomsLoading: false })
   },
 
   onLeadInput(event) {
     const field = event.currentTarget.dataset.field
     this.setData({
       [`leadForm.${field}`]: event.detail.value
+    })
+  },
+
+  selectRoom(event) {
+    const id = Number(event.currentTarget.dataset.id)
+    const selectedRoom = this.data.rooms.find(item => item.id === id) || null
+    this.setData({
+      selectedRoom,
+      'leadForm.roomId': selectedRoom ? selectedRoom.id : null
+    })
+  },
+
+  clearRoom() {
+    this.setData({
+      selectedRoom: null,
+      'leadForm.roomId': null
     })
   },
 
@@ -56,7 +106,8 @@ Page({
     try {
       const result = await api.post('/mobile/investment/leads', {
         ...form,
-        desiredArea: form.desiredArea ? Number(form.desiredArea) : null
+        desiredArea: form.desiredArea ? Number(form.desiredArea) : null,
+        roomId: form.roomId || null
       })
       wx.showModal({
         title: '已提交预约',
@@ -64,7 +115,8 @@ Page({
         showCancel: false
       })
       this.setData({
-        leadForm: initialLeadForm()
+        leadForm: initialLeadForm(),
+        selectedRoom: null
       })
     } finally {
       this.setData({ submitting: false })

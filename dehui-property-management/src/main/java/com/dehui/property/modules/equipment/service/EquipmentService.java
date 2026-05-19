@@ -53,6 +53,27 @@ public class EquipmentService {
     }
 
     @Transactional
+    public Result<EquipmentResponse> update(Long id, EquipmentCreateRequest request) {
+        return equipmentRepository.findById(id)
+                .map(equipment -> {
+                    equipment.setEquipmentName(request.getEquipmentName());
+                    equipment.setEquipmentCode(request.getEquipmentCode());
+                    equipment.setEquipmentType(request.getEquipmentType());
+                    equipment.setLocation(request.getLocation());
+                    equipment.setManufacturer(request.getManufacturer());
+                    equipment.setModel(request.getModel());
+                    equipment.setInstallDate(request.getInstallDate());
+                    equipment.setRemark(request.getRemark());
+
+                    Equipment saved = equipmentRepository.save(equipment);
+                    log.info("设备信息已更新: id={}, name={}", saved.getId(), saved.getEquipmentName());
+
+                    return Result.success(toEquipmentResponse(saved));
+                })
+                .orElseGet(() -> Result.error("设备不存在"));
+    }
+
+    @Transactional
     public Result<EquipmentResponse> updateStatus(Long id, String status) {
         return equipmentRepository.findById(id)
                 .map(equipment -> {

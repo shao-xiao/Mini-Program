@@ -3,6 +3,7 @@ package com.dehui.property.modules.tenant.controller;
 import com.dehui.property.common.Result;
 import com.dehui.property.modules.tenant.dto.TenantContactRequest;
 import com.dehui.property.modules.tenant.dto.TenantContactResponse;
+import com.dehui.property.modules.tenant.dto.TenantOverviewResponse;
 import com.dehui.property.modules.tenant.entity.Tenant;
 import com.dehui.property.modules.tenant.service.TenantContactService;
 import com.dehui.property.modules.tenant.service.TenantService;
@@ -26,6 +27,11 @@ public class TenantController {
     @PostMapping("/save")
     public Result<Tenant> save(@RequestBody Tenant tenant) {
         return Result.success(tenantService.save(tenant));
+    }
+
+    @GetMapping("/{tenantId}/overview")
+    public Result<TenantOverviewResponse> overview(@PathVariable Long tenantId) {
+        return tenantService.overview(tenantId);
     }
 
     @GetMapping("/{tenantId}/contacts")

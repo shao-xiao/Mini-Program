@@ -13,12 +13,13 @@ Page({
     identityText: '访客',
     profile: {},
     loading: false,
+    showDebugPanel: false,
     devForm: {
-      phone: '13800000000',
-      nickname: '德汇访客'
+      phone: '',
+      nickname: ''
     },
     internalForm: {
-      username: 'admin',
+      username: '',
       password: ''
     },
     tenantAccountForm: {
@@ -26,10 +27,10 @@ Page({
       password: ''
     },
     tenantForm: {
-      tenantId: '1',
-      name: '账单测试用户',
-      phone: '13900000001',
-      role: '财务联系人'
+      tenantId: '',
+      name: '',
+      phone: '',
+      role: ''
     },
     apiBaseURL: '',
     apiForm: {
@@ -164,27 +165,29 @@ Page({
     })
     try {
       const health = await api.get('/ping')
-      let fixtures = null
-      try {
-        fixtures = await api.request({
-          url: '/mobile/dev/fixtures',
-          method: 'GET',
-          silent: true
-        })
-      } catch (error) {
-        fixtures = null
-      }
-      this.setData({
+      const nextData = {
         apiStatus: '可用',
         apiStatusClass: 'success',
-        apiMessage: health && health.time ? `服务时间：${health.time.replace('T', ' ').slice(0, 19)}` : '后端已响应',
-        fixtures
-      })
-      if (fixtures && fixtures.testTenantId) {
-        this.setData({
-          'tenantForm.tenantId': String(fixtures.testTenantId)
-        })
+        apiMessage: health && health.time ? `服务时间：${health.time.replace('T', ' ').slice(0, 19)}` : '后端已响应'
       }
+
+      if (this.data.showDebugPanel) {
+        try {
+          const fixtures = await api.request({
+            url: '/mobile/dev/fixtures',
+            method: 'GET',
+            silent: true
+          })
+          nextData.fixtures = fixtures
+          if (fixtures && fixtures.testTenantId) {
+            nextData['tenantForm.tenantId'] = String(fixtures.testTenantId)
+          }
+        } catch (error) {
+          nextData.fixtures = null
+        }
+      }
+
+      this.setData(nextData)
     } catch (error) {
       this.setData({
         apiStatus: '不可用',
@@ -197,11 +200,15 @@ Page({
   },
 
   async devLogin() {
+    if (!this.data.devForm.phone.trim()) {
+      wx.showToast({ title: '请填写开发调试手机号', icon: 'none' })
+      return
+    }
     this.setData({ loading: true })
     try {
       const session = await api.post('/mobile/auth/dev-login', {
         phone: this.data.devForm.phone,
-        nickname: this.data.devForm.nickname
+        nickname: this.data.devForm.nickname || '小程序调试用户'
       })
       setSession(session)
       this.setData({ profile: session.profile || {} })
@@ -215,7 +222,7 @@ Page({
 
   async bindInternal() {
     if (!wx.getStorageSync('token')) {
-      wx.showToast({ title: '请先开发态登录', icon: 'none' })
+      wx.showToast({ title: '请先登录后再绑定', icon: 'none' })
       return
     }
 
@@ -234,7 +241,7 @@ Page({
 
   async bindTenantAccount() {
     if (!wx.getStorageSync('token')) {
-      wx.showToast({ title: '请先开发态登录', icon: 'none' })
+      wx.showToast({ title: '请先登录后再绑定', icon: 'none' })
       return
     }
     if (!this.data.tenantAccountForm.phone || !this.data.tenantAccountForm.password) {
@@ -260,7 +267,11 @@ Page({
 
   async bindTenant() {
     if (!wx.getStorageSync('token')) {
-      wx.showToast({ title: '请先开发态登录', icon: 'none' })
+      wx.showToast({ title: '请先开发调试登录', icon: 'none' })
+      return
+    }
+    if (!this.data.tenantForm.tenantId || !this.data.tenantForm.phone) {
+      wx.showToast({ title: '请填写租户ID和手机号', icon: 'none' })
       return
     }
 
@@ -281,10 +292,17 @@ Page({
     }
   },
 
+  toggleDebugPanel() {
+    this.setData({
+      showDebugPanel: !this.data.showDebugPanel,
+      fixtures: null
+    }, () => this.checkBackend())
+  },
+
   logout() {
     clearSession()
     this.setData({ profile: {} })
     this.refreshIdentity()
-    wx.showToast({ title: '已清除', icon: 'success' })
+    wx.showToast({ title: '已清除登录态', icon: 'success' })
   }
 })

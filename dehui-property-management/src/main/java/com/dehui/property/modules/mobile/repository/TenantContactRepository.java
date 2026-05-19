@@ -12,4 +12,6 @@ public interface TenantContactRepository extends JpaRepository<TenantContact, Lo
     List<TenantContact> findByTenantId(Long tenantId);
 
     List<TenantContact> findByTenantIdOrderByIsPrimaryDescIdAsc(Long tenantId);
+
+    List<TenantContact> findByTenantIdAndIsPrimary(Long tenantId, Boolean isPrimary);
 }

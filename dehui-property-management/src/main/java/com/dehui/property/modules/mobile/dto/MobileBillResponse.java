@@ -24,6 +24,9 @@ public class MobileBillResponse {
     private Boolean overdue;
     private String sourceType;
     private String sourceTypeText;
+    private String invoiceStatus;
+    private String invoiceFileName;
+    private String invoiceDownloadUrl;
     private String remark;
     private LocalDateTime createdTime;
 }

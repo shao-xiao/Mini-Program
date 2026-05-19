@@ -1,69 +1,147 @@
 <view class="page">
   <view class="section card">
     <view class="title">我的</view>
-    <view class="subtitle">当前身份：{{identityText}}</view>
-    <view class="subtitle" wx:if="{{profile.nickname}}">昵称：{{profile.nickname}}</view>
-    <view class="subtitle" wx:if="{{profile.boundSysRealName}}">内部账号：{{profile.boundSysRealName}}</view>
-    <view class="subtitle" wx:if="{{profile.boundTenantName}}">绑定租户：{{profile.boundTenantName}}</view>
+    <view class="subtitle">当前身份：{{identityText || '游客'}}</view>
+    <view wx:if="{{profile.nickname}}" class="api-message">昵称：{{profile.nickname}}</view>
+    <view wx:if="{{profile.boundTenantName}}" class="api-message">绑定租户：{{profile.boundTenantName}}</view>
+    <view wx:if="{{profile.boundSysRealName || profile.boundSysUsername}}" class="api-message">内部账号：{{profile.boundSysRealName || profile.boundSysUsername}}</view>
   </view>
 
   <view class="section card">
-    <view class="action-title">联调设置</view>
-    <view class="action-desc">当前接口：{{apiBaseURL}}</view>
+    <view class="section-title">接口设置</view>
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="baseURL"
+      value="{{apiForm.baseURL}}"
+      bindinput="onApiInput"
+    />
     <view class="api-status-row">
       <view class="api-status {{apiStatusClass}}">{{apiStatus}}</view>
       <view class="api-message">{{apiMessage}}</view>
     </view>
-    <input class="input" placeholder="例如 http://192.168.1.10:8080/api" value="{{apiForm.baseURL}}" data-field="baseURL" bindinput="onApiInput" />
     <view class="api-actions">
-      <button size="mini" bindtap="useDefaultApi">本机</button>
-      <button size="mini" bindtap="useLanApi">真机同网模板</button>
+      <button size="mini" bindtap="useDefaultApi">恢复默认</button>
+      <button size="mini" bindtap="useLanApi">局域网</button>
       <button size="mini" bindtap="saveApiBaseURL">保存地址</button>
-      <button size="mini" loading="{{checkingApi}}" bindtap="checkBackend">检查后端</button>
+      <button size="mini" class="button-primary" loading="{{checkingApi}}" bindtap="checkBackend">检测后端</button>
     </view>
-    <view wx:if="{{fixtures}}" class="fixtures-box">
-      <view>测试租户：{{fixtures.testTenantName}}（ID {{fixtures.testTenantId}}）</view>
-      <view>会议室数量：{{fixtures.meetingRoomCount}}</view>
-      <view>账单数量：{{fixtures.billCount}}</view>
-      <view>后台账号：{{fixtures.adminUsername}}</view>
+    <view class="api-message">当前请求地址：{{apiBaseURL}}</view>
+  </view>
+
+  <view class="section card">
+    <view class="section-title">租户账号绑定</view>
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="手机号码"
+      value="{{tenantAccountForm.phone}}"
+      data-field="phone"
+      bindinput="onTenantAccountInput"
+    />
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="密码"
+      password="true"
+      value="{{tenantAccountForm.password}}"
+      data-field="password"
+      bindinput="onTenantAccountInput"
+    />
+    <button class="button-primary" bindtap="bindTenantAccount">微信登录绑定租户</button>
+  </view>
+
+  <view class="section card">
+    <view class="section-title">内部人员绑定</view>
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="用户名"
+      value="{{internalForm.username}}"
+      data-field="username"
+      bindinput="onInternalInput"
+    />
+    <input
+      class="input"
+      placeholder-class="input-placeholder"
+      placeholder="密码"
+      password="true"
+      value="{{internalForm.password}}"
+      data-field="password"
+      bindinput="onInternalInput"
+    />
+    <button class="button-primary" bindtap="bindInternal">绑定内部用户</button>
+  </view>
+
+  <view class="section card">
+    <button size="mini" bindtap="toggleDebugPanel">
+      {{showDebugPanel ? '隐藏调试入口' : '显示调试入口'}}
+    </button>
+    <view wx:if="{{showDebugPanel}}" class="dev-card">
+      <view class="section-title">开发调试</view>
+      <view class="section-subtitle">仅调试环境可用</view>
+      <input
+        class="input"
+        placeholder-class="input-placeholder"
+        placeholder="调试手机号"
+        value="{{devForm.phone}}"
+        data-field="phone"
+        bindinput="onDevInput"
+      />
+      <input
+        class="input"
+        placeholder-class="input-placeholder"
+        placeholder="昵称（可选）"
+        value="{{devForm.nickname}}"
+        data-field="nickname"
+        bindinput="onDevInput"
+      />
+      <button bindtap="devLogin">开发登录</button>
+
+      <view wx:if="{{fixtures}}" class="fixtures-box">
+        <view class="fixtures-title">服务端调试数据</view>
+        <view>tenantId：{{fixtures.testTenantId || '-'}}</view>
+        <view>phone：{{fixtures.testPhone || '-'}}</view>
+      </view>
+
+      <view class="section-title">租户 ID 直绑（调试）</view>
+      <input
+        class="input"
+        placeholder-class="input-placeholder"
+        placeholder="租户ID"
+        value="{{tenantForm.tenantId}}"
+        data-field="tenantId"
+        bindinput="onTenantInput"
+      />
+      <input
+        class="input"
+        placeholder-class="input-placeholder"
+        placeholder="联系人"
+        value="{{tenantForm.name}}"
+        data-field="name"
+        bindinput="onTenantInput"
+      />
+      <input
+        class="input"
+        placeholder-class="input-placeholder"
+        placeholder="联系方式"
+        value="{{tenantForm.phone}}"
+        data-field="phone"
+        bindinput="onTenantInput"
+      />
+      <input
+        class="input"
+        placeholder-class="input-placeholder"
+        placeholder="角色"
+        value="{{tenantForm.role}}"
+        data-field="role"
+        bindinput="onTenantInput"
+      />
+      <button bindtap="bindTenant">直绑租户</button>
     </view>
   </view>
 
   <view class="section card">
-    <view class="action-title">开发态登录</view>
-    <view class="action-desc">用于本地开发，后续替换为真实微信登录。</view>
-    <input class="input" placeholder="手机号" value="{{devForm.phone}}" data-field="phone" bindinput="onDevInput" />
-    <input class="input" placeholder="昵称" value="{{devForm.nickname}}" data-field="nickname" bindinput="onDevInput" />
-    <button class="button-primary" bindtap="devLogin" loading="{{loading}}">开发态登录</button>
-  </view>
-
-  <view class="section card">
-    <view class="action-title">绑定内部员工</view>
-    <view class="action-desc">使用后台系统账号绑定内部员工身份。</view>
-    <input class="input" placeholder="后台用户名" value="{{internalForm.username}}" data-field="username" bindinput="onInternalInput" />
-    <input class="input" placeholder="后台密码" password value="{{internalForm.password}}" data-field="password" bindinput="onInternalInput" />
-    <button class="button-primary" bindtap="bindInternal" loading="{{loading}}">绑定内部账号</button>
-  </view>
-
-  <view class="section card">
-    <view class="action-title">绑定租户联系人</view>
-    <view class="action-desc">使用物业后台发放的手机号账号和 6 位初始密码绑定租户。</view>
-    <input class="input" placeholder="手机号账号" value="{{tenantAccountForm.phone}}" data-field="phone" bindinput="onTenantAccountInput" />
-    <input class="input" placeholder="初始密码" password value="{{tenantAccountForm.password}}" data-field="password" bindinput="onTenantAccountInput" />
-    <button class="button-primary" bindtap="bindTenantAccount" loading="{{loading}}">绑定租户账号</button>
-  </view>
-
-  <view class="section card dev-card">
-    <view class="action-title">开发调试：租户 ID 直绑</view>
-    <view class="action-desc">仅用于本地开发和演示，正式租户请使用手机号账号和初始密码绑定。</view>
-    <input class="input" placeholder="租户ID" type="number" value="{{tenantForm.tenantId}}" data-field="tenantId" bindinput="onTenantInput" />
-    <input class="input" placeholder="联系人姓名" value="{{tenantForm.name}}" data-field="name" bindinput="onTenantInput" />
-    <input class="input" placeholder="手机号" value="{{tenantForm.phone}}" data-field="phone" bindinput="onTenantInput" />
-    <input class="input" placeholder="角色，如行政/财务/负责人" value="{{tenantForm.role}}" data-field="role" bindinput="onTenantInput" />
-    <button bindtap="bindTenant" loading="{{loading}}">开发直绑租户</button>
-  </view>
-
-  <view class="section">
-    <button bindtap="logout">清除登录态</button>
+    <button size="mini" bindtap="logout">退出登录</button>
   </view>
 </view>

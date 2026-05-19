@@ -17,6 +17,7 @@ public class DailyReportResponse {
     private Long roomCount;
     private Long availableRoomCount;
     private Long rentedRoomCount;
+    private Double rentalRate;
 
     // 租赁经营
     private Long tenantCount;

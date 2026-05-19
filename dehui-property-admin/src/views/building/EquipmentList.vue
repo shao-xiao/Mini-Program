@@ -30,8 +30,9 @@
         <el-table-column prop="installDate" label="安装日期" width="120" />
         <el-table-column prop="remark" label="备注" min-width="160" />
 
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
+            <el-button size="small" type="primary" @click="edit(row)">编辑</el-button>
             <el-dropdown @command="status => updateStatus(row, status)">
               <el-button size="small">
                 修改状态
@@ -50,7 +51,7 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="visible" title="新增设备" width="620px">
+    <el-dialog v-model="visible" :title="form.id ? '编辑设备' : '新增设备'" width="620px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
         <el-form-item label="设备名称" prop="equipmentName">
           <el-input v-model="form.equipmentName" placeholder="请输入设备名称" />
@@ -118,6 +119,7 @@ const visible = ref(false)
 const formRef = ref(null)
 
 const defaultForm = () => ({
+  id: null,
   equipmentName: '',
   equipmentCode: '',
   equipmentType: 'ELEVATOR',
@@ -156,18 +158,43 @@ function openDialog() {
   visible.value = true
 }
 
+function edit(row) {
+  Object.assign(form, {
+    id: row.id,
+    equipmentName: row.equipmentName || '',
+    equipmentCode: row.equipmentCode || '',
+    equipmentType: row.equipmentType || 'ELEVATOR',
+    location: row.location || '',
+    manufacturer: row.manufacturer || '',
+    model: row.model || '',
+    installDate: row.installDate || '',
+    remark: row.remark || ''
+  })
+  formRef.value?.clearValidate()
+  visible.value = true
+}
+
 async function save() {
   await formRef.value.validate()
 
   saving.value = true
   try {
-    await request.post('/equipments', { ...form })
-    ElMessage.success('设备新增成功')
+    const payload = { ...form }
+    delete payload.id
+
+    if (form.id) {
+      await request.put(`/equipments/${form.id}`, payload)
+      ElMessage.success('设备保存成功')
+    } else {
+      await request.post('/equipments', payload)
+      ElMessage.success('设备新增成功')
+    }
+
     visible.value = false
     resetForm()
     await load()
   } catch (error) {
-    ElMessage.error(error?.response?.data?.message || '设备新增失败')
+    ElMessage.error(error?.response?.data?.message || '设备保存失败')
   } finally {
     saving.value = false
   }

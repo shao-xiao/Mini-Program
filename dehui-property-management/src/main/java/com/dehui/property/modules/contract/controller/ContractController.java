@@ -1,7 +1,10 @@
 package com.dehui.property.modules.contract.controller;
 
 import com.dehui.property.common.Result;
+import com.dehui.property.modules.contract.dto.BillGenerationResult;
+import com.dehui.property.modules.contract.dto.ContractActionRequest;
 import com.dehui.property.modules.contract.dto.ContractCreateRequest;
+import com.dehui.property.modules.contract.dto.ContractEventResponse;
 import com.dehui.property.modules.contract.dto.ContractResponse;
 import com.dehui.property.modules.contract.service.ContractBillGenerationService;
 import com.dehui.property.modules.contract.service.ContractService;
@@ -34,7 +37,7 @@ public class ContractController {
     }
 
     @PostMapping("/generate-bills")
-    public Result<Integer> generateBills() {
+    public Result<BillGenerationResult> generateBills() {
         return Result.success(contractBillGenerationService.generateDueBills());
     }
 
@@ -48,8 +51,26 @@ public class ContractController {
         return contractService.activate(id);
     }
 
+    @PostMapping("/{id}/check-in")
+    public Result<ContractResponse> checkIn(@PathVariable Long id,
+                                            @RequestBody(required = false) ContractActionRequest request) {
+        return contractService.checkIn(id, request);
+    }
+
     @PostMapping("/{id}/terminate")
-    public Result<ContractResponse> terminate(@PathVariable Long id) {
-        return contractService.terminate(id);
+    public Result<ContractResponse> terminate(@PathVariable Long id,
+                                              @RequestBody(required = false) ContractActionRequest request) {
+        return contractService.terminate(id, request);
+    }
+
+    @PostMapping("/{id}/cancel")
+    public Result<ContractResponse> cancel(@PathVariable Long id,
+                                           @RequestBody(required = false) ContractActionRequest request) {
+        return contractService.cancel(id, request);
+    }
+
+    @GetMapping("/{id}/events")
+    public Result<List<ContractEventResponse>> events(@PathVariable Long id) {
+        return contractService.events(id);
     }
 }

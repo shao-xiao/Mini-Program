@@ -1,15 +1,11 @@
 const api = require('../../utils/request')
-
-function formatMoney(value) {
-  return Number(value || 0).toFixed(2)
-}
-
-function formatDate(value) {
-  if (!value) return '-'
-  const datePart = String(value).split('T')[0]
-  const [year, month, day] = datePart.split('-')
-  return year && month && day ? `${year}年${month}月${day}日` : value
-}
+const { getBaseURL } = require('../../config/env')
+const {
+  formatMoney,
+  formatDate,
+  formatDateRange,
+  invoiceStatusText
+} = require('../../utils/format')
 
 function emptySummary() {
   return {
@@ -22,6 +18,19 @@ function emptySummary() {
     overdueCount: 0,
     paidCount: 0
   }
+}
+
+function billStatusClass(item) {
+  if (item.status === 'PAID') return 'paid'
+  if (item.status === 'CANCELLED') return 'cancelled'
+  if (item.overdue) return 'overdue'
+  return 'unpaid'
+}
+
+function absoluteApiUrl(url) {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  return `${getBaseURL()}${url}`
 }
 
 Page({
@@ -56,12 +65,13 @@ Page({
         amountText: formatMoney(item.amount),
         paidAmountText: formatMoney(item.paidAmount),
         unpaidAmountText: formatMoney(item.unpaidAmount),
-        periodText: `${formatDate(item.periodStart)} 至 ${formatDate(item.periodEnd)}`,
+        periodText: formatDateRange(item.periodStart, item.periodEnd),
         dueDateText: formatDate(item.dueDate),
         statusDisplay: item.overdue && item.status !== 'PAID' ? '已逾期' : (item.statusText || item.status || '未知'),
-        statusClass: item.status === 'PAID'
-          ? 'paid'
-          : (item.status === 'CANCELLED' ? 'cancelled' : (item.overdue ? 'overdue' : 'unpaid'))
+        statusClass: billStatusClass(item),
+        invoiceStatusText: invoiceStatusText(item.invoiceStatus),
+        invoiceAvailable: item.invoiceStatus === 'INVOICED' && Boolean(item.invoiceDownloadUrl),
+        invoiceUrl: absoluteApiUrl(item.invoiceDownloadUrl)
       }))
 
       this.setData({
@@ -100,9 +110,42 @@ Page({
     const { number, title, amount } = event.currentTarget.dataset
     wx.showModal({
       title: '线下缴费说明',
-      content: `${title || '账单'}\n编号：${number || '-'}\n待缴金额：¥ ${amount || '0.00'}\n\n当前暂未接入微信支付，请按物业通知线下缴费，后台确认收款后此处会更新为已缴。`,
+      content: `${title || '账单'}\n编号：${number || '-'}\n待缴金额：¥${amount || '0.00'}\n\n当前暂未接入微信支付，请按物业通知线下缴费，后台确认收款后此处会更新为已缴。`,
       showCancel: false,
       confirmText: '知道了'
+    })
+  },
+
+  downloadInvoice(event) {
+    const { url, name } = event.currentTarget.dataset
+    if (!url) {
+      wx.showToast({ title: '暂无发票文件', icon: 'none' })
+      return
+    }
+
+    wx.showLoading({ title: '下载发票中', mask: true })
+    wx.downloadFile({
+      url,
+      header: wx.getStorageSync('token') ? { Authorization: wx.getStorageSync('token') } : {},
+      success(res) {
+        wx.hideLoading()
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          wx.showToast({ title: '发票下载失败', icon: 'none' })
+          return
+        }
+        wx.openDocument({
+          filePath: res.tempFilePath,
+          fileType: 'pdf',
+          showMenu: true,
+          fail() {
+            wx.showToast({ title: name || '发票文件已下载', icon: 'none' })
+          }
+        })
+      },
+      fail() {
+        wx.hideLoading()
+        wx.showToast({ title: '发票下载失败', icon: 'none' })
+      }
     })
   },
 

@@ -31,4 +31,6 @@ public class TenantContact extends BaseEntity {
     private Boolean requirePasswordReset;
 
     private LocalDateTime lastBindTime;
+
+    private LocalDateTime lastLoginAt;
 }

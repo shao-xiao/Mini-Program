@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -43,9 +44,21 @@ public class Contract extends BaseEntity {
 
     private Integer billingLeadDays;
 
+    private Integer advanceBillDays;
+
+    private LocalDate billGeneratedUntil;
+
     private String billingRule;
     
     private String status;
+
+    private LocalDateTime terminatedAt;
+
+    private LocalDateTime cancelledAt;
+
+    private LocalDate terminationDate;
+
+    private String terminationReason;
 
     private String remark;
 }

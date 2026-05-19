@@ -9,9 +9,11 @@ import java.time.LocalDateTime;
 public class BillResponse {
     private Long id;
     private String billNumber;
+    private String billNo;
     private Long tenantId;
     private String tenantName;
     private Long contractId;
+    private Long roomId;
     private String contractNumber;
     private String contractName;
     private String billType;
@@ -21,7 +23,10 @@ public class BillResponse {
     private LocalDate periodEnd;
     private BigDecimal amount;
     private BigDecimal paidAmount;
+    private BigDecimal unpaidAmount;
     private LocalDate dueDate;
+    private Integer overdueDays;
+    private BigDecimal lateFee;
     private String status;
     private String statusText;
     private String auditStatus;
@@ -32,8 +37,15 @@ public class BillResponse {
     private String sourceType;
     private String sourceTypeText;
     private Long sourceId;
+    private String invoiceStatus;
+    private String invoiceStatusText;
+    private String invoiceFileName;
+    private String invoiceDownloadUrl;
+    private LocalDateTime invoiceUploadedAt;
+    private String invoiceUploadedBy;
     private String remark;
     private Boolean overdue;
+    private LocalDateTime paidTime;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
 }

@@ -31,6 +31,11 @@ public class EquipmentController {
         return equipmentService.findById(id);
     }
 
+    @PutMapping("/{id}")
+    public Result<EquipmentResponse> update(@PathVariable Long id, @Valid @RequestBody EquipmentCreateRequest request) {
+        return equipmentService.update(id, request);
+    }
+
     @PatchMapping("/{id}/status")
     public Result<EquipmentResponse> updateStatus(@PathVariable Long id, @RequestParam String status) {
         return equipmentService.updateStatus(id, status);

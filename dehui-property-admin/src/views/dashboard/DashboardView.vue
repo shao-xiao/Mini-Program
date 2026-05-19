@@ -362,6 +362,9 @@ const kpiCards = computed(() => [
 ])
 
 const roomRentRate = computed(() => {
+  if (report.value.rentalRate !== undefined && report.value.rentalRate !== null) {
+    return Number(report.value.rentalRate || 0)
+  }
   const roomCount = money(report.value.roomCount)
   const rentedRoomCount = money(report.value.rentedRoomCount)
   return roomCount > 0 ? Math.round((rentedRoomCount / roomCount) * 100) : 0
@@ -529,7 +532,7 @@ function renderCharts() {
         radius: '68%',
         data: [
           { name: '已出租', value: money(report.value.rentedRoomCount) },
-          { name: '可出租', value: money(report.value.availableRoomCount) }
+          { name: '未出租', value: money(report.value.availableRoomCount) }
         ]
       }
     ]

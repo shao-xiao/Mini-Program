@@ -25,4 +25,22 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
 
     @Query(value = "SELECT COUNT(*) FROM room WHERE status = :status AND deleted_at IS NULL", nativeQuery = true)
     Long countByStatus(@Param("status") String status);
+
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM room
+            WHERE deleted_at IS NULL
+              AND status IN ('AVAILABLE', 'RENTED', 'RESERVED', 'VACANT', 'LEASED')
+            """, nativeQuery = true)
+    Long countRentableRooms();
+
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM room r
+            LEFT JOIN floor f ON r.floor_id = f.id
+            WHERE r.deleted_at IS NULL
+              AND (r.building_id = :buildingId OR f.building_id = :buildingId)
+              AND r.status IN ('AVAILABLE', 'RENTED', 'RESERVED', 'VACANT', 'LEASED')
+            """, nativeQuery = true)
+    Long countRentableRoomsByBuildingId(@Param("buildingId") Long buildingId);
 }

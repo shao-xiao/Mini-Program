@@ -7,6 +7,7 @@ import com.dehui.property.modules.building.repository.FloorRepository;
 import com.dehui.property.modules.building.repository.RoomRepository;
 import com.dehui.property.modules.contract.repository.ContractRepository;
 import com.dehui.property.modules.equipment.repository.EquipmentRepository;
+import com.dehui.property.modules.finance.service.FinanceMetricsService;
 import com.dehui.property.modules.inspection.repository.InspectionRepository;
 import com.dehui.property.modules.tenant.repository.TenantRepository;
 import com.dehui.property.modules.workorder.repository.WorkOrderRepository;
@@ -29,6 +30,7 @@ public class DailyReportService {
     private final TenantRepository tenantRepository;
     private final ContractRepository contractRepository;
     private final BillRepository billRepository;
+    private final FinanceMetricsService financeMetricsService;
     private final WorkOrderRepository workOrderRepository;
     private final EquipmentRepository equipmentRepository;
     private final InspectionRepository inspectionRepository;
@@ -43,9 +45,11 @@ public class DailyReportService {
         // 基础资产
         report.setBuildingCount(buildingRepository.count());
         report.setFloorCount(floorRepository.count());
-        report.setRoomCount(roomRepository.count());
-        report.setAvailableRoomCount(roomRepository.countByStatus("AVAILABLE"));
-        report.setRentedRoomCount(roomRepository.countByStatus("RENTED"));
+        FinanceMetricsService.RoomRentalStats rentalStats = financeMetricsService.overallRoomRentalStats();
+        report.setRoomCount(rentalStats.rentableRoomCount());
+        report.setAvailableRoomCount(rentalStats.availableRoomCount());
+        report.setRentedRoomCount(rentalStats.rentedRoomCount());
+        report.setRentalRate(rentalStats.rentalRate());
 
         // 租户与合同
         report.setTenantCount(tenantRepository.count());
@@ -85,7 +89,7 @@ public class DailyReportService {
 
         // 简要总结
         report.setSummary(
-                "当前房间" + report.getRoomCount() +
+                "当前可出租房间" + report.getRoomCount() +
                 "间，已出租" + report.getRentedRoomCount() +
                 "间，未支付账单" + report.getUnpaidBillCount() +
                 "笔，处理中工单" + report.getProcessingWorkOrderCount() + "个。"

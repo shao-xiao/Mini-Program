@@ -1,18 +1,18 @@
 const api = require('../../utils/request')
+const { formatDateTime } = require('../../utils/format')
 
-function toDateTimeText(value) {
-  if (!value) return '-'
-  return value.replace('T', ' ').slice(0, 16)
+function toInputDateTime(date = new Date()) {
+  const next = new Date(date.getTime() + 60 * 60 * 1000)
+  const year = next.getFullYear()
+  const month = String(next.getMonth() + 1).padStart(2, '0')
+  const day = String(next.getDate()).padStart(2, '0')
+  const hour = String(next.getHours()).padStart(2, '0')
+  const minute = String(next.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
-function initialForm() {
-  return {
-    checkinType: 'ON_DUTY',
-    location: '',
-    longitude: '',
-    latitude: '',
-    remark: ''
-  }
+function toApiDateTime(value) {
+  return value ? `${value.replace(' ', 'T')}:00` : ''
 }
 
 Page({
@@ -21,10 +21,16 @@ Page({
     submitting: false,
     errorMessage: '',
     identityText: '',
-    form: initialForm(),
+    form: {
+      checkinType: 'ON_DUTY',
+      location: '',
+      longitude: '',
+      latitude: '',
+      remark: ''
+    },
     typeOptions: [
-      { label: '上班签到', value: 'ON_DUTY' },
-      { label: '下班签退', value: 'OFF_DUTY' }
+      { label: '上班打卡', value: 'ON_DUTY' },
+      { label: '下班打卡', value: 'OFF_DUTY' }
     ],
     checkins: []
   },
@@ -39,8 +45,9 @@ Page({
       const data = await api.get('/mobile/checkins')
       const checkins = (data.checkins || []).map(item => ({
         ...item,
-        checkinTimeText: toDateTimeText(item.checkinTime),
-        locationText: item.location || '未填写地点'
+        checkinTimeText: formatDateTime(item.checkinTime),
+        checkinTypeText: this.toCheckinTypeText(item.checkinType),
+        locationText: item.location || '未填写位置'
       }))
       this.setData({
         identityText: this.toIdentityText(data.profile),
@@ -48,7 +55,7 @@ Page({
       })
     } catch (error) {
       this.setData({
-        errorMessage: error && error.message ? error.message : '请先登录并绑定内部员工身份后签到',
+        errorMessage: error && error.message ? error.message : '请先登录后再获取打卡记录',
         checkins: []
       })
     } finally {
@@ -58,15 +65,11 @@ Page({
 
   onInput(event) {
     const field = event.currentTarget.dataset.field
-    this.setData({
-      [`form.${field}`]: event.detail.value
-    })
+    this.setData({ [`form.${field}`]: event.detail.value })
   },
 
   selectType(event) {
-    this.setData({
-      'form.checkinType': event.currentTarget.dataset.value
-    })
+    this.setData({ 'form.checkinType': event.currentTarget.dataset.value })
   },
 
   getLocation() {
@@ -80,7 +83,7 @@ Page({
         })
       },
       fail: () => {
-        wx.showToast({ title: '定位失败，可手动填写地点', icon: 'none' })
+        wx.showToast({ title: '定位失败，可手动输入位置', icon: 'none' })
       }
     })
   },
@@ -97,11 +100,19 @@ Page({
         remark: form.remark
       })
       wx.showModal({
-        title: '签到成功',
-        content: `记录ID：${created.id}\n时间：${toDateTimeText(created.checkinTime)}`,
+        title: '提交成功',
+        content: `记录ID：${created.id}\n时间：${formatDateTime(created.checkinTime)}`,
         showCancel: false
       })
-      this.setData({ form: initialForm() })
+      this.setData({
+        form: {
+          checkinType: 'ON_DUTY',
+          location: '',
+          longitude: '',
+          latitude: '',
+          remark: ''
+        }
+      })
       this.loadCheckins()
     } finally {
       this.setData({ submitting: false })
@@ -114,8 +125,14 @@ Page({
 
   toIdentityText(profile) {
     if (!profile) return ''
-    if (profile.userType === 'INTERNAL') return `内部员工：${profile.boundSysRealName || profile.boundSysUsername || profile.nickname || ''}`
+    if (profile.userType === 'INTERNAL') return `内部人员：${profile.boundSysRealName || profile.boundSysUsername || profile.nickname || ''}`
     if (profile.userType === 'TENANT') return `租户：${profile.boundTenantName || profile.nickname || ''}`
-    return `访客：${profile.nickname || ''}`
+    return `游客：${profile.nickname || ''}`
+  },
+
+  toCheckinTypeText(type) {
+    if (type === 'ON_DUTY') return '上班'
+    if (type === 'OFF_DUTY') return '下班'
+    return type || '未知'
   }
 })

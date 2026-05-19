@@ -17,6 +17,8 @@ public class BillCreateRequest {
 
     private Long contractId;
 
+    private Long roomId;
+
     @NotBlank(message = "账单类型不能为空")
     private String billType;
 

@@ -1,7 +1,7 @@
 <view class="page">
   <view class="section card">
     <view class="title">账单中心</view>
-    <view class="subtitle">{{tenantName || '租户'}}已发布的租金、物业、水电燃气、停车、会议室、维修等账单</view>
+    <view class="subtitle">{{tenantName || '租户'}}已发布的租金、物业、能耗、停车、会议和维修服务账单</view>
   </view>
 
   <view wx:if="{{errorMessage}}" class="card section">
@@ -64,27 +64,41 @@
       <view class="bill-tags">
         <view class="bill-tag">{{item.billTypeText}}</view>
         <view class="bill-tag">{{item.sourceTypeText || '历史账单'}}</view>
+        <view class="bill-tag">{{item.invoiceStatusText}}</view>
       </view>
 
       <view class="bill-money">¥ {{item.unpaidAmountText}}</view>
       <view class="bill-meta">应收：¥ {{item.amountText}}　已缴：¥ {{item.paidAmountText}}</view>
       <view class="bill-meta">账期：{{item.periodText}}</view>
       <view class="bill-meta">到期日：{{item.dueDateText}}</view>
+      <view wx:if="{{item.invoiceFileName}}" class="bill-meta">发票：{{item.invoiceFileName}}</view>
       <view wx:if="{{item.remark}}" class="bill-remark">{{item.remark}}</view>
 
       <view class="bill-footer">
         <view class="bill-paid">{{item.status === 'PAID' ? '物业已确认收款' : '请按物业通知线下缴费'}}</view>
-        <button
-          wx:if="{{item.status !== 'PAID' && item.status !== 'CANCELLED'}}"
-          class="pay-button"
-          size="mini"
-          data-number="{{item.billNumber}}"
-          data-title="{{item.displayTitle}}"
-          data-amount="{{item.unpaidAmountText}}"
-          bindtap="showPaymentGuide"
-        >
-          缴费说明
-        </button>
+        <view class="bill-actions">
+          <button
+            wx:if="{{item.invoiceAvailable}}"
+            class="invoice-button"
+            size="mini"
+            data-url="{{item.invoiceUrl}}"
+            data-name="{{item.invoiceFileName}}"
+            bindtap="downloadInvoice"
+          >
+            下载发票
+          </button>
+          <button
+            wx:if="{{item.status !== 'PAID' && item.status !== 'CANCELLED'}}"
+            class="pay-button"
+            size="mini"
+            data-number="{{item.billNumber}}"
+            data-title="{{item.displayTitle}}"
+            data-amount="{{item.unpaidAmountText}}"
+            bindtap="showPaymentGuide"
+          >
+            缴费说明
+          </button>
+        </view>
       </view>
     </view>
   </view>

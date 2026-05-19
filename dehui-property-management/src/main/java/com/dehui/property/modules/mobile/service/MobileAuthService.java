@@ -117,6 +117,7 @@ public class MobileAuthService {
         wechatUser.setBoundSysUserId(null);
 
         contact.setLastBindTime(LocalDateTime.now());
+        contact.setLastLoginAt(LocalDateTime.now());
         tenantContactRepository.save(contact);
 
         WechatUser saved = wechatUserRepository.save(wechatUser);

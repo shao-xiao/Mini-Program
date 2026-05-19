@@ -2,7 +2,10 @@ package com.dehui.property.modules.contract.service;
 
 import com.dehui.property.modules.bill.entity.Bill;
 import com.dehui.property.modules.bill.repository.BillRepository;
+import com.dehui.property.modules.contract.dto.BillGenerationResult;
 import com.dehui.property.modules.contract.entity.Contract;
+import com.dehui.property.modules.contract.entity.ContractEvent;
+import com.dehui.property.modules.contract.repository.ContractEventRepository;
 import com.dehui.property.modules.contract.repository.ContractRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -23,102 +25,184 @@ public class ContractBillGenerationService {
 
     private final ContractRepository contractRepository;
     private final BillRepository billRepository;
+    private final ContractEventRepository contractEventRepository;
 
     @Transactional
-    public int generateDueBills() {
+    public BillGenerationResult generateDueBills() {
         return generateDueBills(LocalDate.now());
     }
 
     @Transactional
-    public int generateDueBills(LocalDate today) {
+    public BillGenerationResult generateDueBills(LocalDate today) {
+        BillGenerationResult result = new BillGenerationResult();
         List<Contract> contracts = contractRepository.findByStatus("ACTIVE");
-        int createdCount = 0;
 
         for (Contract contract : contracts) {
             try {
-                createdCount += generateForContract(contract, today);
+                result.merge(generateDueBillsForContract(contract, today));
             } catch (Exception e) {
                 log.error("合同自动生成账单异常，contractId={}，contractNumber={}",
                         contract.getId(), contract.getContractNumber(), e);
+                result.addSkipped("合同 " + contract.getContractNumber() + " 出账异常：" + e.getMessage());
             }
         }
 
-        return createdCount;
+        return result;
     }
 
     @Transactional
-    public int generateDueBillsForContract(Contract contract, LocalDate today) {
+    public BillGenerationResult generateDueBillsForContract(Contract contract, LocalDate today) {
+        BillGenerationResult result = new BillGenerationResult();
         if (contract == null || !"ACTIVE".equals(contract.getStatus())) {
-            return 0;
+            result.addSkipped("合同不存在或不是履约中状态，跳过");
+            return result;
         }
-
-        return generateForContract(contract, today);
-    }
-
-    private int generateForContract(Contract contract, LocalDate today) {
         if (contract.getStartDate() == null || contract.getEndDate() == null) {
-            return 0;
+            result.addSkipped("合同 " + contract.getContractNumber() + " 缺少起止日期，跳过");
+            return result;
         }
 
-        int months = paymentMonths(contract.getPaymentCycle());
-        int leadDays = contract.getBillingLeadDays() == null ? 7 : Math.max(contract.getBillingLeadDays(), 0);
-        LocalDate periodStart = contract.getStartDate();
-        int createdCount = 0;
+        LocalDate billableEnd = resolveBillableEnd(contract);
+        int cycleMonths = paymentMonths(contract.getPaymentCycle());
+        LocalDate dueLimit = today.plusDays(resolveAdvanceBillDays(contract));
+        LocalDate cursor = contract.getStartDate();
+        LocalDate generatedUntil = contract.getBillGeneratedUntil();
         int guard = 0;
 
-        while (!periodStart.isAfter(contract.getEndDate()) && guard < 240) {
-            LocalDate generateDate = previousWorkday(periodStart.minusDays(leadDays));
-            if (today.isBefore(generateDate)) {
+        createDepositIfNeeded(contract, dueLimit, result);
+
+        while (!cursor.isAfter(billableEnd) && guard < 240) {
+            LocalDate periodEnd = "FULL".equals(contract.getPaymentCycle())
+                    ? billableEnd
+                    : cursor.plusMonths(cycleMonths).minusDays(1);
+            if (periodEnd.isAfter(billableEnd)) {
+                periodEnd = billableEnd;
+            }
+
+            LocalDate dueDate = resolveDueDate(contract, cursor);
+            if (dueDate.isAfter(dueLimit)) {
+                result.addSkipped("合同 " + contract.getContractNumber() + " " + cursor + " 未到提前出账日期，跳过");
                 break;
             }
 
-            LocalDate periodEnd = periodStart.plusMonths(months).minusDays(1);
-            if (periodEnd.isAfter(contract.getEndDate())) {
-                periodEnd = contract.getEndDate();
-            }
-
-            int periodMonths = periodMonths(periodStart, periodEnd);
-            createdCount += createBillIfNeeded(contract, "RENT", contract.getRentAmount(), periodMonths, periodStart, periodEnd);
-            createdCount += createBillIfNeeded(contract, "PROPERTY", contract.getPropertyFeeAmount(), periodMonths, periodStart, periodEnd);
+            createPeriodBillIfNeeded(contract, "RENT", contract.getRentAmount(), cursor, periodEnd, dueDate, result);
+            createPeriodBillIfNeeded(contract, "PROPERTY_FEE", contract.getPropertyFeeAmount(), cursor, periodEnd, dueDate, result);
+            generatedUntil = generatedUntil == null || periodEnd.isAfter(generatedUntil) ? periodEnd : generatedUntil;
 
             if ("FULL".equals(contract.getPaymentCycle())) {
                 break;
             }
-
-            periodStart = periodStart.plusMonths(months);
+            cursor = cursor.plusMonths(cycleMonths);
             guard++;
         }
 
-        return createdCount;
+        if (generatedUntil != null) {
+            contract.setBillGeneratedUntil(generatedUntil);
+            contractRepository.save(contract);
+        }
+        if (result.getGenerated() > 0) {
+            writeEvent(contract, "GENERATE_BILL", "生成账单 " + result.getGenerated() + " 张");
+        }
+        return result;
     }
 
-    private int createBillIfNeeded(Contract contract, String billType, BigDecimal monthlyAmount, int periodMonths,
-                                   LocalDate periodStart, LocalDate periodEnd) {
-        if (monthlyAmount == null || monthlyAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            return 0;
+    private void createDepositIfNeeded(Contract contract, LocalDate dueLimit, BillGenerationResult result) {
+        BigDecimal deposit = defaultAmount(contract.getDepositAmount());
+        if (deposit.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        LocalDate dueDate = resolveDueDate(contract, contract.getStartDate());
+        if (dueDate.isAfter(dueLimit)) {
+            result.addSkipped("合同 " + contract.getContractNumber() + " 押金未到提前出账日期，跳过");
+            return;
+        }
+        createBillIfNeeded(contract, "DEPOSIT", deposit, contract.getStartDate(), contract.getStartDate(), dueDate, result);
+    }
+
+    private void createPeriodBillIfNeeded(Contract contract, String billType, BigDecimal monthlyAmount,
+                                          LocalDate periodStart, LocalDate periodEnd, LocalDate dueDate,
+                                          BillGenerationResult result) {
+        BigDecimal amount = defaultAmount(monthlyAmount);
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        BigDecimal total = amount.multiply(BigDecimal.valueOf(periodMonths(periodStart, periodEnd)));
+        createBillIfNeeded(contract, billType, total, periodStart, periodEnd, dueDate, result);
+    }
+
+    private void createBillIfNeeded(Contract contract, String billType, BigDecimal amount,
+                                    LocalDate periodStart, LocalDate periodEnd, LocalDate dueDate,
+                                    BillGenerationResult result) {
+        if (billRepository.existsByContractIdAndBillTypeAndPeriodStartAndPeriodEnd(
+                contract.getId(), billType, periodStart, periodEnd)) {
+            result.addSkipped("合同 " + contract.getContractNumber() + " " + periodStart + " " + billType + " 已存在，跳过");
+            return;
         }
 
-        if (billRepository.existsByContractIdAndBillTypeAndPeriodStart(contract.getId(), billType, periodStart)) {
-            return 0;
+        String billNumber = buildBillNumber(contract, billType, periodStart);
+        if (billRepository.existsByBillNumber(billNumber)) {
+            result.addSkipped("账单编号 " + billNumber + " 已存在，跳过");
+            return;
         }
 
         Bill bill = new Bill();
-        bill.setBillNumber(buildBillNumber(contract, billType, periodStart));
+        bill.setBillNumber(billNumber);
         bill.setTenantId(contract.getTenantId());
         bill.setContractId(contract.getId());
+        bill.setRoomId(contract.getRoomId());
         bill.setBillType(billType);
         bill.setTitle(periodStart.format(DateTimeFormatter.ofPattern("yyyy年MM月")) + toBillTypeText(billType) + "账单");
         bill.setPeriodStart(periodStart);
         bill.setPeriodEnd(periodEnd);
-        bill.setAmount(monthlyAmount.multiply(BigDecimal.valueOf(periodMonths)));
+        bill.setAmount(amount);
         bill.setPaidAmount(BigDecimal.ZERO);
-        bill.setDueDate(periodStart);
+        bill.setDueDate(dueDate);
         bill.setStatus("UNPAID");
         bill.setAuditStatus("PENDING");
         bill.setSourceType("CONTRACT");
         bill.setSourceId(contract.getId());
         bill.setRemark("合同自动出账，审核通过后租户可见");
         billRepository.save(bill);
+        result.addGenerated();
+    }
+
+    private LocalDate resolveBillableEnd(Contract contract) {
+        LocalDate end = contract.getEndDate();
+        if (contract.getTerminationDate() != null && contract.getTerminationDate().isBefore(end)) {
+            return contract.getTerminationDate();
+        }
+        return end;
+    }
+
+    private LocalDate resolveDueDate(Contract contract, LocalDate periodStart) {
+        int dueDay = contract.getDueDay() == null ? periodStart.getDayOfMonth() : contract.getDueDay();
+        int maxDay = periodStart.lengthOfMonth();
+        return periodStart.withDayOfMonth(Math.min(Math.max(dueDay, 1), maxDay));
+    }
+
+    private int resolveAdvanceBillDays(Contract contract) {
+        if (contract.getAdvanceBillDays() != null) {
+            return Math.max(contract.getAdvanceBillDays(), 0);
+        }
+        if (contract.getBillingLeadDays() != null) {
+            return Math.max(contract.getBillingLeadDays(), 0);
+        }
+        return 7;
+    }
+
+    private int paymentMonths(String paymentCycle) {
+        if ("QUARTERLY".equals(paymentCycle)) {
+            return 3;
+        }
+        if ("SEMI_ANNUAL".equals(paymentCycle)) {
+            return 6;
+        }
+        if ("YEARLY".equals(paymentCycle)) {
+            return 12;
+        }
+        if ("FULL".equals(paymentCycle)) {
+            return 1200;
+        }
         return 1;
     }
 
@@ -140,33 +224,27 @@ public class ContractBillGenerationService {
         if ("RENT".equals(billType)) {
             return "租金";
         }
-        if ("PROPERTY".equals(billType)) {
+        if ("PROPERTY_FEE".equals(billType) || "PROPERTY".equals(billType)) {
             return "物业费";
+        }
+        if ("DEPOSIT".equals(billType)) {
+            return "押金";
         }
         return "费用";
     }
 
-    private int paymentMonths(String paymentCycle) {
-        if ("QUARTERLY".equals(paymentCycle)) {
-            return 3;
-        }
-        if ("SEMI_ANNUAL".equals(paymentCycle)) {
-            return 6;
-        }
-        if ("YEARLY".equals(paymentCycle)) {
-            return 12;
-        }
-        if ("FULL".equals(paymentCycle)) {
-            return 1200;
-        }
-        return 1;
+    private BigDecimal defaultAmount(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
-    private LocalDate previousWorkday(LocalDate date) {
-        LocalDate result = date;
-        while (result.getDayOfWeek() == DayOfWeek.SATURDAY || result.getDayOfWeek() == DayOfWeek.SUNDAY) {
-            result = result.minusDays(1);
-        }
-        return result;
+    private void writeEvent(Contract contract, String action, String remark) {
+        ContractEvent event = new ContractEvent();
+        event.setContractId(contract.getId());
+        event.setAction(action);
+        event.setBeforeStatus(contract.getStatus());
+        event.setAfterStatus(contract.getStatus());
+        event.setOperatorName("system");
+        event.setRemark(remark);
+        contractEventRepository.save(event);
     }
 }

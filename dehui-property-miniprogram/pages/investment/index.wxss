@@ -95,3 +95,57 @@
 .submit-button {
   margin-top: 24rpx;
 }
+
+.room-card {
+  padding: 18rpx;
+  margin-top: 14rpx;
+  border: 1rpx solid #ebeef5;
+  border-radius: 8rpx;
+  background: #ffffff;
+}
+
+.room-card.selected {
+  border-color: #d93025;
+  background: #fff7f6;
+}
+
+.room-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.room-title {
+  flex: 1;
+  color: #1f1b1b;
+  font-size: 28rpx;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.room-status {
+  flex: none;
+  color: #d93025;
+  font-size: 24rpx;
+}
+
+.room-meta {
+  margin-top: 8rpx;
+  color: #73767a;
+  font-size: 24rpx;
+}
+
+.selected-room {
+  margin-top: 16rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 8rpx;
+  background: #f5f6f8;
+  color: #606266;
+  font-size: 24rpx;
+}
+
+.clear-room {
+  margin-left: 18rpx;
+  color: #d93025;
+}
