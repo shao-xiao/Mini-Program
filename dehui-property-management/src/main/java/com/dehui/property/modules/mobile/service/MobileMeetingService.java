@@ -74,12 +74,16 @@ public class MobileMeetingService {
                 return Result.error("绑定的内部账号不存在");
             }
             bookingRequest.setApplicantType("INTERNAL");
+            bookingRequest.setSourceType("INTERNAL");
             bookingRequest.setInternalUserId(currentUser.getId());
             bookingRequest.setApplicantName(currentUser.getRealName());
+            bookingRequest.setFeeType("INTERNAL_FREE");
             bookingRequest.setBillingMode("FREE");
         } else {
             bookingRequest.setApplicantType("TENANT");
+            bookingRequest.setSourceType("TENANT");
             bookingRequest.setTenantId(profile.getBoundTenantId());
+            bookingRequest.setTenantName(profile.getBoundTenantName());
             bookingRequest.setApplicantName(profile.getNickname() == null || profile.getNickname().isBlank()
                     ? profile.getBoundTenantName()
                     : profile.getNickname());
@@ -111,10 +115,11 @@ public class MobileMeetingService {
         if (!belongsToProfile(booking, profile)) {
             return Result.error(403, "不能取消他人的预约");
         }
-        if ("COMPLETED".equals(booking.getStatus())) {
+        String status = normalizeStatus(booking.getStatus());
+        if ("COMPLETED".equals(status)) {
             return Result.error("已完成的预约不能取消");
         }
-        if ("CANCELLED".equals(booking.getStatus())) {
+        if ("CANCELLED".equals(status)) {
             return Result.error("预约已取消");
         }
 
@@ -169,9 +174,16 @@ public class MobileMeetingService {
         response.setDiscountRate(booking.getDiscountRate());
         response.setCalculatedAmount(booking.getCalculatedAmount());
         response.setBillId(booking.getBillId());
-        response.setStatus(booking.getStatus());
+        response.setStatus(normalizeStatus(booking.getStatus()));
         response.setCreatedTime(booking.getCreatedTime());
         response.setUpdatedTime(booking.getUpdatedTime());
         return response;
+    }
+
+    private String normalizeStatus(String status) {
+        if ("BOOKED".equals(status) || status == null || status.isBlank()) {
+            return "PENDING";
+        }
+        return status;
     }
 }

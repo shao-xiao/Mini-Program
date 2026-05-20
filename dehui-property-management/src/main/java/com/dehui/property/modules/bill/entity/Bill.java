@@ -18,6 +18,8 @@ public class Bill extends BaseEntity {
 
     private Long tenantId;
 
+    private String payerName;
+
     private Long contractId;
 
     private Long roomId;

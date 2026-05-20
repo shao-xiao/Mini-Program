@@ -12,6 +12,7 @@ public class BillResponse {
     private String billNo;
     private Long tenantId;
     private String tenantName;
+    private String payerName;
     private Long contractId;
     private Long roomId;
     private String contractNumber;

@@ -15,4 +15,6 @@ public class InspectionCreateRequest {
     private String problemDescription;
     private String actionTaken;
     private String remark;
+    private Long planId;
+    private String status;
 }

@@ -4,146 +4,177 @@
       <template #header>
         <div class="card-header">
           <span>车位管理</span>
-          <el-button type="primary" @click="openDialog">新增车位</el-button>
+          <el-button type="primary" @click="openDialog()">新增车位</el-button>
         </div>
       </template>
 
-      <el-table :data="list" border>
-        <el-table-column prop="id" label="ID" width="70"/>
-        <el-table-column prop="spaceCode" label="车位编号"/>
-        <el-table-column prop="area" label="区域"/>
-        <el-table-column label="类型">
-          <template #default="{row}">
-            {{ spaceTypeText(row.spaceType) }}
-          </template>
-        </el-table-column>
-        
-        <el-table-column label="状态">
-          <template #default="{row}">
-            <el-tag v-if="row.status==='AVAILABLE'" type="success">空闲</el-tag>
-            <el-tag v-else-if="row.status==='OCCUPIED'" type="danger">占用</el-tag>
-            <el-tag v-else type="info">停用</el-tag>
-          </template>
-        </el-table-column>
+      <el-form :inline="true" :model="query" class="toolbar">
+        <el-form-item label="关键词">
+          <el-input v-model.trim="query.keyword" clearable placeholder="车位编号/使用方/车牌" @keyup.enter="load" />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="query.status" clearable placeholder="全部" style="width: 140px">
+            <el-option label="空闲" value="AVAILABLE" />
+            <el-option label="占用" value="OCCUPIED" />
+            <el-option label="维护中" value="MAINTENANCE" />
+            <el-option label="停用" value="DISABLED" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="区域">
+          <el-select v-model="query.area" clearable placeholder="全部" style="width: 120px">
+            <el-option v-for="area in areaOptions" :key="area" :label="area" :value="area" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="load">查询</el-button>
+          <el-button @click="resetQuery">重置</el-button>
+        </el-form-item>
+      </el-form>
 
-        <el-table-column label="使用方" min-width="150">
-          <template #default="{row}">
-            {{ ownerText(row) }}
+      <el-table v-loading="loading" :data="list" border>
+        <el-table-column prop="id" label="ID" width="70" />
+        <el-table-column prop="spaceNo" label="车位编号" min-width="120" />
+        <el-table-column prop="area" label="区域" width="90" />
+        <el-table-column prop="floor" label="楼层/位置" min-width="110" />
+        <el-table-column label="类型" width="150">
+          <template #default="{ row }">{{ row.typeText || spaceTypeText(row.type || row.spaceType) }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="110">
+          <template #default="{ row }">
+            <el-tag :type="statusTag(row.status)">{{ row.statusText || statusText(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="plateNumber" label="车牌"/>
-
-        <el-table-column label="操作" width="280">
-          <template #default="{row}">
-            <el-button size="small" @click="bind(row)" v-if="row.status==='AVAILABLE'">绑定</el-button>
-            <el-button size="small" type="warning" @click="release(row)" v-if="row.status==='OCCUPIED'">释放</el-button>
-            <el-button size="small" type="primary" @click="edit(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="remove(row)">删除</el-button>
+        <el-table-column label="使用方" min-width="170">
+          <template #default="{ row }">
+            {{ row.partyNameSnapshot || '-' }}
+            <span v-if="row.partyTypeText" class="muted">（{{ row.partyTypeText }}）</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="plateNo" label="车牌" width="130" />
+        <el-table-column label="月费" width="110">
+          <template #default="{ row }">{{ row.monthlyFee ? `¥ ${Number(row.monthlyFee).toFixed(2)}` : '-' }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="320" fixed="right">
+          <template #default="{ row }">
+            <el-button v-if="row.status === 'AVAILABLE'" size="small" @click="openBind(row)">绑定</el-button>
+            <el-button v-if="row.status === 'OCCUPIED'" size="small" type="warning" @click="release(row)">释放</el-button>
+            <el-button v-if="row.status === 'OCCUPIED'" size="small" @click="viewBills(row)">查看账单</el-button>
+            <el-button size="small" type="primary" @click="openDialog(row)">编辑</el-button>
+            <el-button v-if="row.status === 'MAINTENANCE' || row.status === 'DISABLED'" size="small" @click="enable(row)">启用</el-button>
+            <el-button v-if="row.status === 'AVAILABLE'" size="small" type="danger" @click="remove(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <el-dialog v-model="visible" :title="form.id ? '编辑车位' : '新增车位'" width="520px">
-      <el-form :model="form">
-        <el-form-item label="车位编号">
-          <el-input v-model="form.spaceCode"/>
+    <el-dialog v-model="spaceVisible" :title="spaceForm.id ? '编辑车位' : '新增车位'" width="520px" destroy-on-close>
+      <el-form ref="spaceFormRef" :model="spaceForm" :rules="spaceRules" label-width="100px">
+        <el-form-item label="车位编号" prop="spaceNo">
+          <el-input v-model.trim="spaceForm.spaceNo" placeholder="如 B1-004" />
         </el-form-item>
-
-        <el-form-item label="区域">
-          <el-select v-model="form.area" placeholder="请选择区域" style="width: 100%">
-            <el-option v-for="area in areaOptions" :key="area" :label="area" :value="area"/>
+        <el-form-item label="区域" prop="area">
+          <el-select v-model="spaceForm.area" placeholder="请选择区域" style="width: 100%">
+            <el-option v-for="area in areaOptions" :key="area" :label="area" :value="area" />
           </el-select>
         </el-form-item>
-
-        <el-form-item label="类型">
-          <el-select v-model="form.spaceType" style="width: 100%">
-            <el-option
-              v-for="option in spaceTypeOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
+        <el-form-item label="楼层/位置">
+          <el-input v-model.trim="spaceForm.floor" placeholder="如 B1、地面停车区" />
+        </el-form-item>
+        <el-form-item label="类型" prop="type">
+          <el-select v-model="spaceForm.type" style="width: 100%">
+            <el-option v-for="option in spaceTypeOptions" :key="option.value" :label="option.label" :value="option.value" />
           </el-select>
         </el-form-item>
-
-        <el-form-item label="状态">
-          <el-select v-model="form.status" style="width: 100%">
-            <el-option label="空闲" value="AVAILABLE"/>
-            <el-option label="占用" value="OCCUPIED"/>
-            <el-option label="停用" value="DISABLED"/>
-          </el-select>
+        <el-form-item label="排序">
+          <el-input-number v-model="spaceForm.sortOrder" :min="0" style="width: 100%" />
         </el-form-item>
-
-        <template v-if="form.status === 'OCCUPIED'">
-          <el-form-item label="使用方">
-            <el-select v-model="form.ownerKey" filterable placeholder="请选择租户或VIP" style="width: 100%">
-              <el-option label="VIP" value="VIP"/>
-              <el-option
-                v-for="tenant in tenants"
-                :key="tenant.id"
-                :label="tenantLabel(tenant)"
-                :value="tenantOwnerKey(tenant.id)"
-              />
-            </el-select>
-          </el-form-item>
-
-          <el-form-item label="车牌号">
-            <el-input v-model.trim="form.plateNumber" placeholder="请输入车牌号"/>
-          </el-form-item>
-        </template>
+        <el-form-item label="备注">
+          <el-input v-model="spaceForm.remark" type="textarea" :rows="3" />
+        </el-form-item>
       </el-form>
-
       <template #footer>
-        <el-button @click="visible=false">取消</el-button>
-        <el-button type="primary" @click="save">保存</el-button>
+        <el-button @click="spaceVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="saveSpace">保存</el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="bindVisible" title="绑定车牌" width="460px" destroy-on-close>
-      <el-form ref="bindFormRef" :model="bindForm" :rules="bindRules" label-width="90px">
+    <el-dialog v-model="bindVisible" title="绑定车位" width="560px" destroy-on-close>
+      <el-form ref="bindFormRef" :model="bindForm" :rules="bindRules" label-width="110px">
         <el-form-item label="车位编号">
-          <el-input :model-value="currentSpace?.spaceCode || ''" disabled />
+          <el-input :model-value="currentSpace?.spaceNo || ''" disabled />
         </el-form-item>
-
-        <el-form-item label="使用方" prop="ownerKey">
-          <el-select v-model="bindForm.ownerKey" filterable placeholder="请选择租户或VIP" style="width: 100%">
-            <el-option label="VIP" value="VIP"/>
-            <el-option
-              v-for="tenant in tenants"
-              :key="tenant.id"
-              :label="tenantLabel(tenant)"
-              :value="tenantOwnerKey(tenant.id)"
-            />
+        <el-form-item label="使用方类型" prop="partyType">
+          <el-select v-model="bindForm.partyType" style="width: 100%" @change="onPartyTypeChange">
+            <el-option label="租户" value="tenant" />
+            <el-option label="VIP" value="vip" />
+            <el-option label="外部客户" value="external" />
+            <el-option label="内部员工" value="internal" />
+            <el-option label="其他" value="other" />
           </el-select>
         </el-form-item>
-
-        <el-form-item label="车牌号" prop="plateNumber">
-          <el-input v-model.trim="bindForm.plateNumber" placeholder="请输入车牌号" />
+        <el-form-item v-if="bindForm.partyType === 'tenant'" label="租户" prop="partyId">
+          <el-select v-model="bindForm.partyId" filterable placeholder="请选择租户" style="width: 100%">
+            <el-option v-for="tenant in tenants" :key="tenant.id" :label="tenantLabel(tenant)" :value="tenant.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-else label="使用方名称" prop="partyName">
+          <el-input v-model.trim="bindForm.partyName" placeholder="请输入使用方名称" />
+        </el-form-item>
+        <el-form-item label="车牌号" prop="plateNo">
+          <el-input v-model.trim="bindForm.plateNo" placeholder="请输入车牌号" />
+        </el-form-item>
+        <el-form-item label="开始日期" prop="startDate">
+          <el-date-picker v-model="bindForm.startDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="收费类型" prop="billingType">
+          <el-select v-model="bindForm.billingType" style="width: 100%">
+            <el-option label="月租" value="monthly" />
+            <el-option label="免费" value="free" />
+            <el-option label="临停" value="temporary" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="月租金额" prop="monthlyFee">
+          <el-input-number v-model="bindForm.monthlyFee" :min="0" :precision="2" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="bindForm.remark" type="textarea" :rows="3" />
         </el-form-item>
       </el-form>
-
       <template #footer>
-        <el-button @click="bindVisible=false">取消</el-button>
-        <el-button type="primary" :loading="binding" @click="submitBind">确定</el-button>
+        <el-button @click="bindVisible = false">取消</el-button>
+        <el-button type="primary" :loading="binding" @click="submitBind">确定绑定</el-button>
       </template>
     </el-dialog>
-
   </div>
 </template>
 
 <script setup>
-import {ref, reactive, onMounted} from 'vue'
-import {ElMessage, ElMessageBox} from 'element-plus'
+import { reactive, ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  bindParkingSpace,
+  createParkingSpace,
+  deleteParkingSpace,
+  listParkingSpaces,
+  releaseParkingSpace,
+  updateParkingSpace,
+  updateParkingSpaceStatus
+} from '../../api/parking'
 import request from '../../utils/request'
 
+const router = useRouter()
 const list = ref([])
 const tenants = ref([])
-const visible = ref(false)
-const bindVisible = ref(false)
+const loading = ref(false)
+const saving = ref(false)
 const binding = ref(false)
+const spaceVisible = ref(false)
+const bindVisible = ref(false)
+const spaceFormRef = ref(null)
 const bindFormRef = ref(null)
 const currentSpace = ref(null)
+
 const areaOptions = ['A', 'B', 'C', 'D']
 const spaceTypeOptions = [
   { label: '普通车位', value: 'NORMAL' },
@@ -153,210 +184,200 @@ const spaceTypeOptions = [
   { label: '临停车位', value: 'TEMPORARY' }
 ]
 
-const form = reactive({
-  id:null,
-  spaceCode:'',
-  area:'A',
-  spaceType:'NORMAL',
-  status:'AVAILABLE',
-  ownerKey:'',
-  plateNumber:'',
-  remark:''
+const query = reactive({ keyword: '', status: '', area: '' })
+const spaceForm = reactive({ id: null, spaceNo: '', area: 'A', floor: '', type: 'NORMAL', sortOrder: 0, remark: '' })
+const bindForm = reactive({
+  partyType: 'tenant',
+  partyId: null,
+  partyName: '',
+  plateNo: '',
+  startDate: new Date().toISOString().slice(0, 10),
+  billingType: 'monthly',
+  monthlyFee: 300,
+  remark: ''
 })
 
-const bindForm = reactive({
-  ownerKey: '',
-  plateNumber: ''
-})
+const spaceRules = {
+  spaceNo: [{ required: true, message: '请输入车位编号', trigger: 'blur' }],
+  area: [{ required: true, message: '请选择区域', trigger: 'change' }],
+  type: [{ required: true, message: '请选择类型', trigger: 'change' }]
+}
 
 const bindRules = {
-  ownerKey: [{ required: true, message: '请选择租户或VIP', trigger: 'change' }],
-  plateNumber: [{ required: true, message: '请输入车牌号', trigger: 'blur' }]
+  partyType: [{ required: true, message: '请选择使用方类型', trigger: 'change' }],
+  partyId: [{ required: true, message: '请选择租户', trigger: 'change' }],
+  partyName: [{ required: true, message: '请输入使用方名称', trigger: 'blur' }],
+  plateNo: [{ required: true, message: '请输入车牌号', trigger: 'blur' }],
+  startDate: [{ required: true, message: '请选择开始日期', trigger: 'change' }],
+  billingType: [{ required: true, message: '请选择收费类型', trigger: 'change' }],
+  monthlyFee: [{
+    validator: (_rule, value, callback) => {
+      if (bindForm.billingType === 'monthly' && (!value || value <= 0)) callback(new Error('月租金额必须大于0'))
+      else callback()
+    },
+    trigger: 'change'
+  }]
 }
 
-const load = async ()=>{
-  const data = await request.get('/parking/spaces')
-  list.value = data || []
-}
-
-const loadTenants = async ()=>{
-  const data = await request.get('/tenant/list')
-  tenants.value = data || []
-}
-
-const tenantOwnerKey = (tenantId)=>`TENANT:${tenantId}`
-
-const parseOwnerKey = (ownerKey)=>{
-  if (ownerKey === 'VIP') return { vip: true, tenantId: null }
-  if (String(ownerKey || '').startsWith('TENANT:')) {
-    return { vip: false, tenantId: Number(String(ownerKey).replace('TENANT:', '')) }
+async function load() {
+  loading.value = true
+  try {
+    list.value = await listParkingSpaces({ ...query })
+  } finally {
+    loading.value = false
   }
-  return { vip: false, tenantId: null }
 }
 
-const tenantLabel = (tenant)=>{
+async function loadTenants() {
+  tenants.value = await request.get('/tenant/list')
+}
+
+function resetQuery() {
+  query.keyword = ''
+  query.status = ''
+  query.area = ''
+  load()
+}
+
+function openDialog(row) {
+  Object.assign(spaceForm, {
+    id: row?.id || null,
+    spaceNo: row?.spaceNo || row?.spaceCode || '',
+    area: row?.area || 'A',
+    floor: row?.floor || '',
+    type: normalizeSpaceType(row?.type || row?.spaceType),
+    sortOrder: row?.sortOrder || 0,
+    remark: row?.remark || ''
+  })
+  spaceVisible.value = true
+}
+
+async function saveSpace() {
+  await spaceFormRef.value.validate()
+  saving.value = true
+  try {
+    const payload = { ...spaceForm }
+    if (spaceForm.id) {
+      await updateParkingSpace(spaceForm.id, payload)
+      ElMessage.success('保存成功')
+    } else {
+      await createParkingSpace(payload)
+      ElMessage.success('新增成功')
+    }
+    spaceVisible.value = false
+    await load()
+  } finally {
+    saving.value = false
+  }
+}
+
+function openBind(row) {
+  currentSpace.value = row
+  Object.assign(bindForm, {
+    partyType: 'tenant',
+    partyId: null,
+    partyName: '',
+    plateNo: '',
+    startDate: new Date().toISOString().slice(0, 10),
+    billingType: 'monthly',
+    monthlyFee: 300,
+    remark: ''
+  })
+  bindVisible.value = true
+}
+
+function onPartyTypeChange(type) {
+  bindForm.partyId = null
+  bindForm.partyName = type === 'vip' ? 'VIP' : ''
+}
+
+async function submitBind() {
+  await bindFormRef.value.validate()
+  binding.value = true
+  try {
+    await bindParkingSpace(currentSpace.value.id, { ...bindForm })
+    ElMessage.success('绑定成功')
+    bindVisible.value = false
+    await load()
+  } finally {
+    binding.value = false
+  }
+}
+
+async function release(row) {
+  await ElMessageBox.confirm(`确定释放车位「${row.spaceNo}」吗？`, '释放确认', { type: 'warning' })
+  await releaseParkingSpace(row.id, { endDate: new Date().toISOString().slice(0, 10) })
+  ElMessage.success('已释放')
+  await load()
+}
+
+async function enable(row) {
+  await updateParkingSpaceStatus(row.id, 'AVAILABLE')
+  ElMessage.success('已启用')
+  await load()
+}
+
+async function remove(row) {
+  await ElMessageBox.confirm(`确定删除车位「${row.spaceNo}」吗？`, '删除确认', { type: 'warning' })
+  await deleteParkingSpace(row.id)
+  ElMessage.success('已删除')
+  await load()
+}
+
+function viewBills(row) {
+  router.push({ path: '/parking/bills', query: { keyword: row.spaceNo } })
+}
+
+function tenantLabel(tenant) {
   const name = tenant.tenantName || tenant.tenantCode || `租户${tenant.id}`
   return tenant.contactPerson ? `${name}（${tenant.contactPerson}）` : name
 }
 
-const tenantText = (tenantId)=>{
-  if (!tenantId) return ''
-  const tenant = tenants.value.find(item => item.id === tenantId)
-  return tenant ? tenantLabel(tenant) : `租户 ${tenantId}`
-}
-
-const ownerKeyOf = (row)=>{
-  if (row.spaceType === 'VIP' && !row.tenantId) return 'VIP'
-  return row.tenantId ? tenantOwnerKey(row.tenantId) : ''
-}
-
-const ownerText = (row)=>{
-  if (row.spaceType === 'VIP' && !row.tenantId) return 'VIP'
-  return tenantText(row.tenantId) || '-'
-}
-
-const spaceTypeText = (type)=>({
-  NORMAL: '普通车位',
-  CHARGING_FAST: '充电车位（快充）',
-  CHARGING_SLOW: '充电车位（慢充）',
-  MECHANICAL: '机械车位',
-  TEMPORARY: '临停车位',
-  FIXED: '固定',
-  TEMP: '临停',
-  VIP: 'VIP'
-}[type] || type || '-')
-
-const openDialog = ()=>{
-  form.id=null
-  form.spaceCode=''
-  form.area='A'
-  form.spaceType='NORMAL'
-  form.status='AVAILABLE'
-  form.ownerKey=''
-  form.plateNumber=''
-  form.remark=''
-  visible.value = true
-}
-
-const edit = (row)=>{
-  form.id = row.id
-  form.spaceCode = row.spaceCode || ''
-  form.area = row.area || 'A'
-  form.spaceType = normalizeSpaceType(row.spaceType)
-  form.status = row.status || 'AVAILABLE'
-  form.ownerKey = ownerKeyOf(row)
-  form.plateNumber = row.plateNumber || ''
-  form.remark = row.remark || ''
-  visible.value = true
-}
-
-const normalizeSpaceType = (type)=>{
-  if (type === 'FIXED') return 'NORMAL'
+function normalizeSpaceType(type) {
+  if (type === 'FIXED' || type === 'VIP' || !type) return 'NORMAL'
   if (type === 'TEMP') return 'TEMPORARY'
-  if (type === 'VIP') return 'NORMAL'
-  return type || 'NORMAL'
+  return type
 }
 
-const buildPayload = ()=>{
-  const owner = parseOwnerKey(form.ownerKey)
-  const occupied = form.status === 'OCCUPIED'
+function statusTag(status) {
+  return { AVAILABLE: 'success', OCCUPIED: 'danger', MAINTENANCE: 'warning', DISABLED: 'info' }[status] || 'info'
+}
+
+function statusText(status) {
+  return { AVAILABLE: '空闲', OCCUPIED: '占用', MAINTENANCE: '维护中', DISABLED: '停用' }[status] || status || '-'
+}
+
+function spaceTypeText(type) {
   return {
-    spaceCode: form.spaceCode,
-    area: form.area,
-    spaceType: occupied && owner.vip ? 'VIP' : form.spaceType,
-    status: form.status,
-    tenantId: occupied && !owner.vip ? owner.tenantId : null,
-    plateNumber: occupied ? form.plateNumber : null,
-    remark: form.remark
-  }
+    NORMAL: '普通车位',
+    CHARGING_FAST: '充电车位（快充）',
+    CHARGING_SLOW: '充电车位（慢充）',
+    MECHANICAL: '机械车位',
+    TEMPORARY: '临停车位'
+  }[type] || type || '-'
 }
 
-const save = async ()=>{
-  if (!form.spaceCode.trim()) {
-    ElMessage.warning('请输入车位编号')
-    return
-  }
-  if (!form.area) {
-    ElMessage.warning('请选择区域')
-    return
-  }
-  if (form.status === 'OCCUPIED' && !form.ownerKey) {
-    ElMessage.warning('请选择使用方')
-    return
-  }
-  if (form.status === 'OCCUPIED' && !form.plateNumber) {
-    ElMessage.warning('请输入车牌号')
-    return
-  }
-
-  if (form.id) {
-    await request.put(`/parking/spaces/${form.id}`, buildPayload())
-    ElMessage.success('保存成功')
-  } else {
-    await request.post('/parking/spaces', buildPayload())
-    ElMessage.success('新增成功')
-  }
-  visible.value = false
-  load()
-}
-
-const bind = (row)=>{
-  currentSpace.value = row
-  bindForm.ownerKey = ownerKeyOf(row)
-  bindForm.plateNumber = row.plateNumber || ''
-  bindVisible.value = true
-}
-
-const submitBind = async()=>{
-  if (!bindFormRef.value || !currentSpace.value) return
-
-  await bindFormRef.value.validate(async valid => {
-    if (!valid) return
-
-    binding.value = true
-
-    try {
-      await request.patch(`/parking/spaces/${currentSpace.value.id}/bind`, null, {
-        params: {
-          tenantId: parseOwnerKey(bindForm.ownerKey).tenantId,
-          vip: parseOwnerKey(bindForm.ownerKey).vip,
-          plateNumber: bindForm.plateNumber
-        }
-      })
-      ElMessage.success('绑定成功')
-      bindVisible.value = false
-      await load()
-    } finally {
-      binding.value = false
-    }
-  })
-}
-
-const release = async(row)=>{
-  await request.patch(`/parking/spaces/${row.id}/release`)
-  ElMessage.success('已释放')
-  load()
-}
-
-const remove = async(row)=>{
-  await ElMessageBox.confirm(`确定删除车位「${row.spaceCode}」吗？`, '删除确认', {type: 'warning'})
-  await request.delete(`/parking/spaces/${row.id}`)
-  ElMessage.success('已删除')
-  load()
-}
-
-onMounted(()=>{
-  load()
-  loadTenants()
+onMounted(async () => {
+  await Promise.all([load(), loadTenants()])
 })
 </script>
 
 <style scoped>
-.page-container{
-  padding:20px;
+.page-container {
+  padding: 20px;
 }
-.card-header{
-  display:flex;
-  justify-content:space-between;
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toolbar {
+  margin-bottom: 12px;
+}
+
+.muted {
+  color: #909399;
 }
 </style>

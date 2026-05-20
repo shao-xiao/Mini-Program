@@ -6,6 +6,8 @@ import jakarta.persistence.Table;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.time.LocalDateTime;
+
 @Data
 @Entity
 @Table(name = "parking_space")
@@ -20,9 +22,15 @@ public class ParkingSpace extends BaseEntity {
 
     private String status;        // AVAILABLE / OCCUPIED / DISABLED
 
+    private String floor;
+
+    private Integer sortOrder;
+
     private Long tenantId;        // 绑定租户，可为空
 
     private String plateNumber;   // 绑定车牌，可为空
 
     private String remark;
+
+    private LocalDateTime deletedAt;
 }

@@ -7,6 +7,8 @@ import java.util.List;
 
 public interface VisitorRecordRepository extends JpaRepository<VisitorRecord, Long> {
 
+    List<VisitorRecord> findByDeletedAtIsNullOrderByVisitTimeDescCreatedTimeDesc();
+
     List<VisitorRecord> findByStatus(String status);
 
     List<VisitorRecord> findByTenantId(Long tenantId);

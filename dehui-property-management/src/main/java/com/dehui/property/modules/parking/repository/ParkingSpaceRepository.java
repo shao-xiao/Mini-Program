@@ -12,5 +12,15 @@ public interface ParkingSpaceRepository extends JpaRepository<ParkingSpace, Long
 
     List<ParkingSpace> findByStatus(String status);
 
+    List<ParkingSpace> findByDeletedAtIsNullOrderBySortOrderAscIdAsc();
+
+    Optional<ParkingSpace> findByIdAndDeletedAtIsNull(Long id);
+
+    Optional<ParkingSpace> findBySpaceCodeAndDeletedAtIsNull(String spaceCode);
+
+    boolean existsBySpaceCodeAndDeletedAtIsNull(String spaceCode);
+
     Long countByStatus(String status);
+
+    Long countByStatusAndDeletedAtIsNull(String status);
 }

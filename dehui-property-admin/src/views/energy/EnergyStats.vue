@@ -4,44 +4,66 @@
       <template #header>
         <div class="page-header">
           <div>
-            <div class="page-title">能耗分析</div>
-            <div class="page-subtitle">按能耗类型、月份、楼宇和房间分析用量趋势与异常波动</div>
+            <div class="page-title">能耗统计</div>
+            <div class="page-subtitle">按表具、空间、租户和账单状态分析水电气用量</div>
           </div>
-          <el-button type="primary" :loading="loading" @click="loadRecords">刷新</el-button>
+          <el-button type="primary" :loading="loading" @click="loadStats">刷新</el-button>
         </div>
       </template>
 
       <el-form :inline="true" :model="queryForm" class="query-form">
         <el-form-item label="能耗类型">
-          <el-select v-model="queryForm.energyType" clearable placeholder="全部" style="width: 150px">
-            <el-option label="电" value="ELECTRICITY" />
+          <el-select v-model="queryForm.meterType" clearable placeholder="全部" class="query-select">
+            <el-option label="电" value="ELECTRIC" />
             <el-option label="水" value="WATER" />
             <el-option label="燃气" value="GAS" />
-            <el-option label="其他" value="OTHER" />
           </el-select>
         </el-form-item>
-
         <el-form-item label="月份">
           <el-date-picker
-            v-model="queryForm.month"
+            v-model="queryForm.periodMonth"
             type="month"
             value-format="YYYY-MM"
             placeholder="选择月份"
             clearable
-            style="width: 160px"
+            class="query-select"
           />
         </el-form-item>
-
-        <el-form-item label="楼宇ID">
-          <el-input v-model="queryForm.buildingId" clearable placeholder="楼宇ID" style="width: 120px" />
+        <el-form-item label="楼宇">
+          <el-select v-model="queryForm.buildingId" clearable placeholder="全部楼宇" class="query-select" @change="onBuildingChange">
+            <el-option v-for="item in buildings" :key="item.id" :label="item.buildingName" :value="item.id" />
+          </el-select>
         </el-form-item>
-
-        <el-form-item label="房间ID">
-          <el-input v-model="queryForm.roomId" clearable placeholder="房间ID" style="width: 120px" />
+        <el-form-item label="楼层">
+          <el-select v-model="queryForm.floorId" clearable placeholder="全部楼层" class="query-select" @change="onFloorChange">
+            <el-option v-for="item in floors" :key="item.id" :label="formatFloor(item)" :value="item.id" />
+          </el-select>
         </el-form-item>
-
+        <el-form-item label="房间">
+          <el-select v-model="queryForm.roomId" clearable placeholder="全部房间" class="query-select">
+            <el-option v-for="item in rooms" :key="item.id" :label="formatRoom(item)" :value="item.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="租户">
+          <el-select v-model="queryForm.tenantId" clearable filterable placeholder="全部租户" class="query-select">
+            <el-option v-for="item in tenants" :key="item.id" :label="item.tenantName" :value="item.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="账单状态">
+          <el-select v-model="queryForm.billStatus" clearable placeholder="全部" class="query-select">
+            <el-option label="未生成" value="NOT_GENERATED" />
+            <el-option label="已生成" value="GENERATED" />
+            <el-option label="已入账" value="POSTED" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="异常">
+          <el-select v-model="queryForm.abnormalFlag" clearable placeholder="全部" class="query-select-small">
+            <el-option label="异常" :value="true" />
+            <el-option label="正常" :value="false" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="renderCharts">分析</el-button>
+          <el-button type="primary" @click="loadStats">分析</el-button>
           <el-button @click="resetSearch">重置</el-button>
         </el-form-item>
       </el-form>
@@ -56,42 +78,61 @@
 
       <div class="chart-grid">
         <el-card class="chart-card wide" shadow="never">
-          <template #header>近6个月能耗趋势</template>
-          <div ref="trendRef" class="chart"></div>
+          <template #header>近6个月趋势</template>
+          <el-empty v-if="isTrendEmpty" description="暂无趋势数据" :image-size="80" />
+          <div v-else ref="trendRef" class="chart"></div>
         </el-card>
 
         <el-card class="chart-card" shadow="never">
-          <template #header>能耗类型结构</template>
-          <div ref="typeRef" class="chart"></div>
+          <template #header>
+            <div class="card-header-inline">
+              <span>能耗类型结构</span>
+              <el-segmented v-model="structureMode" :options="structureModeOptions" size="small" />
+            </div>
+          </template>
+          <el-empty v-if="isStructureEmpty" description="暂无结构数据" :image-size="80" />
+          <div v-else ref="typeRef" class="chart"></div>
         </el-card>
 
         <el-card class="chart-card" shadow="never">
           <template #header>房间用量排行</template>
-          <div ref="roomRankRef" class="chart"></div>
+          <el-empty v-if="!stats.roomRanking.length" description="暂无房间排行" :image-size="80" />
+          <div v-else ref="roomRankRef" class="chart"></div>
         </el-card>
 
         <el-card class="chart-card" shadow="never">
           <template #header>楼宇用量排行</template>
-          <div ref="buildingRankRef" class="chart"></div>
+          <el-empty v-if="!stats.buildingRanking.length" description="暂无楼宇排行" :image-size="80" />
+          <div v-else ref="buildingRankRef" class="chart"></div>
         </el-card>
       </div>
 
       <el-card shadow="never" class="table-card">
         <template #header>异常用量提示</template>
-        <el-table v-loading="loading" :data="abnormalRecords" border stripe>
-          <el-table-column prop="meterNumber" label="表号" min-width="130" />
+        <el-table v-loading="loading" :data="stats.anomalies" border stripe>
+          <el-table-column prop="meterNo" label="表号" min-width="120" />
           <el-table-column label="类型" width="90">
-            <template #default="{ row }">{{ formatEnergyType(row.energyType) }}</template>
+            <template #default="{ row }">{{ meterTypeText(row.meterType) }}</template>
           </el-table-column>
-          <el-table-column prop="recordDate" label="抄表日期" width="120" />
-          <el-table-column prop="buildingId" label="楼宇ID" width="90" />
-          <el-table-column prop="roomId" label="房间ID" width="90" />
-          <el-table-column label="本期用量" width="130" align="right">
-            <template #default="{ row }">{{ formatNumber(row.consumption) }}</template>
+          <el-table-column prop="periodMonth" label="账期" width="100" />
+          <el-table-column prop="buildingName" label="楼宇" min-width="130" />
+          <el-table-column prop="roomName" label="房间" min-width="120" />
+          <el-table-column label="本期用量" width="120" align="right">
+            <template #default="{ row }">{{ formatNumber(row.usageAmount) }}</template>
           </el-table-column>
-          <el-table-column label="提示">
+          <el-table-column label="异常原因" min-width="130">
             <template #default="{ row }">
-              <el-tag type="warning">超过平均用量 150%</el-tag>
+              <el-tag type="danger">{{ abnormalReasonText(row.abnormalReason) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="110">
+            <template #default="{ row }">{{ anomalyStatusText(row.abnormalStatus) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="210" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" @click="setAnomalyStatus(row, 'CONFIRMED')">确认</el-button>
+              <el-button size="small" @click="setAnomalyStatus(row, 'IGNORED')">忽略</el-button>
+              <el-button size="small" type="success" @click="setAnomalyStatus(row, 'RESOLVED')">解决</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -103,11 +144,11 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import * as echarts from 'echarts'
-import { ElMessage } from 'element-plus'
 import request from '../../utils/request'
+import { getEnergyStats, updateAnomalyStatus } from '../../api/energy'
 
 const loading = ref(false)
-const records = ref([])
+const structureMode = ref('usage')
 const charts = []
 
 const trendRef = ref(null)
@@ -115,133 +156,135 @@ const typeRef = ref(null)
 const roomRankRef = ref(null)
 const buildingRankRef = ref(null)
 
+const buildings = ref([])
+const floors = ref([])
+const rooms = ref([])
+const tenants = ref([])
+
 const queryForm = reactive({
-  energyType: '',
-  month: '',
-  buildingId: '',
-  roomId: ''
+  meterType: '',
+  periodMonth: '',
+  buildingId: null,
+  floorId: null,
+  roomId: null,
+  tenantId: null,
+  billStatus: '',
+  abnormalFlag: ''
 })
 
-const filteredRecords = computed(() => {
-  return records.value.filter(item => {
-    const matchType = !queryForm.energyType || item.energyType === queryForm.energyType
-    const matchMonth = !queryForm.month || String(item.recordDate || '').startsWith(queryForm.month)
-    const matchBuilding = !queryForm.buildingId || String(item.buildingId || '') === String(queryForm.buildingId)
-    const matchRoom = !queryForm.roomId || String(item.roomId || '') === String(queryForm.roomId)
-    return matchType && matchMonth && matchBuilding && matchRoom
-  })
+const stats = reactive({
+  recordCount: 0,
+  electricUsage: 0,
+  waterUsage: 0,
+  gasUsage: 0,
+  totalAmount: 0,
+  averageUsage: 0,
+  abnormalCount: 0,
+  trend: [],
+  typeStructure: [],
+  roomRanking: [],
+  buildingRanking: [],
+  anomalies: []
 })
 
-const totalConsumption = computed(() => {
-  return filteredRecords.value.reduce((total, item) => total + number(item.consumption), 0)
-})
-
-const averageConsumption = computed(() => {
-  return filteredRecords.value.length > 0 ? totalConsumption.value / filteredRecords.value.length : 0
-})
+const structureModeOptions = [
+  { label: '用量', value: 'usage' },
+  { label: '金额', value: 'amount' }
+]
 
 const summaryCards = computed(() => [
-  { label: '记录数', value: filteredRecords.value.length, desc: '当前筛选范围', className: '' },
-  { label: '总用量', value: formatNumber(totalConsumption.value), desc: '全部类型合计', className: '' },
-  { label: '平均用量', value: formatNumber(averageConsumption.value), desc: '单条记录平均', className: 'success' },
-  { label: '异常记录', value: abnormalRecords.value.length, desc: '超过平均 150%', className: 'warning' }
+  { label: '记录数', value: stats.recordCount, desc: '当前筛选范围', className: '' },
+  { label: '电用量', value: `${formatNumber(stats.electricUsage)} kWh`, desc: '电表用量', className: 'warning' },
+  { label: '水用量', value: `${formatNumber(stats.waterUsage)} m³`, desc: '水表用量', className: 'primary' },
+  { label: '燃气用量', value: `${formatNumber(stats.gasUsage)} m³`, desc: '燃气表用量', className: 'danger' },
+  { label: '结算金额', value: `¥ ${formatNumber(stats.totalAmount)}`, desc: '当前筛选范围', className: '' },
+  { label: '异常记录', value: stats.abnormalCount, desc: '待关注抄表记录', className: 'danger' }
 ])
 
-const typeStats = computed(() => {
-  return groupBy(filteredRecords.value, item => item.energyType || 'OTHER')
-    .map(item => ({
-      name: formatEnergyType(item.key),
-      value: item.totalConsumption
-    }))
+const isTrendEmpty = computed(() => {
+  return !stats.trend.some(item => number(item.electricUsage) || number(item.waterUsage) || number(item.gasUsage))
 })
 
-const monthlyTrend = computed(() => {
-  const months = []
-  const today = new Date()
+const isStructureEmpty = computed(() => {
+  return !stats.typeStructure.some(item => number(item.usageAmount) || number(item.settlementAmount))
+})
 
-  for (let i = 5; i >= 0; i -= 1) {
-    const date = new Date(today.getFullYear(), today.getMonth() - i, 1)
-    months.push(date.toISOString().slice(0, 7))
-  }
-
-  return months.map(month => {
-    const rows = filteredRecords.value.filter(item => String(item.recordDate || '').startsWith(month))
-    const typeMap = new Map()
-
-    rows.forEach(item => {
-      const key = formatEnergyType(item.energyType)
-      typeMap.set(key, (typeMap.get(key) || 0) + number(item.consumption))
+async function loadStats() {
+  loading.value = true
+  try {
+    const data = await getEnergyStats({
+      meterType: queryForm.meterType || undefined,
+      periodMonth: queryForm.periodMonth || undefined,
+      buildingId: queryForm.buildingId || undefined,
+      floorId: queryForm.floorId || undefined,
+      roomId: queryForm.roomId || undefined,
+      tenantId: queryForm.tenantId || undefined,
+      billStatus: queryForm.billStatus || undefined,
+      abnormalFlag: queryForm.abnormalFlag === '' ? undefined : queryForm.abnormalFlag
     })
-
-    return { month, typeMap }
-  })
-})
-
-const energyTypesInTrend = computed(() => {
-  const set = new Set()
-  monthlyTrend.value.forEach(item => {
-    item.typeMap.forEach((_value, key) => set.add(key))
-  })
-  return Array.from(set)
-})
-
-const roomRank = computed(() => {
-  return groupBy(filteredRecords.value, item => `房间 ${item.roomId || '-'}`)
-    .sort((a, b) => b.totalConsumption - a.totalConsumption)
-    .slice(0, 8)
-})
-
-const buildingRank = computed(() => {
-  return groupBy(filteredRecords.value, item => `楼宇 ${item.buildingId || '-'}`)
-    .sort((a, b) => b.totalConsumption - a.totalConsumption)
-    .slice(0, 8)
-})
-
-const abnormalRecords = computed(() => {
-  if (averageConsumption.value <= 0) return []
-  return filteredRecords.value
-    .filter(item => number(item.consumption) > averageConsumption.value * 1.5)
-    .sort((a, b) => number(b.consumption) - number(a.consumption))
-    .slice(0, 10)
-})
-
-function number(value) {
-  const n = Number(value || 0)
-  return Number.isFinite(n) ? n : 0
+    Object.assign(stats, {
+      recordCount: data.recordCount || 0,
+      electricUsage: data.electricUsage || 0,
+      waterUsage: data.waterUsage || 0,
+      gasUsage: data.gasUsage || 0,
+      totalAmount: data.totalAmount || 0,
+      averageUsage: data.averageUsage || 0,
+      abnormalCount: data.abnormalCount || 0,
+      trend: data.trend || [],
+      typeStructure: data.typeStructure || [],
+      roomRanking: data.roomRanking || [],
+      buildingRanking: data.buildingRanking || [],
+      anomalies: data.anomalies || []
+    })
+  } finally {
+    loading.value = false
+    await nextTick()
+    renderCharts()
+  }
 }
 
-function formatNumber(value) {
-  return number(value).toLocaleString('zh-CN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })
+async function loadBaseData() {
+  const [buildingData, tenantData] = await Promise.all([
+    request.get('/buildings'),
+    request.get('/tenant/list')
+  ])
+  buildings.value = Array.isArray(buildingData) ? buildingData : (buildingData?.content || [])
+  tenants.value = Array.isArray(tenantData) ? tenantData : []
 }
 
-function groupBy(list, getKey) {
-  const map = new Map()
-
-  list.forEach(item => {
-    const key = getKey(item)
-    if (!map.has(key)) {
-      map.set(key, { key, count: 0, totalReading: 0, totalConsumption: 0 })
-    }
-
-    const current = map.get(key)
-    current.count += 1
-    current.totalReading += number(item.reading)
-    current.totalConsumption += number(item.consumption)
-  })
-
-  return Array.from(map.values())
+async function onBuildingChange() {
+  queryForm.floorId = null
+  queryForm.roomId = null
+  floors.value = queryForm.buildingId
+    ? await request.get('/floors', { params: { building_id: queryForm.buildingId } })
+    : []
+  rooms.value = []
 }
 
-function formatEnergyType(type) {
-  return {
-    ELECTRICITY: '电',
-    WATER: '水',
-    GAS: '燃气',
-    OTHER: '其他'
-  }[type] || type || '-'
+async function onFloorChange() {
+  queryForm.roomId = null
+  rooms.value = queryForm.buildingId
+    ? await request.get('/rooms', { params: { building_id: queryForm.buildingId, floor_id: queryForm.floorId || undefined } })
+    : []
+}
+
+function resetSearch() {
+  queryForm.meterType = ''
+  queryForm.periodMonth = ''
+  queryForm.buildingId = null
+  queryForm.floorId = null
+  queryForm.roomId = null
+  queryForm.tenantId = null
+  queryForm.billStatus = ''
+  queryForm.abnormalFlag = ''
+  floors.value = []
+  rooms.value = []
+  loadStats()
+}
+
+async function setAnomalyStatus(row, status) {
+  await updateAnomalyStatus(row.id, status)
+  await loadStats()
 }
 
 function createChart(elRef) {
@@ -260,46 +303,59 @@ function renderCharts() {
   const building = createChart(buildingRankRef)
 
   trend?.setOption({
-    color: ['#d93025', '#409eff', '#e6a23c', '#67c23a'],
+    color: ['#d93025', '#409eff', '#e6a23c'],
     tooltip: { trigger: 'axis' },
     legend: { top: 0 },
-    grid: { left: 42, right: 20, top: 44, bottom: 28 },
-    xAxis: { type: 'category', data: monthlyTrend.value.map(item => item.month) },
+    grid: { left: 46, right: 20, top: 44, bottom: 28 },
+    xAxis: { type: 'category', data: stats.trend.map(item => item.periodMonth) },
     yAxis: { type: 'value' },
-    series: energyTypesInTrend.value.map(typeName => ({
-      name: typeName,
-      type: 'line',
-      smooth: true,
-      data: monthlyTrend.value.map(item => item.typeMap.get(typeName) || 0)
-    }))
+    series: [
+      { name: '电', type: 'line', smooth: true, data: stats.trend.map(item => number(item.electricUsage)) },
+      { name: '水', type: 'line', smooth: true, data: stats.trend.map(item => number(item.waterUsage)) },
+      { name: '燃气', type: 'line', smooth: true, data: stats.trend.map(item => number(item.gasUsage)) }
+    ]
   })
 
   type?.setOption({
-    color: ['#d93025', '#409eff', '#e6a23c', '#67c23a'],
+    color: ['#d93025', '#409eff', '#e6a23c'],
     tooltip: { trigger: 'item' },
     legend: { bottom: 0 },
-    series: [{ type: 'pie', radius: ['48%', '70%'], center: ['50%', '45%'], data: typeStats.value }]
+    series: [{
+      type: 'pie',
+      radius: ['45%', '68%'],
+      center: ['50%', '45%'],
+      data: stats.typeStructure.map(item => ({
+        name: meterTypeText(item.meterType),
+        value: structureMode.value === 'usage' ? number(item.usageAmount) : number(item.settlementAmount)
+      }))
+    }]
   })
 
-  room?.setOption(rankBarOption(roomRank.value))
-  building?.setOption(rankBarOption(buildingRank.value))
+  room?.setOption(rankBarOption(stats.roomRanking.map(item => ({
+    name: item.roomName || item.name || '未关联房间',
+    value: number(item.usageAmount)
+  }))))
+
+  building?.setOption(rankBarOption(stats.buildingRanking.map(item => ({
+    name: item.buildingName || item.name || '未关联楼宇',
+    value: number(item.usageAmount)
+  }))))
 }
 
 function rankBarOption(rows) {
+  const sorted = [...rows].sort((a, b) => b.value - a.value).slice(0, 10).reverse()
   return {
     color: ['#d93025'],
     tooltip: { trigger: 'axis' },
-    grid: { left: 78, right: 20, top: 18, bottom: 24 },
+    grid: { left: 90, right: 20, top: 18, bottom: 24 },
     xAxis: { type: 'value' },
-    yAxis: { type: 'category', data: rows.map(item => item.key).reverse() },
-    series: [
-      {
-        type: 'bar',
-        barMaxWidth: 22,
-        label: { show: true, position: 'right' },
-        data: rows.map(item => Number(item.totalConsumption.toFixed(2))).reverse()
-      }
-    ]
+    yAxis: { type: 'category', data: sorted.map(item => item.name) },
+    series: [{
+      type: 'bar',
+      barMaxWidth: 22,
+      label: { show: true, position: 'right' },
+      data: sorted.map(item => Number(item.value.toFixed(2)))
+    }]
   }
 }
 
@@ -307,34 +363,62 @@ function resizeCharts() {
   charts.forEach(chart => chart.resize())
 }
 
-async function loadRecords() {
-  loading.value = true
-  try {
-    const data = await request.get('/energy/list')
-    records.value = Array.isArray(data) ? data : []
-  } catch (e) {
-    ElMessage.error(e.message || '加载能耗分析数据失败')
-  } finally {
-    loading.value = false
-    await nextTick()
-    renderCharts()
-  }
+function number(value) {
+  const n = Number(value || 0)
+  return Number.isFinite(n) ? n : 0
 }
 
-function resetSearch() {
-  queryForm.energyType = ''
-  queryForm.month = ''
-  queryForm.buildingId = ''
-  queryForm.roomId = ''
+function formatNumber(value) {
+  return number(value).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
 }
 
-watch(filteredRecords, async () => {
+function meterTypeText(type) {
+  return {
+    ELECTRIC: '电',
+    ELECTRICITY: '电',
+    WATER: '水',
+    GAS: '燃气'
+  }[type] || type || '-'
+}
+
+function abnormalReasonText(reason) {
+  return {
+    NEGATIVE_USAGE: '负用量',
+    ZERO_USAGE: '零用量',
+    HIGH_USAGE: '高用量',
+    LOW_USAGE: '低用量',
+    NO_CHANGE: '连续读数无变化'
+  }[reason] || reason || '-'
+}
+
+function anomalyStatusText(status) {
+  return {
+    PENDING: '待处理',
+    CONFIRMED: '已确认',
+    IGNORED: '已忽略',
+    RESOLVED: '已解决'
+  }[status] || status || '-'
+}
+
+function formatFloor(floor) {
+  return floor.floorName || `${floor.floorNumber}F`
+}
+
+function formatRoom(room) {
+  return room.roomName || room.roomNumber || `房间${room.id}`
+}
+
+watch(structureMode, async () => {
   await nextTick()
   renderCharts()
 })
 
-onMounted(() => {
-  loadRecords()
+onMounted(async () => {
+  await loadBaseData()
+  await loadStats()
   window.addEventListener('resize', resizeCharts)
 })
 
@@ -370,10 +454,18 @@ onBeforeUnmount(() => {
   margin: 18px 0 8px;
 }
 
+.query-select {
+  width: 150px;
+}
+
+.query-select-small {
+  width: 110px;
+}
+
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
   margin: 18px 0;
 }
 
@@ -388,7 +480,7 @@ onBeforeUnmount(() => {
 
 .summary-value {
   margin-top: 12px;
-  font-size: 25px;
+  font-size: 22px;
   font-weight: 700;
   color: #1f1b1b;
 }
@@ -409,6 +501,13 @@ onBeforeUnmount(() => {
   grid-column: span 2;
 }
 
+.card-header-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .chart {
   width: 100%;
   height: 300px;
@@ -418,11 +517,15 @@ onBeforeUnmount(() => {
   margin-top: 16px;
 }
 
-.success {
-  color: #67c23a;
+.primary {
+  color: #409eff;
 }
 
 .warning {
   color: #e6a23c;
+}
+
+.danger {
+  color: #d93025;
 }
 </style>

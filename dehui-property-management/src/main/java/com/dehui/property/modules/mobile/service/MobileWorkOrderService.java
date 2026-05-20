@@ -1,6 +1,8 @@
 package com.dehui.property.modules.mobile.service;
 
 import com.dehui.property.common.Result;
+import com.dehui.property.modules.attachment.dto.AttachmentResponse;
+import com.dehui.property.modules.attachment.service.AttachmentService;
 import com.dehui.property.modules.mobile.dto.MobileUserProfile;
 import com.dehui.property.modules.mobile.dto.MobileWorkOrderEvaluationRequest;
 import com.dehui.property.modules.mobile.dto.MobileWorkOrderHomeResponse;
@@ -8,22 +10,18 @@ import com.dehui.property.modules.mobile.dto.MobileWorkOrderRequest;
 import com.dehui.property.modules.mobile.dto.MobileWorkOrderResponse;
 import com.dehui.property.modules.workorder.entity.WorkOrder;
 import com.dehui.property.modules.workorder.repository.WorkOrderRepository;
+import com.dehui.property.modules.workorder.service.WorkOrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +31,8 @@ public class MobileWorkOrderService {
 
     private final MobileAuthService mobileAuthService;
     private final WorkOrderRepository workOrderRepository;
+    private final WorkOrderService workOrderService;
+    private final AttachmentService attachmentService;
 
     public Result<MobileWorkOrderHomeResponse> home(String token) {
         MobileUserProfile profile = mobileAuthService.getProfile(token);
@@ -44,6 +44,21 @@ public class MobileWorkOrderService {
                 .map(this::toResponse)
                 .toList();
         return Result.success(new MobileWorkOrderHomeResponse(profile, workOrders));
+    }
+
+    public Result<MobileWorkOrderResponse> detail(String token, Long id) {
+        MobileUserProfile profile = mobileAuthService.getProfile(token);
+        if (profile == null) {
+            return Result.error(401, "未登录或登录已过期");
+        }
+        WorkOrder workOrder = workOrderRepository.findById(id).orElse(null);
+        if (workOrder == null || workOrder.getDeletedAt() != null) {
+            return Result.error("报修工单不存在");
+        }
+        if (workOrder.getMobileUserId() == null || !workOrder.getMobileUserId().equals(profile.getId())) {
+            return Result.error(403, "不能查看他人的报修");
+        }
+        return Result.success(toResponse(workOrder));
     }
 
     @Transactional
@@ -61,7 +76,7 @@ public class MobileWorkOrderService {
         workOrder.setOrderType("REPAIR");
         workOrder.setCategory(request.getCategory());
         workOrder.setPriority(request.getPriority() == null || request.getPriority().isBlank() ? "NORMAL" : request.getPriority());
-        workOrder.setStatus("CREATED");
+        workOrder.setStatus("PENDING_ASSIGN");
         workOrder.setMobileUserId(profile.getId());
         workOrder.setTenantId(profile.getBoundTenantId());
         workOrder.setReporterId(profile.getBoundSysUserId());
@@ -70,6 +85,7 @@ public class MobileWorkOrderService {
                 ? profile.getPhone()
                 : request.getContactPhone());
         workOrder.setSubmittedTime(LocalDateTime.now());
+        workOrder.setSource("MINIPROGRAM");
 
         return Result.success(toResponse(workOrderRepository.save(workOrder)));
     }
@@ -88,11 +104,11 @@ public class MobileWorkOrderService {
         if (workOrder.getMobileUserId() == null || !workOrder.getMobileUserId().equals(profile.getId())) {
             return Result.error(403, "不能撤回他人的报修");
         }
-        if (!"CREATED".equals(workOrder.getStatus())) {
+        if (!"PENDING_ASSIGN".equals(workOrder.getStatus()) && !"CREATED".equals(workOrder.getStatus())) {
             return Result.error("工单已派单或处理中，不能撤回");
         }
 
-        workOrder.setStatus("CANCELLED");
+        workOrder.setStatus("WITHDRAWN");
         workOrder.setCancelledTime(LocalDateTime.now());
         return Result.success(toResponse(workOrderRepository.save(workOrder)));
     }
@@ -117,10 +133,11 @@ public class MobileWorkOrderService {
         if (workOrder.getMobileUserId() == null || !workOrder.getMobileUserId().equals(profile.getId())) {
             return Result.error(403, "不能给他人的报修上传图片");
         }
-        if ("CANCELLED".equals(workOrder.getStatus()) || "CLOSED".equals(workOrder.getStatus())) {
+        if ("WITHDRAWN".equals(workOrder.getStatus()) || "CANCELLED".equals(workOrder.getStatus()) || "CLOSED".equals(workOrder.getStatus())) {
             return Result.error("当前状态不能上传图片");
         }
-        if (parseImageUrls(workOrder.getImageUrls()).size() >= MAX_WORK_ORDER_IMAGE_COUNT) {
+        int currentCount = attachmentService.listByCategory("WORK_ORDER", id, "REPORT").size() + parseImageUrls(workOrder.getImageUrls()).size();
+        if (currentCount >= MAX_WORK_ORDER_IMAGE_COUNT) {
             return Result.error("每个报修最多上传" + MAX_WORK_ORDER_IMAGE_COUNT + "张图片");
         }
 
@@ -130,18 +147,33 @@ public class MobileWorkOrderService {
             return Result.error("仅支持 jpg、png、webp 图片");
         }
 
-        try {
-            Path uploadDir = Paths.get("uploads", "workorders", String.valueOf(id)).toAbsolutePath().normalize();
-            Files.createDirectories(uploadDir);
-            String filename = UUID.randomUUID() + extension;
-            Path target = uploadDir.resolve(filename);
-            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
-            String url = "/uploads/workorders/" + id + "/" + filename;
-            workOrder.setImageUrls(appendImageUrl(workOrder.getImageUrls(), url));
-            return Result.success(toResponse(workOrderRepository.save(workOrder)));
-        } catch (IOException e) {
-            return Result.error("图片保存失败");
+        Result<AttachmentResponse> uploadResult = attachmentService.upload("WORK_ORDER", id, "REPORT", String.valueOf(profile.getId()), file);
+        if (uploadResult.getCode() != 200) {
+            return Result.error(uploadResult.getMessage());
         }
+        return Result.success(toResponse(workOrder));
+    }
+
+    @Transactional
+    public Result<MobileWorkOrderResponse> confirm(String token, Long id) {
+        MobileUserProfile profile = mobileAuthService.getProfile(token);
+        if (profile == null) {
+            return Result.error(401, "未登录或登录已过期");
+        }
+        WorkOrder workOrder = workOrderRepository.findById(id).orElse(null);
+        if (workOrder == null || workOrder.getDeletedAt() != null) {
+            return Result.error("报修工单不存在");
+        }
+        if (workOrder.getMobileUserId() == null || !workOrder.getMobileUserId().equals(profile.getId())) {
+            return Result.error(403, "不能确认他人的报修");
+        }
+        Result<com.dehui.property.modules.workorder.dto.WorkOrderResponse> result = workOrderService.confirm(id, String.valueOf(profile.getId()));
+        if (result.getCode() != 200) {
+            return Result.error(result.getCode(), result.getMessage());
+        }
+        return workOrderRepository.findById(id)
+                .map(item -> Result.success(toResponse(item)))
+                .orElseGet(() -> Result.error("报修工单不存在"));
     }
 
     @Transactional
@@ -172,8 +204,14 @@ public class MobileWorkOrderService {
     }
 
     private String generateOrderNumber() {
-        String prefix = "WO-M-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        return prefix + String.format("%04d", workOrderRepository.count() + 1);
+        String prefix = "WO-M-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-";
+        long count = workOrderRepository.countByOrderNumberStartingWith(prefix) + 1;
+        String candidate = prefix + String.format("%04d", count);
+        while (workOrderRepository.existsByOrderNumber(candidate)) {
+            count++;
+            candidate = prefix + String.format("%04d", count);
+        }
+        return candidate;
     }
 
     private String resolveReporterName(MobileUserProfile profile) {
@@ -206,7 +244,10 @@ public class MobileWorkOrderService {
         response.setStatusText(toStatusText(workOrder.getStatus()));
         response.setReporterName(workOrder.getReporterName());
         response.setReporterPhone(workOrder.getReporterPhone());
-        response.setImageUrls(parseImageUrls(workOrder.getImageUrls()));
+        response.setImageUrls(Stream.concat(
+                parseImageUrls(workOrder.getImageUrls()).stream(),
+                attachmentService.listByCategory("WORK_ORDER", workOrder.getId(), "REPORT").stream().map(AttachmentResponse::getFileUrl)
+        ).toList());
         response.setHandlingResult(workOrder.getHandlingResult());
         response.setRating(workOrder.getRating());
         response.setEvaluationContent(workOrder.getEvaluationContent());
@@ -249,12 +290,13 @@ public class MobileWorkOrderService {
     }
 
     private String toStatusText(String status) {
-        if ("CREATED".equals(status)) return "已提交";
+        if ("PENDING_ASSIGN".equals(status) || "CREATED".equals(status)) return "待派单";
         if ("ASSIGNED".equals(status)) return "已派单";
         if ("PROCESSING".equals(status)) return "处理中";
+        if ("PENDING_CONFIRM".equals(status)) return "待确认";
         if ("COMPLETED".equals(status)) return "已完成";
         if ("CLOSED".equals(status)) return "已关闭";
-        if ("CANCELLED".equals(status)) return "已撤回";
+        if ("WITHDRAWN".equals(status) || "CANCELLED".equals(status)) return "已撤回";
         return status == null || status.isBlank() ? "未知" : status;
     }
 
@@ -267,13 +309,6 @@ public class MobileWorkOrderService {
         if ("image/png".equals(contentType)) return ".png";
         if ("image/webp".equals(contentType)) return ".webp";
         return ".jpg";
-    }
-
-    private String appendImageUrl(String current, String url) {
-        if (current == null || current.isBlank()) {
-            return url;
-        }
-        return current + "," + url;
     }
 
     private List<String> parseImageUrls(String imageUrls) {

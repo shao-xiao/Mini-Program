@@ -9,4 +9,5 @@ public class WorkOrderCompleteRequest {
     private Boolean billable;
     private BigDecimal chargeAmount;
     private String chargeRemark;
+    private String operator;
 }

@@ -8,6 +8,7 @@ import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @Entity
@@ -17,13 +18,29 @@ public class ParkingBill extends BaseEntity {
 
     private String billNumber;
 
+    private String billNo;
+
+    private Long assignmentId;
+
     private Long parkingSpaceId;
+
+    private Long spaceId;
+
+    private String spaceNoSnapshot;
 
     private Long tenantId;
 
     private Boolean vip;
 
     private String plateNumber;
+
+    private String partyType;
+
+    private Long partyId;
+
+    private String partyNameSnapshot;
+
+    private String plateNoSnapshot;
 
     private String billType; // MONTHLY / TEMP
 
@@ -35,11 +52,19 @@ public class ParkingBill extends BaseEntity {
 
     private String status; // UNPAID / PAID / CANCELLED
 
+    private String syncStatus;
+
+    private Long financeBillId;
+
+    private String syncError;
+
     private Long billId;
 
     private LocalDate dueDate;
 
     private LocalDate paidDate;
+
+    private LocalDateTime paidAt;
 
     private String remark;
 }

@@ -58,6 +58,8 @@ const handleLogin = async () => {
 
     const token = data.token
     const roles = Array.isArray(data.roles) ? data.roles : []
+    const permissions = Array.isArray(data.permissions) ? data.permissions : []
+    const menus = Array.isArray(data.menus) ? data.menus : []
 
     if (!token) {
       ElMessage.error('登录成功但未返回 token')
@@ -71,6 +73,8 @@ const handleLogin = async () => {
 
     // 新版 RBAC：保存真实角色列表
     localStorage.setItem('roles', JSON.stringify(roles))
+    localStorage.setItem('permissions', JSON.stringify(permissions))
+    localStorage.setItem('menus', JSON.stringify(menus))
 
     // 兼容旧版单角色逻辑，后续动态菜单升级完成后再移除
     localStorage.setItem('role', roles[0] || '')

@@ -132,7 +132,7 @@
       <template #header>
         <span>AI运营摘要</span>
       </template>
-      <p class="ai-summary">{{ report.summary || '暂无数据' }}</p>
+      <p class="ai-summary">{{ report.summaryText || report.summary || '暂无数据' }}</p>
     </el-card>
   </div>
 </template>
@@ -563,7 +563,18 @@ function resizeCharts() {
 async function loadReport() {
   try {
     const data = await request.get('/ai/daily-report', { silent: true })
-    report.value = data || {}
+    const metrics = data?.metrics || {}
+    report.value = {
+      ...(data || {}),
+      summary: data?.summaryText || data?.summary,
+      roomCount: metrics.roomTotal ?? data?.roomCount,
+      rentedRoomCount: metrics.roomRented ?? data?.rentedRoomCount,
+      availableRoomCount: metrics.roomAvailable ?? data?.availableRoomCount,
+      rentalRate: metrics.occupancyRate ?? data?.rentalRate,
+      unpaidBillCount: metrics.unpaidBillCount ?? data?.unpaidBillCount,
+      paidBillCount: metrics.paidBillCount ?? data?.paidBillCount,
+      todayPaidAmount: metrics.todayIncomeAmount ?? data?.todayPaidAmount
+    }
   } catch {
     report.value = {}
   }

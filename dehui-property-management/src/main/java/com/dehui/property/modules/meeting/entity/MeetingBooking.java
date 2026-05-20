@@ -17,11 +17,21 @@ public class MeetingBooking extends BaseEntity {
 
     private String bookingNumber;
 
+    private String bookingNo;
+
     private Long meetingRoomId;
+
+    private Long roomId;
+
+    private String roomName;
 
     private String applicantType;
 
+    private String sourceType;
+
     private Long tenantId;
+
+    private String tenantName;
 
     private Long internalUserId;
 
@@ -29,7 +39,11 @@ public class MeetingBooking extends BaseEntity {
 
     private String departmentName;
 
+    private String department;
+
     private String contactPhone;
+
+    private String applicantPhone;
 
     private LocalDateTime startTime;
 
@@ -39,11 +53,31 @@ public class MeetingBooking extends BaseEntity {
 
     private String billingMode;
 
+    private String feeType;
+
     private BigDecimal discountRate;
 
     private BigDecimal calculatedAmount;
 
+    private BigDecimal amount;
+
     private Long billId;
 
+    private Long billingId;
+
     private String status;
+
+    private LocalDateTime confirmTime;
+
+    private LocalDateTime cancelTime;
+
+    private LocalDateTime completeTime;
+
+    private String cancelReason;
+
+    private String remark;
+
+    private String createdBy;
+
+    private String updatedBy;
 }

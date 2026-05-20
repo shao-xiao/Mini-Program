@@ -53,7 +53,7 @@ public class MobileVisitorService {
         record.setVisitReason(request.getVisitReason());
         record.setVisitTime(request.getVisitTime());
         record.setCarPlateNo(request.getCarPlateNo());
-        record.setStatus("REGISTERED");
+        record.setStatus("PENDING_REVIEW");
         record.setSource("MINIPROGRAM");
         record.setRemark(request.getRemark());
 
@@ -74,7 +74,7 @@ public class MobileVisitorService {
         if (record.getMobileUserId() == null || !record.getMobileUserId().equals(profile.getId())) {
             return Result.error(403, "不能取消他人的访客预约");
         }
-        if (!"REGISTERED".equals(record.getStatus())) {
+        if (!"PENDING_REVIEW".equals(record.getStatus()) && !"REGISTERED".equals(record.getStatus())) {
             return Result.error("当前状态不能取消");
         }
 
@@ -95,21 +95,25 @@ public class MobileVisitorService {
         response.setVisitedPerson(record.getVisitedPerson());
         response.setVisitReason(record.getVisitReason());
         response.setVisitTime(record.getVisitTime());
+        response.setEnterTime(record.getEnterTime());
         response.setLeaveTime(record.getLeaveTime());
         response.setStatus(record.getStatus());
         response.setStatusText(toStatusText(record.getStatus()));
         response.setSource(record.getSource());
         response.setCarPlateNo(record.getCarPlateNo());
         response.setRemark(record.getRemark());
+        response.setRejectReason(record.getRejectReason());
         response.setCreatedTime(record.getCreatedTime());
         return response;
     }
 
     private String toStatusText(String status) {
-        if ("REGISTERED".equals(status)) return "已预约";
-        if ("ENTERED".equals(status)) return "已到访";
+        if ("PENDING_REVIEW".equals(status)) return "待审核";
+        if ("REGISTERED".equals(status)) return "已登记";
+        if ("ENTERED".equals(status)) return "已入场";
         if ("LEFT".equals(status)) return "已离场";
         if ("CANCELLED".equals(status)) return "已取消";
+        if ("REJECTED".equals(status)) return "已拒绝";
         return status == null || status.isBlank() ? "未知" : status;
     }
 }

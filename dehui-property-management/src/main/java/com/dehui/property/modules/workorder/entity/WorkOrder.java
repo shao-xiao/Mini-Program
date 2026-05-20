@@ -86,4 +86,15 @@ public class WorkOrder extends BaseEntity {
     private LocalDateTime closedTime;
 
     private LocalDateTime cancelledTime;
+
+    private LocalDateTime confirmedTime;
+
+    private Long inspectionRecordId;
+
+    private String source;
+
+    @Column(length = 1000)
+    private String remark;
+
+    private LocalDateTime deletedAt;
 }

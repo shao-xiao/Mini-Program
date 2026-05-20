@@ -13,6 +13,8 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     List<WorkOrder> findByMobileUserIdOrderByCreatedTimeDesc(Long mobileUserId);
 
+    long countByOrderNumberStartingWith(String prefix);
+
     @Query(value = "SELECT COUNT(*) FROM work_order WHERE status = :status", nativeQuery = true)
     Long countByStatus(@Param("status") String status);
 

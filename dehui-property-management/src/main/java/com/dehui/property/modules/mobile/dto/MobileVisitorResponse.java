@@ -14,11 +14,13 @@ public class MobileVisitorResponse {
     private String visitedPerson;
     private String visitReason;
     private LocalDateTime visitTime;
+    private LocalDateTime enterTime;
     private LocalDateTime leaveTime;
     private String status;
     private String statusText;
     private String source;
     private String carPlateNo;
     private String remark;
+    private String rejectReason;
     private LocalDateTime createdTime;
 }

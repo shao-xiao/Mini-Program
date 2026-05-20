@@ -1,6 +1,7 @@
 package com.dehui.property.modules.system.entity;
 
 import com.dehui.property.common.BaseEntity;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.Data;
@@ -12,11 +13,14 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class SysRole extends BaseEntity {
 
-    private String roleCode; // ADMIN / MANAGER / STAFF / SECURITY / CLEANER
+    @Column(unique = true)
+    private String roleCode;
 
     private String roleName;
 
     private String description;
 
-    private String status; // ACTIVE / DISABLED
+    private String status; // ENABLED / DISABLED,兼容旧 ACTIVE
+
+    private java.time.LocalDateTime deletedAt;
 }

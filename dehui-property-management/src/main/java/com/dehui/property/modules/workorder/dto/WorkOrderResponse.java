@@ -1,6 +1,7 @@
 package com.dehui.property.modules.workorder.dto;
 
 import lombok.Data;
+import com.dehui.property.modules.attachment.dto.AttachmentResponse;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,14 +18,24 @@ public class WorkOrderResponse {
     private String category;
     private String priority;
     private String status;
+    private String statusLabel;
+    private String orderTypeLabel;
+    private String categoryLabel;
+    private String priorityLabel;
+    private String source;
+    private String sourceLabel;
     private Boolean slaOverdue;
     private String slaLabel;
     private Long reporterId;
     private Long mobileUserId;
     private Long tenantId;
+    private String tenantName;
     private String reporterName;
     private String reporterPhone;
     private List<String> imageUrls;
+    private List<AttachmentResponse> reportAttachments;
+    private List<AttachmentResponse> beforeAttachments;
+    private List<AttachmentResponse> afterAttachments;
     private String handlingResult;
     private Boolean billable;
     private BigDecimal chargeAmount;
@@ -34,12 +45,17 @@ public class WorkOrderResponse {
     private String evaluationContent;
     private LocalDateTime evaluationTime;
     private Long handlerId;
+    private String handlerName;
+    private Long inspectionRecordId;
+    private String remark;
+    private List<WorkOrderLogResponse> logs;
     private LocalDateTime submittedTime;
     private LocalDateTime assignedTime;
     private LocalDateTime processingTime;
     private LocalDateTime completedTime;
     private LocalDateTime closedTime;
     private LocalDateTime cancelledTime;
+    private LocalDateTime confirmedTime;
     private LocalDateTime createdTime;
     private LocalDateTime updatedTime;
 }

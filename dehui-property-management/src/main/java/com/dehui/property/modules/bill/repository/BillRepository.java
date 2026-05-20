@@ -29,6 +29,12 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
     Optional<Bill> findByBillNumber(String billNumber);
 
+    Optional<Bill> findBySourceTypeAndSourceId(String sourceType, Long sourceId);
+
+    List<Bill> findByTenantIdAndSourceTypeOrderByCreatedTimeDesc(Long tenantId, String sourceType);
+
+    List<Bill> findByTenantIdAndSourceTypeAndAuditStatusOrderByCreatedTimeDesc(Long tenantId, String sourceType, String auditStatus);
+
     boolean existsByContractIdAndBillTypeAndPeriodStart(Long contractId, String billType, LocalDate periodStart);
 
     boolean existsByContractIdAndBillTypeAndPeriodStartAndPeriodEnd(Long contractId, String billType, LocalDate periodStart, LocalDate periodEnd);

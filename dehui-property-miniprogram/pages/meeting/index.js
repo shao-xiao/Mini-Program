@@ -66,9 +66,10 @@ Page({
       const bookings = (data.bookings || []).map(item => ({
         ...item,
         timeText: `${formatDateTime(item.startTime)} 至 ${formatDateTime(item.endTime)}`,
-        amountText: formatMoney(item.calculatedAmount),
+        amountText: formatMoney(item.amount || item.calculatedAmount),
+        feeText: item.feeType === 'INTERNAL_FREE' ? '内部免费' : `预计费用 ¥ ${formatMoney(item.amount || item.calculatedAmount)}`,
         statusText: this.toStatusText(item.status),
-        cancellable: item.status === 'BOOKED' || item.status === 'CONFIRMED'
+        cancellable: item.status === 'PENDING' || item.status === 'BOOKED' || item.status === 'CONFIRMED'
       }))
       this.setData({
         profile: data.profile || {},
@@ -161,7 +162,7 @@ Page({
       })
       wx.showModal({
         title: '预约成功',
-        content: `预约号：${booking.bookingNumber}\n应缴金额：${formatMoney(booking.calculatedAmount)}`,
+        content: `预约号：${booking.bookingNo || booking.bookingNumber}\n${booking.feeType === 'INTERNAL_FREE' ? '内部免费' : `预计费用：${formatMoney(booking.amount || booking.calculatedAmount)}`}`,
         showCancel: false
       })
       this.setData({
@@ -217,7 +218,7 @@ Page({
   },
 
   toStatusText(status) {
-    if (status === 'BOOKED') return '待确认'
+    if (status === 'BOOKED' || status === 'PENDING') return '待确认'
     if (status === 'CONFIRMED') return '已确认'
     if (status === 'CANCELLED') return '已取消'
     if (status === 'COMPLETED') return '已完成'

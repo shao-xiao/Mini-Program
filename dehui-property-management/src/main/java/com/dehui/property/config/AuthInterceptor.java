@@ -55,7 +55,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             token = token.substring(7);
         }
 
-        if (uri.startsWith("/api/mobile")) {
+        if (uri.startsWith("/api/mobile") || uri.startsWith("/api/mini")) {
             if (mobileAuthService.getByToken(token) == null) {
                 writeUnauthorized(response, "移动端登录已过期");
                 return false;
@@ -75,9 +75,14 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // ===== 系统管理：仅 ADMIN =====
+        if (uri.startsWith("/api/auth/me")) {
+            return true;
+        }
+
+        // ===== 系统管理：RBAC 权限码 =====
         if (uri.startsWith("/api/system")) {
-            if (!systemUserService.hasRole(token, "ADMIN")) {
+            String required = resolveSystemPermission(uri, method);
+            if (required != null && !systemUserService.hasPermission(token, required)) {
                 writeForbidden(response, "无权限访问系统管理接口");
                 return false;
             }
@@ -88,7 +93,7 @@ public class AuthInterceptor implements HandlerInterceptor {
                 || uri.startsWith("/api/floors")
                 || uri.startsWith("/api/rooms")
                 || uri.startsWith("/api/assets")) {
-            if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "STAFF"))) {
+            if (!systemUserService.hasAnyPermission(token, List.of("asset:view", "asset:create", "asset:update", "asset:delete"))) {
                 writeForbidden(response, "无权限访问基础资产接口");
                 return false;
             }
@@ -173,7 +178,7 @@ public class AuthInterceptor implements HandlerInterceptor {
                     writeForbidden(response, "无停车账单查看权限");
                     return false;
                 }
-            } else if ("POST".equalsIgnoreCase(method) && uri.contains("/pay")) {
+            } else if ("POST".equalsIgnoreCase(method) && (uri.contains("/pay") || uri.contains("/void"))) {
                 if (!systemUserService.hasPermission(token, "parking-bill:pay")) {
                     writeForbidden(response, "无停车账单收款权限");
                     return false;
@@ -197,6 +202,13 @@ public class AuthInterceptor implements HandlerInterceptor {
             }
         }
 
+        if (uri.startsWith("/api/parking/assignments")) {
+            if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "FINANCE"))) {
+                writeForbidden(response, "无权限访问车位绑定接口");
+                return false;
+            }
+        }
+
         // ===== 访客：ADMIN / MANAGER / SECURITY =====
         if (uri.startsWith("/api/visitors")) {
             if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "SECURITY"))) {
@@ -207,7 +219,11 @@ public class AuthInterceptor implements HandlerInterceptor {
 
         // ===== 工单：ADMIN / MANAGER / STAFF / SECURITY / CLEANER =====
         if (uri.startsWith("/api/workorders")) {
-            if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "STAFF", "SECURITY", "CLEANER"))) {
+            if (uri.contains("/assign") && !systemUserService.hasPermission(token, "workorder:assign")) {
+                writeForbidden(response, "无工单派发权限");
+                return false;
+            }
+            if (!systemUserService.hasPermission(token, "workorder:view")) {
                 writeForbidden(response, "无权限访问工单接口");
                 return false;
             }
@@ -222,9 +238,19 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
 
         // ===== 会议室经营：ADMIN / MANAGER / STAFF / FINANCE =====
-        if (uri.startsWith("/api/meetings")) {
+        if (uri.startsWith("/api/meetings")
+                || uri.startsWith("/api/meeting-rooms")
+                || uri.startsWith("/api/meeting-bookings")) {
             if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER", "STAFF", "FINANCE"))) {
                 writeForbidden(response, "无权限访问会议管理接口");
+                return false;
+            }
+        }
+
+        // ===== 能耗：ADMIN / MANAGER =====
+        if (uri.startsWith("/api/energy")) {
+            if (!systemUserService.hasAnyRole(token, List.of("ADMIN", "MANAGER"))) {
+                writeForbidden(response, "无权限访问能耗接口");
                 return false;
             }
         }
@@ -261,5 +287,61 @@ public class AuthInterceptor implements HandlerInterceptor {
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType("application/json;charset=UTF-8");
         response.getWriter().write(objectMapper.writeValueAsString(Result.error(status, message)));
+    }
+
+    private String resolveSystemPermission(String uri, String method) {
+        if (uri.startsWith("/api/system/me/password")) {
+            return null;
+        }
+        if (uri.startsWith("/api/system/users")) {
+            if ("GET".equalsIgnoreCase(method)) {
+                return "system:user:view";
+            }
+            if ("POST".equalsIgnoreCase(method) && uri.matches(".*/users/\\d+/roles.*")) {
+                return "system:user:assign-role";
+            }
+            if ("POST".equalsIgnoreCase(method)) {
+                return "system:user:create";
+            }
+            if ("PUT".equalsIgnoreCase(method)) {
+                return "system:user:update";
+            }
+            if ("PATCH".equalsIgnoreCase(method) && uri.contains("/reset-password")) {
+                return "system:user:reset-password";
+            }
+            if ("PATCH".equalsIgnoreCase(method)) {
+                return "system:user:disable";
+            }
+            if ("DELETE".equalsIgnoreCase(method)) {
+                return "system:user:delete";
+            }
+        }
+        if (uri.startsWith("/api/system/roles")) {
+            if ("GET".equalsIgnoreCase(method)) {
+                return "system:role:view";
+            }
+            if ("POST".equalsIgnoreCase(method) && (uri.contains("/permissions") || uri.contains("/menus"))) {
+                return "system:role:assign-permission";
+            }
+            if ("POST".equalsIgnoreCase(method)) {
+                return "system:role:create";
+            }
+            if ("PUT".equalsIgnoreCase(method)) {
+                return "system:role:update";
+            }
+            if ("PATCH".equalsIgnoreCase(method)) {
+                return "system:role:disable";
+            }
+            if ("DELETE".equalsIgnoreCase(method)) {
+                return "system:role:delete";
+            }
+        }
+        if (uri.startsWith("/api/system/menus")) {
+            return "system:menu:view";
+        }
+        if (uri.startsWith("/api/system/permissions")) {
+            return "system:permission:view";
+        }
+        return "system:user:view";
     }
 }

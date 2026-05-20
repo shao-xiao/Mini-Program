@@ -1,8 +1,10 @@
 package com.dehui.property.modules.visitor.entity;
 
 import com.dehui.property.common.BaseEntity;
+import com.dehui.property.common.OperationDict;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -30,6 +32,8 @@ public class VisitorRecord extends BaseEntity {
 
     private LocalDateTime visitTime;
 
+    private LocalDateTime enterTime;
+
     private LocalDateTime leaveTime;
 
     private String carPlateNo;
@@ -39,4 +43,17 @@ public class VisitorRecord extends BaseEntity {
     private String source; // ADMIN / MINIPROGRAM
 
     private String remark;
+
+    private String reviewedBy;
+
+    private LocalDateTime reviewTime;
+
+    private String rejectReason;
+
+    private LocalDateTime deletedAt;
+
+    @Transient
+    public String getStatusLabel() {
+        return OperationDict.visitorStatusLabel(status);
+    }
 }

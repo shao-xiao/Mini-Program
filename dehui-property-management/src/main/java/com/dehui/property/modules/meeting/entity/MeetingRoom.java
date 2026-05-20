@@ -31,4 +31,6 @@ public class MeetingRoom extends BaseEntity {
     private BigDecimal holidayRate;
 
     private String status;
+
+    private String remark;
 }

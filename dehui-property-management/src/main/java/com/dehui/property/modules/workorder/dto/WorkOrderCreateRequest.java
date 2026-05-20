@@ -29,4 +29,14 @@ public class WorkOrderCreateRequest {
     private Long reporterId;
 
     private Long tenantId;
+
+    private String reporterName;
+
+    private String reporterPhone;
+
+    private String source;
+
+    private String remark;
+
+    private Long inspectionRecordId;
 }

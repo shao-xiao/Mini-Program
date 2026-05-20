@@ -344,9 +344,13 @@ public class BillService {
         response.setBillNumber(bill.getBillNumber());
         response.setBillNo(bill.getBillNumber());
         response.setTenantId(bill.getTenantId());
+        response.setPayerName(bill.getPayerName());
         if (bill.getTenantId() != null) {
             tenantRepository.findById(bill.getTenantId())
                     .ifPresent(tenant -> response.setTenantName(tenant.getTenantName()));
+        }
+        if (isBlank(response.getTenantName()) && !isBlank(bill.getPayerName())) {
+            response.setTenantName(bill.getPayerName());
         }
         response.setContractId(bill.getContractId());
         response.setRoomId(bill.getRoomId());
@@ -661,7 +665,7 @@ public class BillService {
         if ("ENERGY".equals(sourceType)) {
             return "能耗抄表";
         }
-        if ("PARKING".equals(sourceType)) {
+        if ("PARKING".equals(sourceType) || "parking".equals(sourceType)) {
             return "停车账单";
         }
         if ("MEETING_ROOM".equals(sourceType)) {

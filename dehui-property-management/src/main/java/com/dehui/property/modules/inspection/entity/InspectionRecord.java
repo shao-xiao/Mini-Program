@@ -1,5 +1,6 @@
 package com.dehui.property.modules.inspection.entity;
 
+import com.dehui.property.common.OperationDict;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -35,6 +36,14 @@ public class InspectionRecord {
 
     private String remark;
 
+    private Long planId;
+
+    private Long convertedWorkOrderId;
+
+    private LocalDateTime closedTime;
+
+    private LocalDateTime deletedAt;
+
     private LocalDateTime createdTime;
 
     private LocalDateTime updatedTime;
@@ -49,5 +58,20 @@ public class InspectionRecord {
     @PreUpdate
     public void preUpdate() {
         this.updatedTime = LocalDateTime.now();
+    }
+
+    @Transient
+    public String getStatusLabel() {
+        return OperationDict.inspectionStatusLabel(status);
+    }
+
+    @Transient
+    public String getResultLabel() {
+        return OperationDict.inspectionResultLabel(result);
+    }
+
+    @Transient
+    public String getInspectionTypeLabel() {
+        return OperationDict.inspectionTypeLabel(inspectionType);
     }
 }

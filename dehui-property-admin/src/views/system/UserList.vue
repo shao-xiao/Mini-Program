@@ -5,416 +5,282 @@
         <div class="page-header">
           <div>
             <div class="page-title">用户管理</div>
-            <div class="page-subtitle">系统用户、状态与角色分配</div>
+            <div class="page-subtitle">统一维护后台账号、工程师账号、财务账号和租户账号</div>
           </div>
-          <el-button type="primary" @click="openCreateDialog">新增用户</el-button>
+          <el-button v-if="hasPermission('system:user:create')" type="primary" @click="openCreate">新增用户</el-button>
         </div>
       </template>
 
-      <el-table :data="users" border stripe v-loading="loading">
-        <el-table-column prop="id" label="ID" width="80" align="center" />
-        <el-table-column prop="username" label="用户名" width="140" />
-        <el-table-column prop="realName" label="姓名" width="140" />
-        <el-table-column prop="phone" label="手机号" width="150" />
-
-        <el-table-column label="已分配角色" min-width="220">
-          <template #default="{ row }">
-            <el-tag
-              v-for="role in getUserRoleNames(row.id)"
-              :key="role"
-              type="success"
-              style="margin-right: 6px; margin-bottom: 4px"
-            >
-              {{ role }}
-            </el-tag>
-            <span v-if="getUserRoleNames(row.id).length === 0" class="empty-text">未分配</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="状态" width="120" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'info'">
-              {{ row.status === 'ACTIVE' ? '启用' : '禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="创建时间" width="170">
-          <template #default="{ row }">
-            {{ formatTime(row.createdTime) }}
-          </template>
-        </el-table-column>
-
-        <el-table-column label="操作" width="320" fixed="right" align="center">
-          <template #default="{ row }">
-            <div class="action-buttons">
-              <el-button size="small" type="primary" @click="openAssignRole(row)">
-                分配角色
-              </el-button>
-
-              <el-button
-                v-if="row.status === 'ACTIVE' && !isSuperAdmin(row)"
-                size="small"
-                type="danger"
-                @click="changeUserStatus(row, 'DISABLED')"
-              >
-                禁用
-              </el-button>
-
-              <el-button
-                v-else-if="!isSuperAdmin(row)"
-                size="small"
-                type="primary"
-                @click="changeUserStatus(row, 'ACTIVE')"
-              >
-                启用
-              </el-button>
-
-              <el-button
-                v-if="!isSuperAdmin(row)"
-                size="small"
-                type="danger"
-                @click="deleteUser(row)"
-              >
-                删除
-              </el-button>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <el-dialog v-model="dialogVisible" title="新增用户" width="520px" destroy-on-close>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="form.username" placeholder="请输入用户名" />
+      <el-form :inline="true" :model="query" class="filter-form">
+        <el-form-item label="用户名"><el-input v-model="query.username" clearable /></el-form-item>
+        <el-form-item label="姓名"><el-input v-model="query.realName" clearable /></el-form-item>
+        <el-form-item label="手机号"><el-input v-model="query.phone" clearable /></el-form-item>
+        <el-form-item label="类型">
+          <el-select v-model="query.userType" clearable style="width: 150px">
+            <el-option v-for="item in userTypes" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
         </el-form-item>
-
-        <el-form-item label="密码" prop="password">
-          <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" />
-        </el-form-item>
-
-        <el-form-item label="姓名">
-          <el-input v-model="form.realName" placeholder="请输入姓名" />
-        </el-form-item>
-
-        <el-form-item label="电话">
-          <el-input v-model="form.phone" placeholder="请输入手机号" />
-        </el-form-item>
-
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="form.status" style="width: 100%">
-            <el-option label="启用" value="ACTIVE" />
+        <el-form-item label="状态">
+          <el-select v-model="query.status" clearable style="width: 120px">
+            <el-option label="启用" value="ENABLED" />
             <el-option label="禁用" value="DISABLED" />
           </el-select>
         </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="loadUsers">查询</el-button>
+          <el-button @click="resetQuery">重置</el-button>
+        </el-form-item>
       </el-form>
 
+      <el-table :data="users" border stripe v-loading="loading">
+        <el-table-column prop="id" label="ID" width="70" align="center" />
+        <el-table-column prop="username" label="用户名" width="130" />
+        <el-table-column prop="realName" label="姓名" width="120" />
+        <el-table-column prop="phone" label="手机号" width="140" />
+        <el-table-column prop="userTypeText" label="用户类型" width="140" />
+        <el-table-column prop="tenantName" label="所属租户" min-width="150" show-overflow-tooltip />
+        <el-table-column label="角色" min-width="220">
+          <template #default="{ row }">
+            <el-tag v-for="role in row.roleNames" :key="role" type="success" class="role-tag">{{ role }}</el-tag>
+            <span v-if="!row.roleNames || row.roleNames.length === 0" class="muted">未分配</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'DISABLED' ? 'info' : 'success'">{{ row.statusText }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="最近登录" width="150"><template #default="{ row }">{{ fmt(row.lastLoginAt) }}</template></el-table-column>
+        <el-table-column label="创建时间" width="150"><template #default="{ row }">{{ fmt(row.createdTime) }}</template></el-table-column>
+        <el-table-column label="操作" width="360" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button v-if="hasPermission('system:user:update')" size="small" @click="openEdit(row)">编辑</el-button>
+            <el-button v-if="hasPermission('system:user:assign-role')" size="small" type="primary" @click="openRoleDialog(row)">角色</el-button>
+            <el-button v-if="hasPermission('system:user:reset-password')" size="small" @click="resetPassword(row)">重置密码</el-button>
+            <el-button
+              v-if="hasPermission('system:user:disable') && row.username !== 'admin'"
+              size="small"
+              :type="row.status === 'DISABLED' ? 'success' : 'warning'"
+              @click="changeStatus(row)"
+            >
+              {{ row.status === 'DISABLED' ? '启用' : '禁用' }}
+            </el-button>
+            <el-button v-if="hasPermission('system:user:delete') && row.username !== 'admin'" size="small" type="danger" @click="deleteUser(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="pager">
+        <el-pagination
+          layout="total, sizes, prev, pager, next"
+          :total="total"
+          v-model:current-page="currentPage"
+          v-model:page-size="query.size"
+          @current-change="loadUsers"
+          @size-change="loadUsers"
+        />
+      </div>
+    </el-card>
+
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑用户' : '新增用户'" width="620px" destroy-on-close>
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+        <el-form-item label="用户名" prop="username"><el-input v-model="form.username" /></el-form-item>
+        <el-form-item v-if="!editingId" label="初始密码" prop="password"><el-input v-model="form.password" type="password" show-password /></el-form-item>
+        <el-form-item label="姓名"><el-input v-model="form.realName" /></el-form-item>
+        <el-form-item label="手机号"><el-input v-model="form.phone" /></el-form-item>
+        <el-form-item label="邮箱"><el-input v-model="form.email" /></el-form-item>
+        <el-form-item label="用户类型" prop="userType">
+          <el-select v-model="form.userType" style="width: 100%">
+            <el-option v-for="item in userTypes" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="form.userType === 'TENANT'" label="关联租户" prop="tenantId">
+          <el-select v-model="form.tenantId" filterable clearable style="width: 100%">
+            <el-option v-for="tenant in tenants" :key="tenant.id" :label="tenant.tenantName" :value="tenant.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="部门"><el-input v-model="form.department" /></el-form-item>
+        <el-form-item label="角色">
+          <el-select v-model="form.roleIds" multiple style="width: 100%">
+            <el-option v-for="role in roles" :key="role.id" :label="`${role.roleName} (${role.roleCode})`" :value="role.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态"><el-select v-model="form.status" style="width: 100%"><el-option label="启用" value="ENABLED" /><el-option label="禁用" value="DISABLED" /></el-select></el-form-item>
+      </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="submitUser">保存</el-button>
+        <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="roleDialog" title="分配角色" width="420px" destroy-on-close>
-      <el-form label-width="90px">
-        <el-form-item label="当前用户">
-          <el-input :model-value="currentUserName" disabled />
-        </el-form-item>
-
-        <el-form-item label="选择角色">
-          <el-select v-model="selectedRoleId" placeholder="请选择角色" style="width: 100%">
-            <el-option
-              v-for="role in roles"
-              :key="role.id"
-              :label="`${role.roleName}（${role.roleCode}）`"
-              :value="role.id"
-              :disabled="hasUserRole(currentUserId, role.id)"
-            />
-          </el-select>
-        </el-form-item>
-      </el-form>
-
+    <el-dialog v-model="roleDialog" title="分配角色" width="520px" destroy-on-close>
+      <el-select v-model="roleForm.roleIds" multiple style="width: 100%">
+        <el-option v-for="role in roles" :key="role.id" :label="`${role.roleName} (${role.roleCode})`" :value="role.id" />
+      </el-select>
       <template #footer>
         <el-button @click="roleDialog = false">取消</el-button>
-        <el-button type="primary" :loading="assigning" @click="assignRole">确定</el-button>
+        <el-button type="primary" @click="saveRoles">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
+import { hasPermission } from '../../utils/permission'
 
 const loading = ref(false)
 const saving = ref(false)
-const assigning = ref(false)
-
-const users = ref([])
-const roles = ref([])
-const userRolesMap = ref({})
-
 const dialogVisible = ref(false)
 const roleDialog = ref(false)
-const formRef = ref(null)
-
-const currentUserId = ref(null)
-const currentUserName = ref('')
-const selectedRoleId = ref(null)
-
-const form = reactive({
-  username: '',
-  password: '',
-  realName: '',
-  phone: '',
-  status: 'ACTIVE'
+const formRef = ref()
+const users = ref([])
+const roles = ref([])
+const tenants = ref([])
+const total = ref(0)
+const editingId = ref(null)
+const currentPage = computed({
+  get: () => query.page + 1,
+  set: value => { query.page = value - 1 }
 })
 
+const userTypes = [
+  { label: '系统管理员', value: 'ADMIN' },
+  { label: '运营/管理人员', value: 'MANAGER' },
+  { label: '财务人员', value: 'FINANCE' },
+  { label: '工程维修人员', value: 'ENGINEER' },
+  { label: '安保人员', value: 'SECURITY' },
+  { label: '保洁人员', value: 'CLEANER' },
+  { label: '租户用户', value: 'TENANT' },
+  { label: '普通员工', value: 'STAFF' }
+]
+
+const query = reactive({ username: '', realName: '', phone: '', userType: '', status: '', page: 0, size: 20 })
+const form = reactive({ username: '', password: '123456', realName: '', phone: '', email: '', userType: 'STAFF', tenantId: null, department: '', status: 'ENABLED', roleIds: [] })
+const roleForm = reactive({ userId: null, roleIds: [] })
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  status: [{ required: true, message: '请选择状态', trigger: 'change' }]
+  password: [{ required: true, message: '请输入初始密码', trigger: 'blur' }],
+  userType: [{ required: true, message: '请选择用户类型', trigger: 'change' }]
 }
 
-function unwrap(res) {
-  if (res?.code === 200) return res.data
-  if (res?.data?.code === 200) return res.data.data
-  if (Array.isArray(res)) return res
-  if (Array.isArray(res?.data)) return res.data
-  return res?.data ?? res
+function records(data) {
+  if (Array.isArray(data)) return { records: data, total: data.length }
+  return { records: data?.records || [], total: data?.total || 0 }
 }
 
 async function loadUsers() {
   loading.value = true
   try {
-    const res = await request.get('/system/users')
-    users.value = unwrap(res) || []
-    await loadAllUserRoles()
-  } catch (e) {
-    ElMessage.error(e.message || '加载用户列表失败')
+    const data = await request.get('/system/users', { params: { ...query } })
+    const page = records(data)
+    users.value = page.records
+    total.value = page.total
   } finally {
     loading.value = false
   }
 }
 
 async function loadRoles() {
-  try {
-    const res = await request.get('/system/roles')
-    roles.value = unwrap(res) || []
-  } catch (e) {
-    ElMessage.error(e.message || '加载角色列表失败')
-  }
+  const data = await request.get('/system/roles', { params: { size: 500 } })
+  roles.value = records(data).records
 }
 
-async function loadAllUserRoles() {
-  const map = {}
-
-  for (const user of users.value) {
-    try {
-      const res = await request.get(`/system/users/${user.id}/roles`)
-      map[user.id] = unwrap(res) || []
-    } catch (e) {
-      map[user.id] = []
-    }
-  }
-
-  userRolesMap.value = map
+async function loadTenants() {
+  tenants.value = await request.get('/tenant/list')
 }
 
-function getUserRoleNames(userId) {
-  const userRoles = userRolesMap.value[userId] || []
-  return userRoles
-    .map(userRole => {
-      const role = roles.value.find(item => item.id === userRole.roleId)
-      return role ? role.roleName : `角色ID:${userRole.roleId}`
-    })
-    .filter(Boolean)
-}
-
-function hasUserRole(userId, roleId) {
-  const userRoles = userRolesMap.value[userId] || []
-  return userRoles.some(item => item.roleId === roleId)
-}
-
-function isSuperAdmin(row) {
-  return row?.username === 'admin'
+function resetQuery() {
+  Object.assign(query, { username: '', realName: '', phone: '', userType: '', status: '', page: 0 })
+  loadUsers()
 }
 
 function resetForm() {
-  form.username = ''
-  form.password = ''
-  form.realName = ''
-  form.phone = ''
-  form.status = 'ACTIVE'
+  Object.assign(form, { username: '', password: '123456', realName: '', phone: '', email: '', userType: 'STAFF', tenantId: null, department: '', status: 'ENABLED', roleIds: [] })
 }
 
-function openCreateDialog() {
+function openCreate() {
+  editingId.value = null
   resetForm()
   dialogVisible.value = true
 }
 
-async function submitUser() {
-  if (!formRef.value) return
-
-  await formRef.value.validate(async valid => {
-    if (!valid) return
-
-    saving.value = true
-    try {
-      await request.post('/system/users', {
-        username: form.username,
-        password: form.password,
-        realName: form.realName,
-        phone: form.phone,
-        status: form.status
-      })
-
-      ElMessage.success('创建成功')
-      dialogVisible.value = false
-      await loadUsers()
-    } catch (e) {
-      ElMessage.error(e.message || '创建用户失败')
-    } finally {
-      saving.value = false
-    }
-  })
+function openEdit(row) {
+  editingId.value = row.id
+  Object.assign(form, { ...row, password: '', roleIds: row.roleIds || [] })
+  dialogVisible.value = true
 }
 
-function openAssignRole(row) {
-  currentUserId.value = row.id
-  currentUserName.value = row.realName || row.username
-  selectedRoleId.value = null
+async function submit() {
+  await formRef.value?.validate()
+  saving.value = true
+  try {
+    const payload = { ...form }
+    if (editingId.value) {
+      delete payload.password
+      await request.put(`/system/users/${editingId.value}`, payload)
+    } else {
+      await request.post('/system/users', payload)
+    }
+    ElMessage.success('保存成功')
+    dialogVisible.value = false
+    await loadUsers()
+  } finally {
+    saving.value = false
+  }
+}
+
+function openRoleDialog(row) {
+  roleForm.userId = row.id
+  roleForm.roleIds = [...(row.roleIds || [])]
   roleDialog.value = true
 }
 
-async function assignRole() {
-  if (!currentUserId.value || !selectedRoleId.value) {
-    ElMessage.warning('请选择角色')
-    return
-  }
-
-  if (hasUserRole(currentUserId.value, selectedRoleId.value)) {
-    ElMessage.warning('该用户已分配此角色，请勿重复分配')
-    return
-  }
-
-  assigning.value = true
-  try {
-    await request.post(`/system/users/${currentUserId.value}/roles/${selectedRoleId.value}`)
-    ElMessage.success('分配成功')
-    roleDialog.value = false
-    await loadUsers()
-  } catch (e) {
-    ElMessage.error(e.message || '分配角色失败')
-  } finally {
-    assigning.value = false
-  }
+async function saveRoles() {
+  await request.post(`/system/users/${roleForm.userId}/roles`, { ids: roleForm.roleIds })
+  ElMessage.success('角色已更新')
+  roleDialog.value = false
+  await loadUsers()
 }
 
-async function changeUserStatus(row, status) {
-  if (isSuperAdmin(row) && status === 'DISABLED') {
-    ElMessage.warning('超级管理员 admin 不允许禁用')
-    return
-  }
+async function changeStatus(row) {
+  const next = row.status === 'DISABLED' ? 'ENABLED' : 'DISABLED'
+  await request.patch(`/system/users/${row.id}/status`, null, { params: { status: next } })
+  ElMessage.success('状态已更新')
+  await loadUsers()
+}
 
-  try {
-    const actionText = status === 'ACTIVE' ? '启用' : '禁用'
-
-    await ElMessageBox.confirm(
-      `确定要${actionText}用户「${row.realName || row.username}」吗？`,
-      `${actionText}确认`,
-      { type: 'warning' }
-    )
-
-    await request.patch(
-      `/system/users/${row.id}/status`,
-      null,
-      {
-        params: { status }
-      }
-    )
-
-    ElMessage.success(status === 'ACTIVE' ? '用户已启用' : '用户已禁用')
-    await loadUsers()
-  } catch (e) {
-    if (e !== 'cancel') {
-      ElMessage.error(e.message || '状态修改失败')
-    }
-  }
+async function resetPassword(row) {
+  const data = await request.patch(`/system/users/${row.id}/reset-password`)
+  await ElMessageBox.alert(`新密码：${data.password}`, '密码已重置', { confirmButtonText: '知道了' })
 }
 
 async function deleteUser(row) {
-  if (isSuperAdmin(row)) {
-    ElMessage.warning('超级管理员用户不允许删除')
-    return
-  }
-
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除用户「${row.realName || row.username}」吗？删除后无法恢复。`,
-      '删除确认',
-      { type: 'warning' }
-    )
-
-    await request.delete(`/system/users/${row.id}`)
-    ElMessage.success('删除成功')
-    await loadUsers()
-  } catch (e) {
-    if (e !== 'cancel') {
-      ElMessage.error(e.message || '删除用户失败')
-    }
-  }
+  await ElMessageBox.confirm(`确定删除用户「${row.realName || row.username}」吗？`, '删除确认', { type: 'warning' })
+  await request.delete(`/system/users/${row.id}`)
+  ElMessage.success('删除成功')
+  await loadUsers()
 }
 
-function formatTime(time) {
-  if (!time) return '-'
-  return String(time).replace('T', ' ').slice(0, 16)
+function fmt(value) {
+  return value ? String(value).replace('T', ' ').slice(0, 16) : '-'
 }
 
 onMounted(async () => {
-  await loadRoles()
+  await Promise.all([loadRoles(), loadTenants()])
   await loadUsers()
 })
 </script>
 
 <style scoped>
-.page-container {
-  padding: 20px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.page-title {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.page-subtitle {
-  margin-top: 6px;
-  font-size: 13px;
-  color: #909399;
-}
-
-.empty-text {
-  color: #909399;
-  font-size: 13px;
-}
-
-.action-buttons {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-
-.action-buttons :deep(.el-button) {
-  min-width: 64px;
-  margin-left: 0;
-  color: #fff !important;
-}
+.page-container { padding: 20px; }
+.page-header { display: flex; justify-content: space-between; align-items: center; }
+.page-title { font-size: 18px; font-weight: 600; }
+.page-subtitle { margin-top: 6px; color: #909399; font-size: 13px; }
+.filter-form { margin-bottom: 14px; }
+.role-tag { margin-right: 6px; margin-bottom: 4px; }
+.muted { color: #909399; }
+.pager { display: flex; justify-content: flex-end; margin-top: 16px; }
 </style>

@@ -226,7 +226,7 @@ public class MobileBillService {
         if ("ENERGY".equals(sourceType)) {
             return "能耗抄表";
         }
-        if ("PARKING".equals(sourceType)) {
+        if ("PARKING".equals(sourceType) || "parking".equals(sourceType)) {
             return "停车账单";
         }
         if ("MEETING_ROOM".equals(sourceType)) {

@@ -1,124 +1,41 @@
-import { getCurrentRoles, hasAnyRole } from '../config/access'
-
-export { getCurrentRoles }
-
-export function hasRole(allowedRoles = []) {
-  const roles = getCurrentRoles()
-
-  if (!Array.isArray(allowedRoles) || allowedRoles.length === 0) {
-    return false
+function parseStorageArray(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || '[]')
+    return Array.isArray(value) ? value : []
+  } catch (error) {
+    return []
   }
-
-  return hasAnyRole(roles, allowedRoles)
 }
 
-export function hasPermission(permissionCode) {
+export function getCurrentRoles() {
+  const roles = parseStorageArray('roles')
+  if (roles.length > 0) return roles
+  const legacyRole = localStorage.getItem('role')
+  return legacyRole ? [legacyRole] : []
+}
+
+export function getCurrentPermissions() {
+  return parseStorageArray('permissions')
+}
+
+export function hasRole(roleCode) {
+  return getCurrentRoles().includes(roleCode)
+}
+
+export function hasAnyRole(roleCodes = []) {
   const roles = getCurrentRoles()
+  return roles.includes('SUPER_ADMIN') || roles.includes('ADMIN') || roleCodes.some(role => roles.includes(role))
+}
 
-  if (roles.includes('ADMIN')) {
-    return true
-  }
+export function hasPermission(code) {
+  const roles = getCurrentRoles()
+  if (roles.includes('SUPER_ADMIN') || roles.includes('ADMIN')) return true
+  return getCurrentPermissions().includes(code)
+}
 
-  const permissionMap = {
-    MANAGER: [
-      'view',
-      'add',
-      'edit',
-
-      'building:view',
-      'building:add',
-      'building:edit',
-      'building:delete',
-
-      'floor:view',
-      'floor:add',
-      'floor:edit',
-      'floor:delete',
-
-      'room:view',
-      'room:add',
-      'room:edit',
-      'room:delete',
-
-      'tenant:view',
-      'tenant:add',
-      'tenant:edit',
-      'tenant:delete',
-
-      'lease:view',
-      'lease:add',
-      'lease:edit',
-      'lease:checkout',
-
-      'contract:view',
-      'contract:add',
-      'contract:edit',
-      'contract:terminate',
-
-      'workorder:view',
-      'workorder:add',
-      'workorder:edit',
-
-      'inspection:view',
-      'inspection:add',
-      'inspection:edit',
-
-      'visitor:view',
-      'visitor:add',
-      'visitor:edit',
-
-      'announcement:view',
-      'announcement:add',
-      'announcement:edit',
-
-      'energy:view',
-      'energy:add',
-      'energy:stats',
-
-      'parking:view',
-      'parking:add',
-      'parking:edit'
-    ],
-
-    FINANCE: [
-      'bill:view',
-      'bill:add',
-      'bill:audit',
-      'bill:pay',
-      'feerule:view',
-      'feerule:add',
-      'feerule:generate',
-      'finance:view',
-      'parking-bill:view',
-      'parking-bill:add',
-      'parking-bill:pay'
-    ],
-
-    STAFF: [
-      'workorder:view',
-      'workorder:add',
-      'inspection:view',
-      'announcement:view'
-    ],
-
-    SECURITY: [
-      'visitor:view',
-      'visitor:add',
-      'inspection:view',
-      'inspection:add',
-      'announcement:view'
-    ],
-
-    CLEANER: [
-      'workorder:view',
-      'workorder:edit',
-      'inspection:view',
-      'announcement:view'
-    ]
-  }
-
-  return roles.some(role => {
-    const permissions = permissionMap[role] || []
-    return permissions.includes(permissionCode)
-  })
+export function hasAnyPermission(codes = []) {
+  const roles = getCurrentRoles()
+  if (roles.includes('SUPER_ADMIN') || roles.includes('ADMIN')) return true
+  const permissions = getCurrentPermissions()
+  return codes.some(code => permissions.includes(code))
 }

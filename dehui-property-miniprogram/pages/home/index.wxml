@@ -64,6 +64,10 @@
       <view class="action-title">账单中心</view>
       <view class="action-desc">租金、能耗、停车和服务账单</view>
     </navigator>
+    <navigator class="action" url="/pages/energy/index">
+      <view class="action-title">能耗查询</view>
+      <view class="action-desc">查看水电气用量和能源账单</view>
+    </navigator>
     <navigator class="action" url="/pages/meeting/index">
       <view class="action-title">会议预约</view>
       <view class="action-desc">查询会议室并发起预约</view>

@@ -15,4 +15,6 @@ public interface UserRoleRepository extends JpaRepository<UserRole, Long> {
     boolean existsByUserIdAndRoleId(Long userId, Long roleId);
 
     void deleteByUserId(Long userId);
+
+    void deleteByRoleId(Long roleId);
 }

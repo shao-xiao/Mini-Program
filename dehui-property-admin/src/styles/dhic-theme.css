@@ -46,6 +46,7 @@
 .el-button--danger:not(.is-link) {
   background-color: #d93025 !important;
   border-color: #d93025 !important;
+  color: #fff !important;
 }
 
 .el-button.is-link {

@@ -23,6 +23,13 @@ public class MobileWorkOrderController {
         return mobileWorkOrderService.home(normalizeToken(token));
     }
 
+    @GetMapping("/{id}")
+    public Result<MobileWorkOrderResponse> detail(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Long id) {
+        return mobileWorkOrderService.detail(normalizeToken(token), id);
+    }
+
     @PostMapping
     public Result<MobileWorkOrderResponse> create(
             @RequestHeader("Authorization") String token,
@@ -43,6 +50,13 @@ public class MobileWorkOrderController {
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file) {
         return mobileWorkOrderService.uploadImage(normalizeToken(token), id, file);
+    }
+
+    @RequestMapping(value = "/{id}/confirm", method = {RequestMethod.PATCH, RequestMethod.POST})
+    public Result<MobileWorkOrderResponse> confirm(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Long id) {
+        return mobileWorkOrderService.confirm(normalizeToken(token), id);
     }
 
     @RequestMapping(value = "/{id}/evaluation", method = {RequestMethod.PATCH, RequestMethod.POST})

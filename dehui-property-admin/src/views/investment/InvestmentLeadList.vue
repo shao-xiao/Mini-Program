@@ -34,8 +34,8 @@
             <div class="sub-text" v-if="row.intendedUse">{{ row.intendedUse }}</div>
           </template>
         </el-table-column>
-        <el-table-column prop="preferredVisitTime" label="期望看房时间" min-width="150" />
-        <el-table-column prop="remark" label="备注" min-width="180" />
+        <el-table-column prop="preferredVisitTime" label="期望看房时间" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip />
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
             <el-tag :type="statusTagType(row.status)">
@@ -48,13 +48,15 @@
             {{ formatDateTime(row.createdTime) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="260">
+        <el-table-column label="操作" width="230" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.status === 'NEW'" size="small" type="primary" @click="updateStatus(row, 'FOLLOWING')">跟进</el-button>
-            <el-button v-if="row.status !== 'CONVERTED'" size="small" @click="updateStatus(row, 'VIEWED')">已看房</el-button>
-            <el-button v-if="row.status !== 'CONVERTED'" size="small" @click="convertTenant(row)">转租户</el-button>
-            <el-button v-if="row.status !== 'CONVERTED'" size="small" type="success" @click="convertContract(row)">转合同</el-button>
-            <el-button v-if="!['CONVERTED', 'INVALID'].includes(row.status)" size="small" @click="updateStatus(row, 'INVALID')">无效</el-button>
+            <div class="lead-actions">
+              <el-button v-if="row.status === 'NEW'" size="small" type="primary" @click="updateStatus(row, 'FOLLOWING')">跟进</el-button>
+              <el-button v-if="row.status !== 'CONVERTED'" size="small" @click="updateStatus(row, 'VIEWED')">已看房</el-button>
+              <el-button v-if="row.status !== 'CONVERTED'" size="small" @click="convertTenant(row)">转租户</el-button>
+              <el-button v-if="row.status !== 'CONVERTED'" size="small" type="success" @click="convertContract(row)">转合同</el-button>
+              <el-button v-if="!['CONVERTED', 'INVALID'].includes(row.status)" size="small" @click="updateStatus(row, 'INVALID')">无效</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -135,5 +137,19 @@ onMounted(load)
   margin-top: 4px;
   color: #909399;
   font-size: 12px;
+}
+
+.lead-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.lead-actions :deep(.el-button) {
+  min-width: 56px;
+  margin-left: 0;
+  padding-left: 10px;
+  padding-right: 10px;
 }
 </style>

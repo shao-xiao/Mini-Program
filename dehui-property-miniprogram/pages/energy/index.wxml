@@ -1,0 +1,89 @@
+<view class="page">
+  <view class="section card">
+    <view class="title">能耗查询</view>
+    <view class="subtitle">查看当前绑定租户的水、电、燃气用量和能源账单</view>
+  </view>
+
+  <view wx:if="{{errorMessage}}" class="card section">
+    <view class="empty-title">暂时无法显示能耗</view>
+    <view class="empty-desc">{{errorMessage}}</view>
+    <button class="button-primary bind-button" bindtap="goProfile">去登录或绑定租户</button>
+  </view>
+
+  <view wx:if="{{!errorMessage}}" class="summary-grid section">
+    <view class="summary-card">
+      <view class="summary-label">电用量</view>
+      <view class="summary-value primary">{{stats.electricUsageText}}</view>
+      <view class="summary-desc">kWh</view>
+    </view>
+    <view class="summary-card">
+      <view class="summary-label">水用量</view>
+      <view class="summary-value">{{stats.waterUsageText}}</view>
+      <view class="summary-desc">m³</view>
+    </view>
+    <view class="summary-card">
+      <view class="summary-label">燃气用量</view>
+      <view class="summary-value">{{stats.gasUsageText}}</view>
+      <view class="summary-desc">m³</view>
+    </view>
+    <view class="summary-card">
+      <view class="summary-label">结算金额</view>
+      <view class="summary-value primary">￥{{stats.totalAmountText}}</view>
+      <view class="summary-desc">{{stats.recordCount}} 条，异常 {{stats.abnormalCount}} 条</view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="card muted">正在加载能耗数据...</view>
+
+  <view wx:if="{{!errorMessage}}" class="section">
+    <view class="section-title">抄表记录</view>
+    <view wx:if="{{readings.length === 0 && !loading}}" class="card muted">暂无抄表记录</view>
+    <view wx:for="{{readings}}" wx:key="id" class="energy-card">
+      <view class="energy-head">
+        <view>
+          <view class="energy-title">{{item.meterNo}} · {{item.typeText}}</view>
+          <view class="energy-sub">{{item.periodMonth}} · {{item.roomName || '-'}}</view>
+        </view>
+        <view class="energy-status {{item.abnormalFlag ? 'warn' : ''}}">{{item.abnormalText}}</view>
+      </view>
+      <view class="energy-row">
+        <text>本期用量</text>
+        <text>{{item.usageText}}</text>
+      </view>
+      <view class="energy-row">
+        <text>结算金额</text>
+        <text>￥{{item.amountText}}</text>
+      </view>
+      <view class="energy-row">
+        <text>账单状态</text>
+        <text>{{item.billStatusText}}</text>
+      </view>
+      <view class="energy-row">
+        <text>抄表日期</text>
+        <text>{{item.readingDateText}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{!errorMessage}}" class="section">
+    <view class="section-title">能源账单</view>
+    <view wx:if="{{bills.length === 0 && !loading}}" class="card muted">暂无能源账单</view>
+    <view wx:for="{{bills}}" wx:key="id" class="energy-card">
+      <view class="energy-head">
+        <view>
+          <view class="energy-title">{{item.title || item.billNumber}}</view>
+          <view class="energy-sub">{{item.billNumber}}</view>
+        </view>
+        <view class="energy-status">{{item.statusText}}</view>
+      </view>
+      <view class="energy-row">
+        <text>账期</text>
+        <text>{{item.periodText}}</text>
+      </view>
+      <view class="energy-row">
+        <text>金额</text>
+        <text>￥{{item.amountText}}</text>
+      </view>
+    </view>
+  </view>
+</view>
