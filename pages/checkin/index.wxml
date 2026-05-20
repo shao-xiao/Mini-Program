@@ -1,7 +1,56 @@
 <view class="page">
   <view class="section card">
     <view class="title">员工签到</view>
-    <view class="subtitle">内部员工移动打卡、定位和签到记录。</view>
+    <view class="subtitle">{{identityText || '内部员工'}}移动打卡、定位和签到记录。</view>
   </view>
-  <button class="button-primary">签到</button>
+
+  <view wx:if="{{errorMessage}}" class="card section">
+    <view class="empty-title">暂时无法签到</view>
+    <view class="empty-desc">{{errorMessage}}</view>
+    <button class="button-primary bind-button" bindtap="goProfile">去登录或绑定内部账号</button>
+  </view>
+
+  <view wx:if="{{!errorMessage}}" class="section card">
+    <view class="section-title">签到信息</view>
+    <view class="chip-row">
+      <view
+        wx:for="{{typeOptions}}"
+        wx:key="value"
+        class="chip {{form.checkinType === item.value ? 'active' : ''}}"
+        data-value="{{item.value}}"
+        bindtap="selectType"
+      >
+        {{item.label}}
+      </view>
+    </view>
+    <input class="input" placeholder-class="input-placeholder" placeholder="签到地点，例如 德汇创新中心前台" value="{{form.location}}" data-field="location" bindinput="onInput" />
+    <view class="location-row">
+      <input class="input location-input" placeholder-class="input-placeholder" placeholder="经度，可选" type="digit" value="{{form.longitude}}" data-field="longitude" bindinput="onInput" />
+      <input class="input location-input" placeholder-class="input-placeholder" placeholder="纬度，可选" type="digit" value="{{form.latitude}}" data-field="latitude" bindinput="onInput" />
+    </view>
+    <button class="location-button" bindtap="getLocation">获取当前位置</button>
+    <textarea class="textarea" placeholder-class="input-placeholder" placeholder="备注，可选" value="{{form.remark}}" data-field="remark" bindinput="onInput" />
+    <button class="button-primary submit-button" loading="{{submitting}}" bindtap="submitCheckin">提交签到</button>
+  </view>
+
+  <view wx:if="{{loading}}" class="card muted">正在加载签到记录...</view>
+
+  <view wx:if="{{!errorMessage && !loading && checkins.length === 0}}" class="card muted">
+    暂无签到记录
+  </view>
+
+  <view wx:if="{{!errorMessage && checkins.length > 0}}" class="section">
+    <view class="section-title">我的签到</view>
+    <view wx:for="{{checkins}}" wx:key="id" class="checkin-card">
+      <view class="checkin-head">
+        <view class="checkin-type">{{item.checkinTypeText}}</view>
+        <view class="checkin-time">{{item.checkinTimeText}}</view>
+      </view>
+      <view class="checkin-meta">{{item.locationText}}</view>
+      <view wx:if="{{item.longitude && item.latitude}}" class="checkin-meta">
+        {{item.longitude}}, {{item.latitude}}
+      </view>
+      <view wx:if="{{item.remark}}" class="checkin-remark">{{item.remark}}</view>
+    </view>
+  </view>
 </view>

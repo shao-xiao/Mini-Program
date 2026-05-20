@@ -8,6 +8,28 @@
   </view>
 
   <view class="section card">
+    <view class="action-title">联调设置</view>
+    <view class="action-desc">当前接口：{{apiBaseURL}}</view>
+    <view class="api-status-row">
+      <view class="api-status {{apiStatusClass}}">{{apiStatus}}</view>
+      <view class="api-message">{{apiMessage}}</view>
+    </view>
+    <input class="input" placeholder="例如 http://192.168.1.10:8080/api" value="{{apiForm.baseURL}}" data-field="baseURL" bindinput="onApiInput" />
+    <view class="api-actions">
+      <button size="mini" bindtap="useDefaultApi">本机</button>
+      <button size="mini" bindtap="useLanApi">真机同网模板</button>
+      <button size="mini" bindtap="saveApiBaseURL">保存地址</button>
+      <button size="mini" loading="{{checkingApi}}" bindtap="checkBackend">检查后端</button>
+    </view>
+    <view wx:if="{{fixtures}}" class="fixtures-box">
+      <view>测试租户：{{fixtures.testTenantName}}（ID {{fixtures.testTenantId}}）</view>
+      <view>会议室数量：{{fixtures.meetingRoomCount}}</view>
+      <view>账单数量：{{fixtures.billCount}}</view>
+      <view>后台账号：{{fixtures.adminUsername}}</view>
+    </view>
+  </view>
+
+  <view class="section card">
     <view class="action-title">开发态登录</view>
     <view class="action-desc">用于本地开发，后续替换为真实微信登录。</view>
     <input class="input" placeholder="手机号" value="{{devForm.phone}}" data-field="phone" bindinput="onDevInput" />
@@ -25,12 +47,20 @@
 
   <view class="section card">
     <view class="action-title">绑定租户联系人</view>
-    <view class="action-desc">开发阶段先用租户 ID 绑定，后续改为手机号授权与后台审核。</view>
+    <view class="action-desc">使用物业后台发放的手机号账号和 6 位初始密码绑定租户。</view>
+    <input class="input" placeholder="手机号账号" value="{{tenantAccountForm.phone}}" data-field="phone" bindinput="onTenantAccountInput" />
+    <input class="input" placeholder="初始密码" password value="{{tenantAccountForm.password}}" data-field="password" bindinput="onTenantAccountInput" />
+    <button class="button-primary" bindtap="bindTenantAccount" loading="{{loading}}">绑定租户账号</button>
+  </view>
+
+  <view class="section card dev-card">
+    <view class="action-title">开发调试：租户 ID 直绑</view>
+    <view class="action-desc">仅用于本地开发和演示，正式租户请使用手机号账号和初始密码绑定。</view>
     <input class="input" placeholder="租户ID" type="number" value="{{tenantForm.tenantId}}" data-field="tenantId" bindinput="onTenantInput" />
     <input class="input" placeholder="联系人姓名" value="{{tenantForm.name}}" data-field="name" bindinput="onTenantInput" />
     <input class="input" placeholder="手机号" value="{{tenantForm.phone}}" data-field="phone" bindinput="onTenantInput" />
     <input class="input" placeholder="角色，如行政/财务/负责人" value="{{tenantForm.role}}" data-field="role" bindinput="onTenantInput" />
-    <button class="button-primary" bindtap="bindTenant" loading="{{loading}}">绑定租户</button>
+    <button bindtap="bindTenant" loading="{{loading}}">开发直绑租户</button>
   </view>
 
   <view class="section">

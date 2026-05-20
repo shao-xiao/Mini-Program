@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "open in WeChat DevTools",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/tools/wechat-devtools.ps1",
+        "-Command",
+        "open",
+        "-ProjectPath",
+        "${workspaceFolder}"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "preview QR",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/tools/wechat-devtools.ps1",
+        "-Command",
+        "preview",
+        "-ProjectPath",
+        "${workspaceFolder}",
+        "-QrFormat",
+        "terminal"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

@@ -206,7 +206,7 @@ Page({
       success: async (res) => {
         if (!res.confirm) return
         try {
-          await api.patch(`/mobile/meetings/bookings/${id}/cancel`)
+          await api.post(`/mobile/meetings/bookings/${id}/cancel`)
           wx.showToast({ title: '已取消', icon: 'success' })
           this.loadMeetingHome()
         } catch (error) {

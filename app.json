@@ -17,6 +17,14 @@
     "navigationBarTextStyle": "white",
     "backgroundColor": "#f5f6f8"
   },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于员工签到时记录当前位置"
+    }
+  },
+  "requiredPrivateInfos": [
+    "getLocation"
+  ],
   "style": "v2",
   "lazyCodeLoading": "requiredComponents"
 }

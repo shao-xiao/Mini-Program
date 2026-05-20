@@ -1,5 +1,5 @@
 const api = require('../../utils/request')
-const { baseURL } = require('../../config/env')
+const { getBaseURL } = require('../../config/env')
 
 function toDateTimeText(value) {
   if (!value) return '-'
@@ -22,7 +22,7 @@ function initialForm() {
 function imageUrl(url) {
   if (!url) return ''
   if (url.startsWith('http')) return url
-  return `${baseURL}${url}`
+  return `${getBaseURL()}${url}`
 }
 
 const MAX_IMAGE_COUNT = 6
@@ -216,7 +216,7 @@ Page({
       success: async (res) => {
         if (!res.confirm) return
         try {
-          await api.patch(`/mobile/workorders/${id}/cancel`)
+          await api.post(`/mobile/workorders/${id}/cancel`)
           wx.showToast({ title: '已撤回', icon: 'success' })
           this.loadWorkOrders()
         } catch (error) {
@@ -262,7 +262,7 @@ Page({
     const form = this.data.evaluationForm
     if (!form.workOrderId) return
     try {
-      await api.patch(`/mobile/workorders/${form.workOrderId}/evaluation`, {
+      await api.post(`/mobile/workorders/${form.workOrderId}/evaluation`, {
         rating: form.rating,
         content: form.content
       })

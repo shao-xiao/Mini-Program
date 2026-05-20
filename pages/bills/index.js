@@ -6,8 +6,9 @@ function formatMoney(value) {
 
 function formatDate(value) {
   if (!value) return '-'
-  const [year, month, day] = value.split('-')
-  return `${year}年${month}月${day}日`
+  const datePart = String(value).split('T')[0]
+  const [year, month, day] = datePart.split('-')
+  return year && month && day ? `${year}年${month}月${day}日` : value
 }
 
 function emptySummary() {
@@ -30,8 +31,9 @@ Page({
     activeStatus: '',
     filters: [
       { label: '全部', value: '' },
-      { label: '待支付', value: 'UNPAID' },
-      { label: '已支付', value: 'PAID' }
+      { label: '待缴', value: 'UNPAID' },
+      { label: '已缴', value: 'PAID' },
+      { label: '逾期', value: 'OVERDUE' }
     ],
     tenantName: '',
     summary: emptySummary(),
@@ -50,12 +52,16 @@ Page({
       const summary = data.summary || {}
       const bills = (data.bills || []).map(item => ({
         ...item,
+        displayTitle: item.title || item.billTypeText || '账单',
         amountText: formatMoney(item.amount),
         paidAmountText: formatMoney(item.paidAmount),
         unpaidAmountText: formatMoney(item.unpaidAmount),
         periodText: `${formatDate(item.periodStart)} 至 ${formatDate(item.periodEnd)}`,
         dueDateText: formatDate(item.dueDate),
-        statusClass: item.status === 'PAID' ? 'paid' : (item.overdue ? 'overdue' : 'unpaid')
+        statusDisplay: item.overdue && item.status !== 'PAID' ? '已逾期' : (item.statusText || item.status || '未知'),
+        statusClass: item.status === 'PAID'
+          ? 'paid'
+          : (item.status === 'CANCELLED' ? 'cancelled' : (item.overdue ? 'overdue' : 'unpaid'))
       }))
 
       this.setData({
@@ -90,12 +96,13 @@ Page({
     this.setData({ activeStatus: status }, () => this.loadBills())
   },
 
-  handlePay(event) {
-    const id = event.currentTarget.dataset.id
+  showPaymentGuide(event) {
+    const { number, title, amount } = event.currentTarget.dataset
     wx.showModal({
-      title: '支付功能待接入',
-      content: `账单 ${id} 已可查询，真实微信支付会在后续阶段接入。`,
-      showCancel: false
+      title: '线下缴费说明',
+      content: `${title || '账单'}\n编号：${number || '-'}\n待缴金额：¥ ${amount || '0.00'}\n\n当前暂未接入微信支付，请按物业通知线下缴费，后台确认收款后此处会更新为已缴。`,
+      showCancel: false,
+      confirmText: '知道了'
     })
   },
 
