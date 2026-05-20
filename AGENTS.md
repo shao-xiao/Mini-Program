@@ -339,7 +339,7 @@ npm run build
 当前远程仓库：
 
 ```text
-https://github.com/jwgit2467/dehui-property-vscode
+https://github.com/shao-xiao/Mini-Program
 ```
 
 稳定阶段必须提交：
