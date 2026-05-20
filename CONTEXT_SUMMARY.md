@@ -235,6 +235,46 @@
 }
 ```
 
+## 11. 2026-05-20 分支同步说明
+
+当前 GitHub 仓库统一为：
+
+- `https://github.com/shao-xiao/Mini-Program`
+
+本次处理的是远端两个不同历史分支：
+
+- `main`：保留为最终主分支，包含后端、后台管理端、小程序子目录和项目说明文档。
+- `dehui-property-miniprogram-standalone`：独立小程序仓库历史，根目录即小程序代码。
+
+同步策略：
+
+- 未执行 `merge`、`rebase` 或强行合并历史。
+- 仅把 `dehui-property-miniprogram-standalone` 中确认有效且 `main` 缺失的小程序开发辅助文件同步到 `main` 的 `dehui-property-miniprogram/` 目录。
+- 保留 `main` 根目录 `README.md`、`AGENTS.md`、`CONTEXT_SUMMARY.md` 等项目说明文件，不使用 standalone 分支覆盖。
+- 同名小程序页面经过对比后，`main` 版本更完整，保留 `main`：
+  - `pages/bills`：`main` 保留账单格式化、状态映射、发票下载扩展和线下缴费说明。
+  - `pages/me`：`main` 保留联调面板开关、接口地址切换、健康检查和更保守的表单行为。
+  - `pages/workorders`、`pages/visitors`、`pages/meeting`：`main` 保留统一格式化工具、状态/类型文本映射和更完整的交互逻辑。
+  - `pages/energy`、`utils/format.js`：为 `main` 独有有效功能，未删除。
+
+实际同步目录/文件：
+
+- `dehui-property-miniprogram/.vscode/settings.json`
+- `dehui-property-miniprogram/.vscode/tasks.json`
+
+涉及模块：
+
+- 仅涉及小程序开发辅助配置。
+- 不涉及后端 Java 代码。
+- 不涉及后台管理端 Vue 代码。
+- 不涉及数据库实体、字段或初始化数据变更。
+- 不涉及生产部署配置变更。
+
+后续注意：
+
+- `dehui-property-miniprogram-standalone` 分支可以作为独立小程序历史参考，但后续正式开发应以 `main` 分支下的 `dehui-property-miniprogram/` 为准。
+- 如需删除 standalone 分支，应先确认不再需要独立小程序历史。
+
 鉴权：
 
 - 文件：`dehui-property-vscode/dehui-property-management/src/main/java/com/dehui/property/config/AuthInterceptor.java`
