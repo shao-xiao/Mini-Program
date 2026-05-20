@@ -22,29 +22,39 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="publishTime" label="发布时间" width="180" />
-        <el-table-column prop="createdTime" label="创建时间" width="180" />
+        <el-table-column label="发布时间" width="180">
+          <template #default="{ row }">
+            {{ formatDateTime(row.publishTime) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="创建时间" width="180">
+          <template #default="{ row }">
+            {{ formatDateTime(row.createdTime) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="content" label="内容" min-width="260" show-overflow-tooltip />
 
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="170" fixed="right">
           <template #default="{ row }">
-            <el-button
-              v-if="row.status === 'DRAFT'"
-              size="small"
-              type="success"
-              @click="publish(row)"
-            >
-              发布
-            </el-button>
-            <el-button v-else size="small" disabled>
-              已处理
-            </el-button>
+            <div class="announcement-actions">
+              <el-button size="small" type="primary" plain @click="openDialog(row)">
+                编辑
+              </el-button>
+              <el-button
+                v-if="row.status === 'DRAFT'"
+                size="small"
+                type="success"
+                @click="publish(row)"
+              >
+                发布
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <el-dialog v-model="visible" title="新增公告" width="680px">
+    <el-dialog v-model="visible" :title="form.id ? '编辑公告' : '新增公告'" width="680px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="标题" prop="title">
           <el-input v-model="form.title" />
@@ -66,7 +76,9 @@
 
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存为草稿</el-button>
+        <el-button type="primary" :loading="saving" @click="save">
+          {{ form.id ? '保存修改' : '保存为草稿' }}
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -84,9 +96,11 @@ const visible = ref(false)
 const formRef = ref(null)
 
 const defaultForm = () => ({
+  id: null,
   title: '',
   type: 'NOTICE',
-  content: ''
+  content: '',
+  status: 'DRAFT'
 })
 
 const form = reactive(defaultForm())
@@ -114,8 +128,17 @@ async function load() {
   }
 }
 
-function openDialog() {
+function openDialog(row) {
   resetForm()
+  if (row?.id) {
+    Object.assign(form, {
+      id: row.id,
+      title: row.title || '',
+      type: row.type || 'NOTICE',
+      content: row.content || '',
+      status: row.status || 'DRAFT'
+    })
+  }
   visible.value = true
 }
 
@@ -124,22 +147,34 @@ async function save() {
 
   saving.value = true
   try {
-    await request.post('/announcements', {
+    const payload = {
       title: form.title,
       type: form.type,
       content: form.content,
-      status: 'DRAFT'
-    })
+      status: form.status || 'DRAFT'
+    }
 
-    ElMessage.success('公告草稿创建成功')
+    if (form.id) {
+      await request.put(`/announcements/${form.id}`, payload)
+      ElMessage.success('公告修改成功')
+    } else {
+      await request.post('/announcements', payload)
+      ElMessage.success('公告草稿创建成功')
+    }
+
     visible.value = false
     resetForm()
     await load()
   } catch (error) {
-    ElMessage.error(error?.response?.data?.message || '公告创建失败')
+    ElMessage.error(error?.response?.data?.message || '公告保存失败')
   } finally {
     saving.value = false
   }
+}
+
+function formatDateTime(value) {
+  if (!value) return '-'
+  return String(value).replace('T', ' ').slice(0, 16)
 }
 
 async function publish(row) {
@@ -170,5 +205,15 @@ onMounted(load)
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.announcement-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.announcement-actions :deep(.el-button) {
+  margin-left: 0;
 }
 </style>

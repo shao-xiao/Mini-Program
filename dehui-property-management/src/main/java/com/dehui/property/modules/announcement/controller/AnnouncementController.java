@@ -20,6 +20,11 @@ public class AnnouncementController {
         return Result.success(announcementService.create(announcement));
     }
 
+    @PutMapping("/{id}")
+    public Result<Announcement> update(@PathVariable Long id, @RequestBody Announcement announcement) {
+        return Result.success(announcementService.update(id, announcement));
+    }
+
     @GetMapping
     public Result<List<Announcement>> list() {
         return Result.success(announcementService.list());

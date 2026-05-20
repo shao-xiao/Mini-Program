@@ -14,6 +14,8 @@ public interface MeetingBookingRepository extends JpaRepository<MeetingBooking, 
 
     List<MeetingBooking> findByTenantIdOrderByStartTimeDesc(Long tenantId);
 
+    long countByTenantId(Long tenantId);
+
     List<MeetingBooking> findByInternalUserIdOrderByStartTimeDesc(Long internalUserId);
 
     boolean existsByMeetingRoomIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(

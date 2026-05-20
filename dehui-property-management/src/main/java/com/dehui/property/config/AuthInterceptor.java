@@ -36,6 +36,8 @@ public class AuthInterceptor implements HandlerInterceptor {
                 || uri.startsWith("/api/ping")
                 || uri.startsWith("/api/system/login")
                 || uri.startsWith("/api/mobile/auth/dev-login")
+                || ("GET".equalsIgnoreCase(method) && "/api/mobile/me".equals(uri))
+                || ("GET".equalsIgnoreCase(method) && uri.startsWith("/api/mobile/mine/summary"))
                 || uri.startsWith("/api/mobile/dev/fixtures")
                 || ("GET".equalsIgnoreCase(method) && uri.startsWith("/api/uploads/"))
                 || ("GET".equalsIgnoreCase(method) && uri.startsWith("/api/mobile/announcements"))

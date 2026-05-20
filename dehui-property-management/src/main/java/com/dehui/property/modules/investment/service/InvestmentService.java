@@ -87,6 +87,17 @@ public class InvestmentService {
                 .toList();
     }
 
+    @Transactional
+    public InvestmentContent updateContent(Long id, InvestmentContent request) {
+        InvestmentContent content = investmentContentRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("招商内容不存在"));
+        content.setTitle(request.getTitle());
+        content.setContent(request.getContent());
+        content.setContentType(request.getContentType());
+        content.setSortOrder(request.getSortOrder() == null ? 100 : request.getSortOrder());
+        return investmentContentRepository.save(content);
+    }
+
     public InvestmentContent publishContent(Long id) {
         InvestmentContent content = investmentContentRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("招商内容不存在"));

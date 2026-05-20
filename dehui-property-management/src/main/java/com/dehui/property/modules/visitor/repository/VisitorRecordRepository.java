@@ -15,5 +15,7 @@ public interface VisitorRecordRepository extends JpaRepository<VisitorRecord, Lo
 
     List<VisitorRecord> findByMobileUserIdOrderByVisitTimeDesc(Long mobileUserId);
 
+    long countByMobileUserId(Long mobileUserId);
+
     Long countByStatus(String status);
 }

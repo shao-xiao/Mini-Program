@@ -22,6 +22,29 @@ public class AnnouncementService {
         return announcementRepository.save(announcement);
     }
 
+    public Announcement update(Long id, Announcement request) {
+        Announcement announcement = announcementRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("公告不存在"));
+
+        announcement.setTitle(request.getTitle());
+        announcement.setType(request.getType());
+        announcement.setContent(request.getContent());
+        if (request.getTargetType() != null) {
+            announcement.setTargetType(request.getTargetType());
+            announcement.setTargetTenantId(request.getTargetTenantId());
+            announcement.setTargetFloorId(request.getTargetFloorId());
+            announcement.setTargetRoomId(request.getTargetRoomId());
+        }
+        if (request.getPinned() != null) {
+            announcement.setPinned(request.getPinned());
+        }
+        if (request.getAttachmentUrls() != null) {
+            announcement.setAttachmentUrls(request.getAttachmentUrls());
+        }
+
+        return announcementRepository.save(announcement);
+    }
+
     public List<Announcement> list() {
         return announcementRepository.findAll()
                 .stream()

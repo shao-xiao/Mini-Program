@@ -30,8 +30,9 @@
             {{ formatDateTime(row.publishTime) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
+            <el-button size="small" type="primary" @click="edit(row)">编辑</el-button>
             <el-button
               v-if="row.status === 'DRAFT'"
               size="small"
@@ -46,7 +47,7 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="visible" title="新增招商内容" width="680px">
+    <el-dialog v-model="visible" :title="form.id ? '编辑招商内容' : '新增招商内容'" width="680px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="类型" prop="contentType">
           <el-select v-model="form.contentType" style="width: 100%">
@@ -74,7 +75,7 @@
 
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存为草稿</el-button>
+        <el-button type="primary" :loading="saving" @click="save">{{ form.id ? '保存修改' : '保存为草稿' }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -92,6 +93,7 @@ const visible = ref(false)
 const formRef = ref(null)
 
 const defaultForm = () => ({
+  id: null,
   title: '',
   content: '',
   contentType: 'HIGHLIGHT',
@@ -144,12 +146,37 @@ const openDialog = () => {
   visible.value = true
 }
 
+const edit = (row) => {
+  Object.assign(form, {
+    id: row.id,
+    title: row.title || '',
+    content: row.content || '',
+    contentType: row.contentType || 'HIGHLIGHT',
+    status: row.status || 'DRAFT',
+    sortOrder: row.sortOrder || 100
+  })
+  formRef.value?.clearValidate()
+  visible.value = true
+}
+
 const save = async () => {
   await formRef.value.validate()
   saving.value = true
   try {
-    await request.post('/investment/contents', { ...form })
-    ElMessage.success('招商内容草稿创建成功')
+    const payload = {
+      title: form.title,
+      content: form.content,
+      contentType: form.contentType,
+      sortOrder: form.sortOrder
+    }
+
+    if (form.id) {
+      await request.put(`/investment/contents/${form.id}`, payload)
+      ElMessage.success('招商内容保存成功')
+    } else {
+      await request.post('/investment/contents', { ...payload, status: 'DRAFT' })
+      ElMessage.success('招商内容草稿创建成功')
+    }
     visible.value = false
     resetForm()
     await load()
