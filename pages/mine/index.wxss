@@ -1,0 +1,170 @@
+.mine-page {
+  background: #F5F6F8;
+}
+
+.profile-card {
+  padding: 28rpx;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+}
+
+.avatar-wrap {
+  width: 96rpx;
+  height: 96rpx;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #FFF1F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar {
+  width: 78rpx;
+  height: 78rpx;
+  display: block;
+}
+
+.profile-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-title {
+  margin-bottom: 6rpx;
+  font-size: 24rpx;
+  color: #8A8F99;
+}
+
+.profile-identity {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #1F2933;
+}
+
+.profile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 14rpx;
+}
+
+.status-label {
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  line-height: 1.2;
+  background: #F2F4F7;
+  color: #8A8F99;
+}
+
+.status-label.bound {
+  color: #168047;
+  background: #EAF7EF;
+}
+
+.status-label.not-bound {
+  color: #8A8F99;
+  background: #F2F4F7;
+}
+
+.list-section {
+  padding: 0;
+  overflow: hidden;
+}
+
+.section-title {
+  padding: 26rpx 28rpx 10rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1F2933;
+}
+
+.list-section .list-item:last-child {
+  border-bottom: 0;
+}
+
+.list-item {
+  min-height: 124rpx;
+  padding: 18rpx 28rpx;
+  border-bottom: 1rpx solid #EEF0F3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  box-sizing: border-box;
+}
+
+.item-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+}
+
+.item-icon {
+  width: 40rpx;
+  height: 40rpx;
+  flex: none;
+  border-radius: 14rpx;
+  background: #FFF1F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #E4312B;
+}
+
+.item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-title {
+  font-size: 30rpx;
+  line-height: 1.25;
+  color: #1F2933;
+  font-weight: 700;
+}
+
+.item-subtitle {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #8A8F99;
+  line-height: 1.4;
+}
+
+.item-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.item-value {
+  max-width: 140rpx;
+  text-align: right;
+  font-size: 26rpx;
+  color: #A0A7B2;
+}
+
+.item-value.bound {
+  color: #168047;
+}
+
+.item-value.not-bound {
+  color: #A0A7B2;
+}
+
+.cell-arrow {
+  font-size: 32rpx;
+  line-height: 1;
+  color: #C4C9D0;
+}

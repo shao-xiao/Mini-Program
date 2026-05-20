@@ -36,7 +36,7 @@
       <view class="action-title">员工签到</view>
       <view class="action-desc">内部员工移动打卡</view>
     </navigator>
-    <navigator class="action" url="/pages/me/index">
+    <navigator class="action" url="/pages/mine/index" open-type="switchTab">
       <view class="action-title">我的身份</view>
       <view class="action-desc">登录、绑定租户或内部账号</view>
     </navigator>

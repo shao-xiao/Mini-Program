@@ -1,0 +1,25 @@
+.bind-page {
+  padding-bottom: 40rpx;
+}
+
+.sub-title {
+  margin-top: 8rpx;
+  margin-bottom: 20rpx;
+  color: #909399;
+  font-size: 24rpx;
+}
+
+.input {
+  height: 76rpx;
+  margin-top: 16rpx;
+  padding: 0 20rpx;
+  border-radius: 10rpx;
+  background: #f5f6f8;
+  font-size: 26rpx;
+  box-sizing: border-box;
+}
+
+.bind-button {
+  margin-top: 20rpx;
+}
+

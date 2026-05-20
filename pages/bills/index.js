@@ -107,8 +107,6 @@ Page({
   },
 
   goProfile() {
-    wx.navigateTo({
-      url: '/pages/me/index'
-    })
+    wx.switchTab({ url: '/pages/mine/index' })
   }
 })

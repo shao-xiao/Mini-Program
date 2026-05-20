@@ -1,0 +1,10 @@
+<view class="page bind-page">
+  <view class="section card">
+    <view class="title">租户账号绑定</view>
+    <view class="sub-title">绑定后可使用账单、会议、报修、访客与能耗等租户功能</view>
+    <input class="input" placeholder="租户绑定手机号" value="{{form.phone}}" data-field="phone" bindinput="onTenantInput" />
+    <input class="input" placeholder="初始密码" password value="{{form.password}}" data-field="password" bindinput="onTenantInput" />
+    <button class="button-primary bind-button" loading="{{submitting}}" bindtap="bindTenantAccount">绑定租户账号</button>
+  </view>
+</view>
+
