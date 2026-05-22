@@ -35,7 +35,7 @@
       </el-form>
 
       <el-table v-loading="loading" :data="rooms" border style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column prop="buildingName" label="楼宇" min-width="130" />
         <el-table-column prop="floorName" label="楼层" min-width="100" />
         <el-table-column prop="roomNumber" label="房间号" min-width="110" />

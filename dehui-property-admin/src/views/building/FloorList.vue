@@ -5,7 +5,8 @@
         <el-card>
           <template #header>楼宇列表</template>
           <el-table v-loading="buildingLoading" :data="buildings" border @row-click="selectBuilding">
-            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column type="index" label="序号" width="70" />
+            <el-table-column prop="buildingCode" label="楼宇编号" width="120" />
             <el-table-column prop="buildingName" label="楼宇名称" />
           </el-table>
         </el-card>
@@ -15,7 +16,7 @@
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>楼层管理（楼宇ID：{{ currentBuildingId || '-' }}）</span>
+              <span>楼层管理（{{ currentBuildingLabel }}）</span>
               <div class="header-actions">
                 <el-button :disabled="!currentBuildingId" @click="batchGenerateFloors">
                   批量生成
@@ -28,7 +29,7 @@
           </template>
 
           <el-table v-loading="floorLoading" :data="floors" border style="width: 100%">
-            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column type="index" label="序号" width="70" />
             <el-table-column prop="floorNumber" label="楼层号" width="110" />
             <el-table-column prop="floorName" label="楼层名称" min-width="140" />
             <el-table-column prop="totalArea" label="总面积" width="130" />
@@ -78,13 +79,24 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 
 const buildings = ref([])
 const floors = ref([])
 const currentBuildingId = ref(null)
+const currentBuilding = computed(() => {
+  return buildings.value.find((item) => item.id === currentBuildingId.value) || null
+})
+const currentBuildingLabel = computed(() => {
+  if (!currentBuilding.value) {
+    return '未选择楼宇'
+  }
+  const name = currentBuilding.value.buildingName || '未命名楼宇'
+  const code = currentBuilding.value.buildingCode || '-'
+  return `${name}｜编号：${code}`
+})
 
 const buildingLoading = ref(false)
 const floorLoading = ref(false)

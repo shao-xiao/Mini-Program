@@ -9,9 +9,9 @@
       </template>
 
       <el-table :data="list" v-loading="loading" border style="width: 100%">
-        <el-table-column prop="id" label="ID" width="70" />
+        <el-table-column type="index" label="序号" width="70" />
         <el-table-column prop="buildingName" label="楼宇名称" min-width="140" />
-        <el-table-column prop="buildingCode" label="编码" width="120" />
+        <el-table-column prop="buildingCode" label="楼宇编号" width="120" />
         <el-table-column prop="address" label="地址" min-width="180" />
         <el-table-column prop="totalFloors" label="楼层数" width="90" />
         <el-table-column prop="description" label="说明" min-width="160" />
