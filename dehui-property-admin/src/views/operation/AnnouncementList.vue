@@ -34,7 +34,7 @@
         </el-table-column>
         <el-table-column prop="content" label="内容" min-width="260" show-overflow-tooltip />
 
-        <el-table-column label="操作" width="170" fixed="right">
+        <el-table-column label="操作" width="230" fixed="right">
           <template #default="{ row }">
             <div class="announcement-actions">
               <el-button size="small" type="primary" plain @click="openDialog(row)">
@@ -47,6 +47,9 @@
                 @click="publish(row)"
               >
                 发布
+              </el-button>
+              <el-button size="small" type="danger" plain @click="deleteAnnouncement(row)">
+                删除
               </el-button>
             </div>
           </template>
@@ -189,6 +192,24 @@ async function publish(row) {
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error(error?.response?.data?.message || '公告发布失败')
+    }
+  }
+}
+
+async function deleteAnnouncement(row) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除公告「${row.title}」吗？删除后小程序端和后台列表都不会再显示。`,
+      '删除确认',
+      { type: 'warning' }
+    )
+
+    await request.delete(`/announcements/${row.id}`)
+    ElMessage.success('公告删除成功')
+    await load()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.response?.data?.message || '公告删除失败')
     }
   }
 }

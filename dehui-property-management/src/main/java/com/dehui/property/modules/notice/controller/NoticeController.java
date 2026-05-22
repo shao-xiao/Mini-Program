@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -77,6 +78,17 @@ public class NoticeController {
         int updated = jdbcTemplate.update(
                 "UPDATE notice SET publish_status = 'PUBLISHED', published_at = ?, updated_by = ? WHERE id = ? AND deleted = 0",
                 JdbcMaps.now(), 0L, id
+        );
+        ensureUpdated(updated);
+        return ApiResponse.success();
+    }
+
+    @DeleteMapping("/announcements/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        int updated = jdbcTemplate.update(
+                "UPDATE notice SET deleted = 1, updated_by = ? WHERE id = ? AND deleted = 0",
+                0L,
+                id
         );
         ensureUpdated(updated);
         return ApiResponse.success();
