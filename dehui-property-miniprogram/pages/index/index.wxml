@@ -1,0 +1,57 @@
+<view class="page home-page">
+  <view class="card intro-card">
+    <view class="brand-row">
+      <view class="brand-logo-wrap">
+        <image class="brand-logo" src="/assets/dehui-logo.png" mode="aspectFit" />
+      </view>
+      <view class="intro-text">
+        <view class="title">{{overview.title}}</view>
+        <view class="subtitle">{{overview.subtitle}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card banner-card">
+    <view class="section-title">园区公告</view>
+    <swiper
+      class="home-swiper"
+      autoplay="{{true}}"
+      circular="{{true}}"
+      indicator-dots="{{banners.length > 1}}"
+      indicator-color="rgba(255,255,255,0.5)"
+      indicator-active-color="#FFFFFF"
+      interval="3500"
+      duration="500"
+    >
+      <swiper-item
+        wx:for="{{banners}}"
+        wx:key="id"
+        class="swiper-item"
+        data-index="{{index}}"
+        bindtap="openBanner"
+      >
+        <view class="banner-item">
+          <view class="banner-content">
+            <view class="banner-title">{{item.title}}</view>
+            <view class="banner-subtitle">{{item.subtitle}}</view>
+            <view class="banner-time" wx:if="{{item.time}}">{{item.time}}</view>
+          </view>
+          <view class="banner-link">查看详情</view>
+        </view>
+      </swiper-item>
+    </swiper>
+  </view>
+
+  <view class="module-grid">
+    <view
+      wx:for="{{modules}}"
+      wx:key="title"
+      class="module-item"
+      data-index="{{index}}"
+      bindtap="openModule"
+    >
+      <view class="module-title">{{item.title}}</view>
+      <view class="module-desc">{{item.desc}}</view>
+    </view>
+  </view>
+</view>

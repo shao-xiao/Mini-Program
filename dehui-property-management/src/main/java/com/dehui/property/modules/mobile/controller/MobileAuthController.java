@@ -1,55 +1,51 @@
 package com.dehui.property.modules.mobile.controller;
 
-import com.dehui.property.common.Result;
-import com.dehui.property.modules.mobile.dto.MobileAuthResponse;
-import com.dehui.property.modules.mobile.dto.MobileBindInternalRequest;
-import com.dehui.property.modules.mobile.dto.MobileBindTenantRequest;
-import com.dehui.property.modules.mobile.dto.MobileDevLoginRequest;
-import com.dehui.property.modules.mobile.dto.MobileUserProfile;
-import com.dehui.property.modules.mobile.service.MobileAuthService;
+import com.dehui.property.common.ApiResponse;
+import com.dehui.property.common.BusinessException;
+import com.dehui.property.modules.mobile.dto.WechatLoginRequest;
+import com.dehui.property.security.AuthInterceptor;
+import com.dehui.property.security.AuthPrincipal;
+import com.dehui.property.security.TokenService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/mobile/auth")
 @RequiredArgsConstructor
 public class MobileAuthController {
 
-    private final MobileAuthService mobileAuthService;
+    private final TokenService tokenService;
 
-    @PostMapping("/dev-login")
-    public Result<MobileAuthResponse> devLogin(@RequestBody MobileDevLoginRequest request) {
-        return Result.success(mobileAuthService.devLogin(request));
-    }
-
-    @GetMapping("/me")
-    public Result<MobileUserProfile> me(@RequestHeader("Authorization") String token) {
-        MobileUserProfile profile = mobileAuthService.getProfile(normalizeToken(token));
-        if (profile == null) {
-            return Result.error(401, "未登录或登录已过期");
-        }
-        return Result.success(profile);
+    @PostMapping("/wechat-login")
+    public ApiResponse<Void> wechatLogin(@Valid @RequestBody WechatLoginRequest request) {
+        throw new BusinessException(501, "微信 code2Session 需要配置服务端 AppSecret 后接入");
     }
 
     @PostMapping("/bind-internal")
-    public Result<MobileAuthResponse> bindInternal(
-            @RequestHeader("Authorization") String token,
-            @Valid @RequestBody MobileBindInternalRequest request) {
-        return mobileAuthService.bindInternal(normalizeToken(token), request);
+    public ApiResponse<Void> bindInternal() {
+        throw BusinessException.notImplemented("移动端绑定内部员工");
     }
 
     @PostMapping("/bind-tenant")
-    public Result<MobileAuthResponse> bindTenant(
-            @RequestHeader("Authorization") String token,
-            @Valid @RequestBody MobileBindTenantRequest request) {
-        return mobileAuthService.bindTenant(normalizeToken(token), request);
+    public ApiResponse<Void> bindTenant() {
+        throw BusinessException.notImplemented("移动端绑定租户联系人");
     }
 
-    private String normalizeToken(String token) {
-        if (token != null && token.startsWith("Bearer ")) {
-            return token.substring(7);
-        }
-        return token;
+    @GetMapping("/me")
+    public ApiResponse<AuthPrincipal> me(@RequestAttribute(AuthInterceptor.PRINCIPAL_ATTRIBUTE) AuthPrincipal principal) {
+        return ApiResponse.success(principal);
+    }
+
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout(HttpServletRequest request) {
+        tokenService.revoke(request.getHeader("Authorization"));
+        return ApiResponse.success();
     }
 }

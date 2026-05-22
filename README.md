@@ -1,5 +1,55 @@
 # 德汇创新中心物业管理系统
 
+## 生产级架构重构说明
+
+当前测试阶段已按长期生产架构重建后端基础：
+
+```text
+微信小程序
+  -> HTTPS 域名 / Nginx / SSL
+  -> Spring Boot 3 API
+  -> MySQL 正式业务数据库
+  -> Redis 登录状态 / 验证码 / 权限缓存 / 首页统计缓存
+```
+
+核心约束：
+
+- MySQL 是唯一正式业务数据库。
+- Redis 只用于 token、验证码、微信 session、权限缓存、首页统计缓存、限流和临时锁。
+- 小程序只访问 `/api/mobile/**`。
+- 管理端访问 `/api/**`。
+- 前端不保存 MySQL、Redis、微信 AppSecret 等服务端密钥。
+
+新增生产配置：
+
+```text
+dehui-property-management/src/main/resources/application-prod.yml
+dehui-property-management/src/main/resources/db/migration/V1__baseline_schema.sql
+deploy/env/dehui-property.env.example
+deploy/nginx/dehui-property.conf
+```
+
+本地后端验证：
+
+```powershell
+cd dehui-property-management
+mvn test
+```
+
+如果本机没有全局 Maven，可使用临时 Maven：
+
+```powershell
+& "$env:USERPROFILE/.cache/codex/apache-maven-3.9.9/bin/mvn.cmd" test
+```
+
+后台管理端验证：
+
+```powershell
+cd dehui-property-admin
+npm install
+npm run build
+```
+
 本仓库是德汇创新中心物业管理系统的统一代码仓库，包含后台管理前端、Spring Boot 后端、微信小程序前端三部分。
 
 GitHub 仓库地址：
@@ -335,7 +385,7 @@ dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property
 
 - 新增 `bill:audit` 权限判断。
 - 财务角色可以执行账单审核。
-- 放行 `/api/ping` 和开发联调接口 `/api/mobile/dev/fixtures`。
+- 放行 `/api/ping`；开发联调假数据接口已在生产级架构中移除。
 
 ### 7.4 小程序员工签到
 
@@ -377,7 +427,7 @@ dehui-property-vscode\dehui-property-miniprogram\pages\me
 - 小程序“我的”页面可以查看当前接口地址。
 - 支持保存接口地址，便于切换本机、局域网、生产环境。
 - 支持检查后端 `/ping`。
-- 支持读取开发联调数据 `/mobile/dev/fixtures`。
+- 不再读取开发联调假数据，后续测试数据必须写入 MySQL 后通过正式 API 返回。
 - 请求封装改为每次动态读取 API 地址，不再写死单一 `baseURL`。
 
 ### 7.6 移动端兼容性调整
@@ -464,11 +514,7 @@ dehui-property-vscode\dehui-property-admin\src\views\operation\WorkOrderList.vue
 /api/ping
 ```
 
-开发联调接口：
-
-```text
-/api/mobile/dev/fixtures
-```
+开发联调假数据接口已移除。需要测试数据时，应通过 MySQL 初始化脚本或后台管理端录入。
 
 该接口仅用于 `dev` 环境辅助联调。
 

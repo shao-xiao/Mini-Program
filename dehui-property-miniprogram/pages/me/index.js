@@ -13,24 +13,13 @@ Page({
     identityText: '访客',
     profile: {},
     loading: false,
-    showDebugPanel: false,
-    devForm: {
-      phone: '',
-      nickname: ''
-    },
     internalForm: {
-      username: '',
+      username: 'admin',
       password: ''
     },
     tenantAccountForm: {
       phone: '',
       password: ''
-    },
-    tenantForm: {
-      tenantId: '',
-      name: '',
-      phone: '',
-      role: ''
     },
     apiBaseURL: '',
     apiForm: {
@@ -41,7 +30,6 @@ Page({
     apiStatus: '未检查',
     apiStatusClass: 'muted',
     apiMessage: '',
-    fixtures: null,
     checkingApi: false
   },
 
@@ -81,13 +69,6 @@ Page({
     }
   },
 
-  onDevInput(event) {
-    const field = event.currentTarget.dataset.field
-    this.setData({
-      [`devForm.${field}`]: event.detail.value
-    })
-  },
-
   onInternalInput(event) {
     const field = event.currentTarget.dataset.field
     this.setData({
@@ -99,13 +80,6 @@ Page({
     const field = event.currentTarget.dataset.field
     this.setData({
       [`tenantAccountForm.${field}`]: event.detail.value
-    })
-  },
-
-  onTenantInput(event) {
-    const field = event.currentTarget.dataset.field
-    this.setData({
-      [`tenantForm.${field}`]: event.detail.value
     })
   },
 
@@ -160,34 +134,15 @@ Page({
       checkingApi: true,
       apiStatus: '检查中',
       apiStatusClass: 'muted',
-      apiMessage: '',
-      fixtures: null
+      apiMessage: ''
     })
     try {
       const health = await api.get('/ping')
-      const nextData = {
+      this.setData({
         apiStatus: '可用',
         apiStatusClass: 'success',
         apiMessage: health && health.time ? `服务时间：${health.time.replace('T', ' ').slice(0, 19)}` : '后端已响应'
-      }
-
-      if (this.data.showDebugPanel) {
-        try {
-          const fixtures = await api.request({
-            url: '/mobile/dev/fixtures',
-            method: 'GET',
-            silent: true
-          })
-          nextData.fixtures = fixtures
-          if (fixtures && fixtures.testTenantId) {
-            nextData['tenantForm.tenantId'] = String(fixtures.testTenantId)
-          }
-        } catch (error) {
-          nextData.fixtures = null
-        }
-      }
-
-      this.setData(nextData)
+      })
     } catch (error) {
       this.setData({
         apiStatus: '不可用',
@@ -200,21 +155,17 @@ Page({
   },
 
   async devLogin() {
-    if (!this.data.devForm.phone.trim()) {
-      wx.showToast({ title: '请填写开发调试手机号', icon: 'none' })
-      return
-    }
     this.setData({ loading: true })
     try {
-      const session = await api.post('/mobile/auth/dev-login', {
-        phone: this.data.devForm.phone,
-        nickname: this.data.devForm.nickname || '小程序调试用户'
+      const loginResult = await wx.login()
+      const session = await api.post('/mobile/auth/wechat-login', {
+        code: loginResult.code
       })
       setSession(session)
       this.setData({ profile: session.profile || {} })
       this.refreshIdentity()
       this.checkBackend()
-      wx.showToast({ title: '登录成功', icon: 'success' })
+      wx.showToast({ title: '微信登录成功', icon: 'success' })
     } finally {
       this.setData({ loading: false })
     }
@@ -222,7 +173,7 @@ Page({
 
   async bindInternal() {
     if (!wx.getStorageSync('token')) {
-      wx.showToast({ title: '请先登录后再绑定', icon: 'none' })
+      wx.showToast({ title: '请先微信登录', icon: 'none' })
       return
     }
 
@@ -241,7 +192,7 @@ Page({
 
   async bindTenantAccount() {
     if (!wx.getStorageSync('token')) {
-      wx.showToast({ title: '请先登录后再绑定', icon: 'none' })
+      wx.showToast({ title: '请先微信登录', icon: 'none' })
       return
     }
     if (!this.data.tenantAccountForm.phone || !this.data.tenantAccountForm.password) {
@@ -265,44 +216,10 @@ Page({
     }
   },
 
-  async bindTenant() {
-    if (!wx.getStorageSync('token')) {
-      wx.showToast({ title: '请先开发调试登录', icon: 'none' })
-      return
-    }
-    if (!this.data.tenantForm.tenantId || !this.data.tenantForm.phone) {
-      wx.showToast({ title: '请填写租户ID和手机号', icon: 'none' })
-      return
-    }
-
-    this.setData({ loading: true })
-    try {
-      const session = await api.post('/mobile/auth/bind-tenant', {
-        ...this.data.tenantForm,
-        tenantId: Number(this.data.tenantForm.tenantId),
-        devMode: true
-      })
-      setSession(session)
-      this.setData({ profile: session.profile || {} })
-      this.refreshIdentity()
-      this.checkBackend()
-      wx.showToast({ title: '绑定成功', icon: 'success' })
-    } finally {
-      this.setData({ loading: false })
-    }
-  },
-
-  toggleDebugPanel() {
-    this.setData({
-      showDebugPanel: !this.data.showDebugPanel,
-      fixtures: null
-    }, () => this.checkBackend())
-  },
-
   logout() {
     clearSession()
     this.setData({ profile: {} })
     this.refreshIdentity()
-    wx.showToast({ title: '已清除登录态', icon: 'success' })
+    wx.showToast({ title: '已清除', icon: 'success' })
   }
 })

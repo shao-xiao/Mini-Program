@@ -1,0 +1,10 @@
+<view class="page bind-page">
+  <view class="section card">
+    <view class="title">内部员工绑定</view>
+    <view class="sub-title">绑定后可使用员工签到等内部业务</view>
+    <input class="input" placeholder="后台用户名" value="{{form.username}}" data-field="username" bindinput="onInternalInput" />
+    <input class="input" placeholder="后台密码" password value="{{form.password}}" data-field="password" bindinput="onInternalInput" />
+    <button class="button-primary bind-button" loading="{{submitting}}" bindtap="bindInternal">绑定内部员工</button>
+  </view>
+</view>
+

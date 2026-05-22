@@ -1,11 +1,14 @@
 {
   "pages": [
+    "pages/index/index",
+    "pages/mine/index",
+    "pages/mine/tenant-bind/index",
+    "pages/mine/staff-bind/index",
     "pages/home/index",
     "pages/me/index",
     "pages/announcements/index",
     "pages/announcements/detail",
     "pages/bills/index",
-    "pages/energy/index",
     "pages/meeting/index",
     "pages/workorders/index",
     "pages/visitors/index",
@@ -14,9 +17,25 @@
   ],
   "window": {
     "navigationBarTitleText": "德汇创新中心",
-    "navigationBarBackgroundColor": "#d93025",
+    "navigationBarBackgroundColor": "#E4312B",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#f5f6f8"
+    "backgroundColor": "#F5F6F8"
+  },
+  "tabBar": {
+    "color": "#8A8F99",
+    "selectedColor": "#E4312B",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的"
+      }
+    ]
   },
   "permission": {
     "scope.userLocation": {

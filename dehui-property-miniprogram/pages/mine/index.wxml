@@ -1,0 +1,102 @@
+<view class="page mine-page">
+  <view class="card profile-card">
+    <view class="profile-header">
+      <view class="avatar-wrap">
+        <image class="avatar" src="/assets/dehui-logo.png" mode="aspectFit" />
+      </view>
+      <view class="profile-meta">
+        <view class="profile-title">当前身份</view>
+        <view class="profile-identity">{{identityText}}</view>
+        <view class="profile-tags">
+          <text class="status-label {{me.tenantBound ? 'bound' : 'not-bound'}}">租户绑定：{{me.tenantBound ? '已绑定' : '未绑定'}}</text>
+          <text class="status-label {{me.staffBound ? 'bound' : 'not-bound'}}">内部员工绑定：{{me.staffBound ? '已绑定' : '未绑定'}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card list-section">
+    <view class="section-title">身份管理</view>
+    <view
+      class="list-item"
+      wx:for="{{identityCards}}"
+      wx:key="key"
+      data-url="{{item.url}}"
+      bindtap="openIdentityItem"
+    >
+      <view class="item-left">
+        <view class="item-icon">{{item.icon}}</view>
+        <view class="item-content">
+          <view class="item-title">{{item.title}}</view>
+          <view class="item-subtitle">{{item.subtitle}}</view>
+        </view>
+      </view>
+      <view class="item-right">
+        <view class="item-value {{item.valueClass}}">{{item.valueText}}</view>
+        <text class="cell-arrow">›</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card list-section">
+    <view class="section-title">园区概览</view>
+    <view
+      class="list-item"
+      wx:for="{{overviewCards}}"
+      wx:key="key"
+      data-url="{{item.target}}"
+      bindtap="openOverviewItem"
+    >
+      <view class="item-left">
+        <view class="item-icon">{{item.icon}}</view>
+        <view class="item-content">
+          <view class="item-title">{{item.title}}</view>
+          <view class="item-subtitle">{{item.subtitle}}</view>
+        </view>
+      </view>
+      <view class="item-right">
+        <view class="item-value">{{item.valueText}}</view>
+        <text class="cell-arrow">›</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card list-section">
+    <view class="section-title">我的业务</view>
+    <view
+      class="list-item"
+      wx:for="{{businessCards}}"
+      wx:key="key"
+      data-url="{{item.target}}"
+      bindtap="openBusinessItem"
+    >
+      <view class="item-left">
+        <view class="item-icon">{{item.icon}}</view>
+        <view class="item-content">
+          <view class="item-title">{{item.title}}</view>
+          <view class="item-subtitle">{{item.subtitle}}</view>
+        </view>
+      </view>
+      <view class="item-right">
+        <view class="item-value">{{item.valueText}}</view>
+        <text class="cell-arrow">›</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card list-section" wx:if="{{showApiSettings}}">
+    <view class="section-title">系统设置</view>
+    <view class="list-item" bindtap="openApiSetting">
+      <view class="item-left">
+        <view class="item-icon">设</view>
+        <view class="item-content">
+          <view class="item-title">接口设置</view>
+          <view class="item-subtitle">开发环境显示</view>
+        </view>
+      </view>
+      <view class="item-right">
+        <text class="cell-arrow">›</text>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,99 +1,68 @@
-# 德汇创新中心物业管理系统
+# 德汇创新中心物业管理系统后端
 
-## 项目简介
+## 架构定位
 
-德汇创新中心物业管理系统后端服务，采用 Java 21 + Spring Boot 3 + Maven 构建。
+后端采用 Java 21 + Spring Boot 3 模块化单体架构，作为小程序和后台管理端唯一业务规则入口。
+
+```text
+HTTPS / Nginx
+  -> Spring Boot 3 API
+  -> MySQL 正式业务数据库
+  -> Redis 登录状态、验证码、权限缓存、首页统计缓存、限流、临时锁
+```
 
 ## 技术栈
 
 - Java 21
 - Spring Boot 3.2.5
 - Spring Data JPA
-- H2 Database (开发环境)
-- Lombok
+- Flyway
+- MySQL 8
+- Redis
 - Maven
 
-## 项目模块
+## 目录结构
 
-| 模块 | 说明 |
-|------|------|
-| user | 用户与权限管理 |
-| building | 楼宇/楼层/房间/租赁面积管理 |
-| tenant | 租户管理 |
-| contract | 合同管理 |
-| workorder | 工单管理 |
-| equipment | 设备巡检 |
-| energy | 能耗记录 |
-| aiassistant | AI物业助手接口预留 |
-
-## 开发环境
-
-- H2 内存数据库（dev 环境）
-- H2 Console: http://localhost:8080/api/h2-console
-- 默认 JDBC URL: `jdbc:h2:mem:property_dev`
-
-## 快速开始
-
-### 编译项目
-
-```bash
-mvn compile
+```text
+src/main/java/com/dehui/property
+  common
+  config
+  security
+  modules
+    system
+    mobile
+    building
+    tenant
+    contract
+    bill
+    meeting
+    parking
+    workorder
+    visitor
+    investment
+    checkin
+    file
+    log
+    notice
 ```
 
-### 运行项目
+## 配置
 
-```bash
-mvn spring-boot:run
+- `application.yml`：公共配置
+- `application-dev.yml`：开发环境 MySQL/Redis 配置
+- `application-prod.yml`：生产环境变量配置
+- `db/migration/V1__baseline_schema.sql`：生产级 MySQL 基线表结构
+
+生产环境不要把数据库密码、Redis 密码、微信 AppSecret 写入前端或仓库代码；使用服务器环境变量注入。
+
+## 验证
+
+```powershell
+mvn test
 ```
 
-### API 访问
+如果本机没有全局 Maven：
 
-- 基础路径: http://localhost:8080/api
-- H2 Console: http://localhost:8080/api/h2-console
-
-## 主要 API
-
-### 用户管理
-- `GET /api/user/list` - 用户列表
-- `POST /api/user/save` - 保存用户
-
-### 楼宇管理
-- `GET /api/building/list` - 楼宇列表
-- `POST /api/building/save` - 保存楼宇
-
-### 租户管理
-- `GET /api/tenant/list` - 租户列表
-- `POST /api/tenant/save` - 保存租户
-
-### 合同管理
-- `GET /api/contract/list` - 合同列表
-- `POST /api/contract/save` - 保存合同
-
-### 工单管理
-- `GET /api/workorder/list` - 工单列表
-- `POST /api/workorder/save` - 保存工单
-
-### 设备管理
-- `GET /api/equipment/list` - 设备列表
-- `POST /api/equipment/save` - 保存设备
-
-### 能耗管理
-- `GET /api/energy/list` - 能耗记录列表
-- `POST /api/energy/save` - 保存能耗记录
-
-### AI助手
-- `POST /api/ai-assistant/chat` - AI对话接口
-
-## 下一步建议
-
-1. 接入真实数据库（MySQL/PostgreSQL）
-2. 添加 Spring Security 权限控制
-3. 配置 Redis 缓存
-4. 添加 Swagger API 文档
-5. 编写单元测试
-6. 配置 Docker 部署
-
-## 配置文件
-
-- `application.yml` - 主配置
-- `application-dev.yml` - 开发环境配置
+```powershell
+& "$env:USERPROFILE/.cache/codex/apache-maven-3.9.9/bin/mvn.cmd" test
+```

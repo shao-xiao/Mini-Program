@@ -1,6 +1,23 @@
 const api = require('../../utils/request')
 const { getBaseURL } = require('../../config/env')
-const { formatDateTime } = require('../../utils/format')
+
+function toDateTimeText(value) {
+  if (!value) return '-'
+  const [date, time = ''] = value.replace('T', ' ').split(' ')
+  const [year, month, day] = date.split('-')
+  return `${year}年${month}月${day}日 ${time.slice(0, 5)}`
+}
+
+function initialForm() {
+  return {
+    title: '',
+    location: '',
+    category: 'WATER',
+    priority: 'NORMAL',
+    contactPhone: '',
+    description: ''
+  }
+}
 
 function imageUrl(url) {
   if (!url) return ''
@@ -24,17 +41,6 @@ function compressImage(filePath) {
   })
 }
 
-function initialForm() {
-  return {
-    title: '',
-    location: '',
-    category: 'WATER',
-    priority: 'NORMAL',
-    contactPhone: '',
-    description: ''
-  }
-}
-
 Page({
   data: {
     loading: false,
@@ -44,7 +50,7 @@ Page({
     form: initialForm(),
     selectedImages: [],
     maxImageCount: MAX_IMAGE_COUNT,
-    imageTip: `最多可上传${MAX_IMAGE_COUNT}张，系统将自动压缩后上传`,
+    imageTip: `最多上传${MAX_IMAGE_COUNT}张，系统会压缩后提交`,
     evaluationVisible: false,
     evaluationForm: {
       workOrderId: null,
@@ -54,17 +60,17 @@ Page({
     },
     ratingOptions: [1, 2, 3, 4, 5],
     categories: [
-      { label: '水类', value: 'WATER' },
-      { label: '电力', value: 'ELECTRIC' },
+      { label: '水路', value: 'WATER' },
+      { label: '电路', value: 'ELECTRIC' },
       { label: '空调', value: 'AIR_CONDITIONER' },
       { label: '门窗', value: 'DOOR_WINDOW' },
       { label: '网络', value: 'NETWORK' },
-      { label: '清洁', value: 'CLEANING' },
+      { label: '保洁', value: 'CLEANING' },
       { label: '其他', value: 'OTHER' }
     ],
     priorities: [
       { label: '普通', value: 'NORMAL' },
-      { label: '高', value: 'HIGH' },
+      { label: '较高', value: 'HIGH' },
       { label: '紧急', value: 'URGENT' }
     ],
     workOrders: []
@@ -80,10 +86,7 @@ Page({
       const data = await api.get('/mobile/workorders')
       const workOrders = (data.workOrders || []).map(item => ({
         ...item,
-        createdTimeText: formatDateTime(item.createdTime),
-        categoryText: this.toCategoryText(item.category),
-        priorityText: this.toPriorityText(item.priority),
-        statusText: this.toStatusText(item.status),
+        createdTimeText: toDateTimeText(item.createdTime),
         statusClass: this.toStatusClass(item.status),
         cancellable: item.status === 'CREATED',
         evaluable: (item.status === 'COMPLETED' || item.status === 'CLOSED') && !item.rating,
@@ -97,7 +100,7 @@ Page({
       })
     } catch (error) {
       this.setData({
-        errorMessage: error && error.message ? error.message : '请先登录后查看工单列表',
+        errorMessage: error && error.message ? error.message : '请先登录后提交报修',
         workOrders: []
       })
     } finally {
@@ -127,7 +130,7 @@ Page({
   chooseImages() {
     const remaining = MAX_IMAGE_COUNT - this.data.selectedImages.length
     if (remaining <= 0) {
-      wx.showToast({ title: `最多可添加${MAX_IMAGE_COUNT}张`, icon: 'none' })
+      wx.showToast({ title: `最多上传${MAX_IMAGE_COUNT}张照片`, icon: 'none' })
       return
     }
     wx.chooseImage({
@@ -139,9 +142,11 @@ Page({
         const compressedImages = await Promise.all(res.tempFilePaths.map(compressImage))
         wx.hideLoading()
         const nextImages = this.data.selectedImages.concat(compressedImages).slice(0, MAX_IMAGE_COUNT)
-        this.setData({ selectedImages: nextImages })
+        this.setData({
+          selectedImages: nextImages
+        })
         if (res.tempFilePaths.length > remaining) {
-          wx.showToast({ title: `已超出${MAX_IMAGE_COUNT}张上限`, icon: 'none' })
+          wx.showToast({ title: `最多保留${MAX_IMAGE_COUNT}张照片`, icon: 'none' })
         }
       }
     })
@@ -155,7 +160,10 @@ Page({
 
   previewSelectedImage(event) {
     const current = event.currentTarget.dataset.url
-    wx.previewImage({ current, urls: this.data.selectedImages })
+    wx.previewImage({
+      current,
+      urls: this.data.selectedImages
+    })
   },
 
   previewWorkOrderImage(event) {
@@ -167,15 +175,15 @@ Page({
   async submitWorkOrder() {
     const form = this.data.form
     if (!form.title.trim()) {
-      wx.showToast({ title: '请输入工单标题', icon: 'none' })
+      wx.showToast({ title: '请填写报修标题', icon: 'none' })
       return
     }
     if (!form.location.trim()) {
-      wx.showToast({ title: '请输入报修位置', icon: 'none' })
+      wx.showToast({ title: '请填写报修位置', icon: 'none' })
       return
     }
     if (!form.description.trim()) {
-      wx.showToast({ title: '请输入报修描述', icon: 'none' })
+      wx.showToast({ title: '请描述问题', icon: 'none' })
       return
     }
 
@@ -186,8 +194,8 @@ Page({
         await api.upload(`/mobile/workorders/${created.id}/images`, imagePath)
       }
       wx.showModal({
-        title: '提交成功',
-        content: `工单编号：${created.orderNumber}`,
+        title: '报修已提交',
+        content: `工单号：${created.orderNumber}`,
         showCancel: false
       })
       this.setData({ form: initialForm(), selectedImages: [] })
@@ -201,15 +209,15 @@ Page({
     const id = event.currentTarget.dataset.id
     const workOrder = this.data.workOrders.find(item => item.id === id)
     wx.showModal({
-      title: '取消工单',
-      content: workOrder ? `确认取消 ${workOrder.title} 的工单？` : '确认取消该工单？',
-      confirmText: '取消工单',
+      title: '撤回报修',
+      content: workOrder ? `确定撤回“${workOrder.title}”吗？` : '确定撤回该报修吗？',
+      confirmText: '撤回',
       confirmColor: '#d93025',
       success: async (res) => {
         if (!res.confirm) return
         try {
           await api.post(`/mobile/workorders/${id}/cancel`)
-          wx.showToast({ title: '已取消', icon: 'success' })
+          wx.showToast({ title: '已撤回', icon: 'success' })
           this.loadWorkOrders()
         } catch (error) {
           // request.js already shows the backend message.
@@ -267,46 +275,14 @@ Page({
   },
 
   goProfile() {
-    wx.navigateTo({ url: '/pages/me/index' })
+    wx.switchTab({ url: '/pages/mine/index' })
   },
 
   toIdentityText(profile) {
     if (!profile) return ''
-    if (profile.userType === 'INTERNAL') return `内部人员：${profile.boundSysRealName || profile.boundSysUsername || profile.nickname || ''}`
+    if (profile.userType === 'INTERNAL') return `内部员工：${profile.boundSysRealName || profile.boundSysUsername || profile.nickname || ''}`
     if (profile.userType === 'TENANT') return `租户：${profile.boundTenantName || profile.nickname || ''}`
-    return `游客：${profile.nickname || ''}`
-  },
-
-  toStatusText(status) {
-    if (status === 'CREATED') return '已创建'
-    if (status === 'ASSIGNED') return '已分配'
-    if (status === 'PROCESSING') return '处理中'
-    if (status === 'COMPLETED') return '已完成'
-    if (status === 'CLOSED') return '已关闭'
-    if (status === 'CANCELLED') return '已取消'
-    return status || '未知'
-  },
-
-  toCategoryText(category) {
-    const map = {
-      WATER: '水类',
-      ELECTRIC: '电力',
-      AIR_CONDITIONER: '空调',
-      DOOR_WINDOW: '门窗',
-      NETWORK: '网络',
-      CLEANING: '清洁',
-      OTHER: '其他'
-    }
-    return map[category] || (category || '未设置')
-  },
-
-  toPriorityText(priority) {
-    const map = {
-      NORMAL: '普通',
-      HIGH: '高',
-      URGENT: '紧急'
-    }
-    return map[priority] || (priority || '普通')
+    return `访客：${profile.nickname || ''}`
   },
 
   toStatusClass(status) {
@@ -318,24 +294,24 @@ Page({
 
   buildTimeline(item) {
     const steps = [
-      { label: '提交工单', time: item.submittedTime || item.createdTime, active: true },
-      { label: '已分配', time: item.assignedTime, active: Boolean(item.assignedTime) },
+      { label: '已提交', time: item.submittedTime || item.createdTime, active: true },
+      { label: '已派单', time: item.assignedTime, active: Boolean(item.assignedTime) },
       { label: '处理中', time: item.processingTime, active: Boolean(item.processingTime) },
-      { label: '完成', time: item.completedTime, active: Boolean(item.completedTime) },
-      { label: '关闭', time: item.closedTime, active: Boolean(item.closedTime) }
+      { label: '已完成', time: item.completedTime, active: Boolean(item.completedTime) },
+      { label: '已关闭', time: item.closedTime, active: Boolean(item.closedTime) }
     ]
     if (item.cancelledTime || item.status === 'CANCELLED') {
       return [
         steps[0],
-        { label: '已取消', time: item.cancelledTime || item.updatedTime, active: true }
+        { label: '已撤回', time: item.cancelledTime || item.updatedTime, active: true }
       ].map(step => ({
         ...step,
-        timeText: formatDateTime(step.time)
+        timeText: toDateTimeText(step.time)
       }))
     }
     return steps.map(step => ({
       ...step,
-      timeText: step.time ? formatDateTime(step.time) : ''
+      timeText: step.time ? toDateTimeText(step.time) : ''
     }))
   },
 

@@ -1,5 +1,4 @@
 const api = require('../../utils/request')
-const { formatMoney, formatDateTime } = require('../../utils/format')
 
 function pad(value) {
   return String(value).padStart(2, '0')
@@ -11,6 +10,17 @@ function formatDate(date) {
 
 function formatTime(date) {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function toDateTimeText(value) {
+  if (!value) return '-'
+  const [date, time = ''] = value.replace('T', ' ').split(' ')
+  const [year, month, day] = date.split('-')
+  return `${year}年${month}月${day}日 ${time.slice(0, 5)}`
+}
+
+function formatMoney(value) {
+  return Number(value || 0).toFixed(2)
 }
 
 function initialForm() {
@@ -58,18 +68,17 @@ Page({
       })
       const rooms = (data.rooms || []).map(room => ({
         ...room,
-        rateText: `工作时段：${formatMoney(room.workdayWorkHourRate)}/小时`,
-        offRateText: `加班时段：${formatMoney(room.workdayOffHourRate)}/小时`,
-        holidayRateText: `节假日：${formatMoney(room.holidayRate)}/小时`,
+        rateText: `工作时 ¥${formatMoney(room.workdayWorkHourRate)}/小时`,
+        offRateText: `非工作时 ¥${formatMoney(room.workdayOffHourRate)}/小时`,
+        holidayRateText: `节假日 ¥${formatMoney(room.holidayRate)}/小时`,
         selected: this.data.form.meetingRoomId === room.id
       }))
       const bookings = (data.bookings || []).map(item => ({
         ...item,
-        timeText: `${formatDateTime(item.startTime)} 至 ${formatDateTime(item.endTime)}`,
-        amountText: formatMoney(item.amount || item.calculatedAmount),
-        feeText: item.feeType === 'INTERNAL_FREE' ? '内部免费' : `预计费用 ¥ ${formatMoney(item.amount || item.calculatedAmount)}`,
+        timeText: `${toDateTimeText(item.startTime)} 至 ${toDateTimeText(item.endTime)}`,
+        amountText: formatMoney(item.calculatedAmount),
         statusText: this.toStatusText(item.status),
-        cancellable: item.status === 'PENDING' || item.status === 'BOOKED' || item.status === 'CONFIRMED'
+        cancellable: item.status === 'BOOKED' || item.status === 'CONFIRMED'
       }))
       this.setData({
         profile: data.profile || {},
@@ -79,7 +88,7 @@ Page({
       })
     } catch (error) {
       this.setData({
-        errorMessage: error && error.message ? error.message : '请先登录后再获取会议信息',
+        errorMessage: error && error.message ? error.message : '请先登录并绑定身份后预约会议室',
         rooms: [],
         bookings: []
       })
@@ -122,30 +131,36 @@ Page({
 
   onInput(event) {
     const field = event.currentTarget.dataset.field
-    this.setData({ [`form.${field}`]: event.detail.value })
+    this.setData({
+      [`form.${field}`]: event.detail.value
+    })
   },
 
   selectRoom(event) {
     const id = Number(event.currentTarget.dataset.id)
     const room = this.data.rooms.find(item => item.id === id)
     if (!room || !room.available) {
-      wx.showToast({ title: room && room.unavailableReason ? room.unavailableReason : '请重新选择可用会议室', icon: 'none' })
+      wx.showToast({ title: room && room.unavailableReason ? room.unavailableReason : '该会议室不可预约', icon: 'none' })
       return
     }
     const rooms = this.data.rooms.map(item => ({
       ...item,
       selected: item.id === id
     }))
-    this.setData({ 'form.meetingRoomId': id, selectedRoom: room, rooms })
+    this.setData({
+      'form.meetingRoomId': id,
+      selectedRoom: room,
+      rooms
+    })
   },
 
   async submitBooking() {
     if (!this.data.form.meetingRoomId) {
-      wx.showToast({ title: '请先选择会议室', icon: 'none' })
+      wx.showToast({ title: '请选择会议室', icon: 'none' })
       return
     }
     if (!this.data.form.purpose.trim()) {
-      wx.showToast({ title: '请填写使用目的', icon: 'none' })
+      wx.showToast({ title: '请填写会议用途', icon: 'none' })
       return
     }
 
@@ -161,8 +176,8 @@ Page({
         billingMode: 'HOURLY'
       })
       wx.showModal({
-        title: '预约成功',
-        content: `预约号：${booking.bookingNo || booking.bookingNumber}\n${booking.feeType === 'INTERNAL_FREE' ? '内部免费' : `预计费用：${formatMoney(booking.amount || booking.calculatedAmount)}`}`,
+        title: '预约已提交',
+        content: `预约单号：${booking.bookingNumber}\n预计金额：¥${formatMoney(booking.calculatedAmount)}`,
         showCancel: false
       })
       this.setData({
@@ -184,9 +199,9 @@ Page({
     const id = event.currentTarget.dataset.id
     const booking = this.data.bookings.find(item => item.id === id)
     wx.showModal({
-      title: '取消会议',
-      content: booking ? `确认取消 ${booking.meetingRoomName} 的预约？` : '确认取消该预约？',
-      confirmText: '取消',
+      title: '取消预约',
+      content: booking ? `确定取消 ${booking.meetingRoomName} 的预约吗？` : '确定取消该预约吗？',
+      confirmText: '取消预约',
       confirmColor: '#d93025',
       success: async (res) => {
         if (!res.confirm) return
@@ -202,7 +217,7 @@ Page({
   },
 
   goProfile() {
-    wx.navigateTo({ url: '/pages/me/index' })
+    wx.switchTab({ url: '/pages/mine/index' })
   },
 
   nextHour(time) {
@@ -212,13 +227,13 @@ Page({
 
   toIdentityText(profile) {
     if (!profile) return ''
-    if (profile.userType === 'INTERNAL') return `内部人员：${profile.boundSysRealName || profile.boundSysUsername || profile.nickname || ''}`
+    if (profile.userType === 'INTERNAL') return `内部员工：${profile.boundSysRealName || profile.boundSysUsername || profile.nickname || ''}`
     if (profile.userType === 'TENANT') return `租户：${profile.boundTenantName || profile.nickname || ''}`
-    return '游客'
+    return '访客'
   },
 
   toStatusText(status) {
-    if (status === 'BOOKED' || status === 'PENDING') return '待确认'
+    if (status === 'BOOKED') return '待确认'
     if (status === 'CONFIRMED') return '已确认'
     if (status === 'CANCELLED') return '已取消'
     if (status === 'COMPLETED') return '已完成'

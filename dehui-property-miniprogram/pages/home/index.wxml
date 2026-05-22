@@ -2,57 +2,9 @@
   <view class="section card">
     <view class="brand-title">
       <image class="brand-logo" src="/assets/dehui-logo.png" mode="aspectFit" />
-      <view>
-        <view class="title">{{overview.title || '德汇创新中心'}}</view>
-        <view class="subtitle">{{overview.subtitle || '移动端物业服务入口'}}</view>
-      </view>
+      <view class="title">德汇创新中心</view>
     </view>
-  </view>
-
-  <view wx:if="{{loading}}" class="card muted">正在加载真实运营数据...</view>
-  <view wx:if="{{publicError}}" class="card error-card">{{publicError}}</view>
-
-  <view class="section metric-grid">
-    <view class="metric-card">
-      <view class="metric-value">{{metrics.announcements.value}}</view>
-      <view class="metric-label">已发布公告</view>
-      <view class="metric-desc">{{metrics.announcements.desc}}</view>
-    </view>
-    <view class="metric-card">
-      <view class="metric-value">{{metrics.rooms.value}}</view>
-      <view class="metric-label">可租房源</view>
-      <view class="metric-desc">{{metrics.rooms.desc}}</view>
-    </view>
-    <view class="metric-card">
-      <view class="metric-value">{{metrics.bills.value}}</view>
-      <view class="metric-label">我的账单</view>
-      <view class="metric-desc">{{metrics.bills.desc}}</view>
-    </view>
-    <view class="metric-card">
-      <view class="metric-value">{{metrics.meetings.value}}</view>
-      <view class="metric-label">我的会议</view>
-      <view class="metric-desc">{{metrics.meetings.desc}}</view>
-    </view>
-    <view class="metric-card">
-      <view class="metric-value">{{metrics.workorders.value}}</view>
-      <view class="metric-label">我的工单</view>
-      <view class="metric-desc">{{metrics.workorders.desc}}</view>
-    </view>
-    <view class="metric-card">
-      <view class="metric-value">{{metrics.visitors.value}}</view>
-      <view class="metric-label">访客预约</view>
-      <view class="metric-desc">{{metrics.visitors.desc}}</view>
-    </view>
-  </view>
-
-  <view class="section card">
-    <view class="section-title">最新公告</view>
-    <view wx:if="{{latestAnnouncement}}">
-      <view class="announcement-title">{{latestAnnouncement.title}}</view>
-      <view class="announcement-time">{{latestAnnouncement.publishTimeText}}</view>
-      <button class="plain-button" size="mini" data-url="/pages/announcements/index" bindtap="goPage">查看公告</button>
-    </view>
-    <view wx:else class="muted">暂无已发布公告</view>
+    <view class="subtitle">租户服务、内部办公与招商入口</view>
   </view>
 
   <view class="section grid">
@@ -62,11 +14,7 @@
     </navigator>
     <navigator class="action" url="/pages/bills/index">
       <view class="action-title">账单中心</view>
-      <view class="action-desc">租金、能耗、停车和服务账单</view>
-    </navigator>
-    <navigator class="action" url="/pages/energy/index">
-      <view class="action-title">能耗查询</view>
-      <view class="action-desc">查看水电气用量和能源账单</view>
+      <view class="action-desc">租金、能耗、停车、会议账单</view>
     </navigator>
     <navigator class="action" url="/pages/meeting/index">
       <view class="action-title">会议预约</view>
@@ -82,13 +30,13 @@
     </navigator>
     <navigator class="action" url="/pages/investment/index">
       <view class="action-title">招商中心</view>
-      <view class="action-desc">查看真实可租房源并预约看房</view>
+      <view class="action-desc">了解园区并预约看房</view>
     </navigator>
     <navigator class="action" url="/pages/checkin/index">
       <view class="action-title">员工签到</view>
       <view class="action-desc">内部员工移动打卡</view>
     </navigator>
-    <navigator class="action" url="/pages/me/index">
+    <navigator class="action" url="/pages/mine/index" open-type="switchTab">
       <view class="action-title">我的身份</view>
       <view class="action-desc">登录、绑定租户或内部账号</view>
     </navigator>

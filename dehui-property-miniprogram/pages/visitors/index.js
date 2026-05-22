@@ -1,5 +1,4 @@
 const api = require('../../utils/request')
-const { formatDateTime } = require('../../utils/format')
 
 function pad(value) {
   return String(value).padStart(2, '0')
@@ -14,22 +13,33 @@ function toApiDateTime(value) {
   return value ? `${value.replace(' ', 'T')}:00` : ''
 }
 
+function toDateTimeText(value) {
+  if (!value) return '-'
+  const [date, time = ''] = value.replace('T', ' ').split(' ')
+  const [year, month, day] = date.split('-')
+  return `${year}年${month}月${day}日 ${time.slice(0, 5)}`
+}
+
+function initialForm() {
+  return {
+    visitorName: '',
+    visitorPhone: '',
+    tenantId: '',
+    visitedPerson: '',
+    visitReason: '',
+    visitTime: toInputDateTime(),
+    carPlateNo: '',
+    remark: ''
+  }
+}
+
 Page({
   data: {
     loading: false,
     submitting: false,
     errorMessage: '',
     identityText: '',
-    form: {
-      visitorName: '',
-      visitorPhone: '',
-      tenantId: '',
-      visitedPerson: '',
-      visitReason: '',
-      visitTime: toInputDateTime(),
-      carPlateNo: '',
-      remark: ''
-    },
+    form: initialForm(),
     visitors: []
   },
 
@@ -43,9 +53,8 @@ Page({
       const data = await api.get('/mobile/visitors')
       const visitors = (data.visitors || []).map(item => ({
         ...item,
-        visitTimeText: formatDateTime(item.visitTime),
-        leaveTimeText: formatDateTime(item.leaveTime),
-        statusText: this.toStatusText(item.status),
+        visitTimeText: toDateTimeText(item.visitTime),
+        leaveTimeText: toDateTimeText(item.leaveTime),
         cancellable: item.status === 'REGISTERED',
         statusClass: this.toStatusClass(item.status)
       }))
@@ -55,7 +64,7 @@ Page({
       })
     } catch (error) {
       this.setData({
-        errorMessage: error && error.message ? error.message : '请先登录后再获取访客记录',
+        errorMessage: error && error.message ? error.message : '请先登录后预约访客',
         visitors: []
       })
     } finally {
@@ -65,25 +74,27 @@ Page({
 
   onInput(event) {
     const field = event.currentTarget.dataset.field
-    this.setData({ [`form.${field}`]: event.detail.value })
+    this.setData({
+      [`form.${field}`]: event.detail.value
+    })
   },
 
   async submitVisitor() {
     const form = this.data.form
     if (!form.visitorName.trim()) {
-      wx.showToast({ title: '请输入来访人姓名', icon: 'none' })
+      wx.showToast({ title: '请填写访客姓名', icon: 'none' })
       return
     }
     if (!form.visitorPhone.trim()) {
-      wx.showToast({ title: '请输入来访人电话', icon: 'none' })
+      wx.showToast({ title: '请填写访客手机号', icon: 'none' })
       return
     }
     if (!form.visitedPerson.trim()) {
-      wx.showToast({ title: '请输入接待人', icon: 'none' })
+      wx.showToast({ title: '请填写被访人', icon: 'none' })
       return
     }
     if (!form.visitReason.trim()) {
-      wx.showToast({ title: '请输入来访目的', icon: 'none' })
+      wx.showToast({ title: '请填写来访事由', icon: 'none' })
       return
     }
 
@@ -100,22 +111,11 @@ Page({
         remark: form.remark
       })
       wx.showModal({
-        title: '提交成功',
-        content: `来访记录ID：${created.id}`,
+        title: '预约成功',
+        content: `访客记录ID：${created.id}`,
         showCancel: false
       })
-      this.setData({
-        form: {
-          visitorName: '',
-          visitorPhone: '',
-          tenantId: '',
-          visitedPerson: '',
-          visitReason: '',
-          visitTime: toInputDateTime(),
-          carPlateNo: '',
-          remark: ''
-        }
-      })
+      this.setData({ form: initialForm() })
       this.loadVisitors()
     } finally {
       this.setData({ submitting: false })
@@ -126,9 +126,9 @@ Page({
     const id = event.currentTarget.dataset.id
     const visitor = this.data.visitors.find(item => item.id === id)
     wx.showModal({
-      title: '取消访客',
-      content: visitor ? `确认取消 ${visitor.visitorName} 的来访记录？` : '确认取消该来访记录？',
-      confirmText: '取消来访',
+      title: '取消预约',
+      content: visitor ? `确定取消“${visitor.visitorName}”的来访预约吗？` : '确定取消该预约吗？',
+      confirmText: '取消预约',
       confirmColor: '#d93025',
       success: async (res) => {
         if (!res.confirm) return
@@ -144,22 +144,14 @@ Page({
   },
 
   goProfile() {
-    wx.navigateTo({ url: '/pages/me/index' })
+    wx.switchTab({ url: '/pages/mine/index' })
   },
 
   toIdentityText(profile) {
     if (!profile) return ''
-    if (profile.userType === 'INTERNAL') return `内部人员：${profile.boundSysRealName || profile.boundSysUsername || profile.nickname || ''}`
+    if (profile.userType === 'INTERNAL') return `内部员工：${profile.boundSysRealName || profile.boundSysUsername || profile.nickname || ''}`
     if (profile.userType === 'TENANT') return `租户：${profile.boundTenantName || profile.nickname || ''}`
-    return `游客：${profile.nickname || ''}`
-  },
-
-  toStatusText(status) {
-    if (status === 'REGISTERED') return '已登记'
-    if (status === 'ENTERED') return '已进入'
-    if (status === 'LEFT') return '已离场'
-    if (status === 'CANCELLED') return '已取消'
-    return status || '未到场'
+    return `访客：${profile.nickname || ''}`
   },
 
   toStatusClass(status) {

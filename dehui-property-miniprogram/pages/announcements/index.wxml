@@ -6,8 +6,6 @@
 
   <view wx:if="{{loading}}" class="card muted">正在加载公告...</view>
 
-  <view wx:elif="{{errorMessage}}" class="card muted">{{errorMessage}}</view>
-
   <view wx:elif="{{announcements.length === 0}}" class="card muted">
     暂无已发布公告
   </view>

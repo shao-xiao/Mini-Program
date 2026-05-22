@@ -167,23 +167,9 @@
   font-size: 24rpx;
 }
 
-.bill-actions {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
 .pay-button {
   margin: 0;
   background: #d93025;
-  color: #ffffff;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-}
-
-.invoice-button {
-  margin: 0;
-  background: #1f1b1b;
   color: #ffffff;
   border-radius: 8rpx;
   font-size: 24rpx;
