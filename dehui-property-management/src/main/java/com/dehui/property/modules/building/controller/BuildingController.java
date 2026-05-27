@@ -2,7 +2,9 @@ package com.dehui.property.modules.building.controller;
 
 import com.dehui.property.common.ApiResponse;
 import com.dehui.property.common.BusinessException;
+import com.dehui.property.common.JdbcPagination;
 import com.dehui.property.common.JdbcMaps;
+import com.dehui.property.common.PageResponse;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -220,10 +222,12 @@ public class BuildingController {
     }
 
     @GetMapping("/rooms")
-    public ApiResponse<List<Map<String, Object>>> rooms(
+    public ApiResponse<PageResponse<Map<String, Object>>> rooms(
             @RequestParam(name = "building_id", required = false) Long buildingId,
             @RequestParam(name = "floor_id", required = false) Long floorId,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer pageSize) {
         StringBuilder sql = new StringBuilder("""
                 SELECT r.id,
                        r.code AS roomCode,
@@ -242,21 +246,29 @@ public class BuildingController {
                 LEFT JOIN building_floor f ON f.id = r.floor_id
                 WHERE r.deleted = 0
                 """);
+        StringBuilder countSql = new StringBuilder("""
+                SELECT COUNT(*)
+                FROM building_room r
+                WHERE r.deleted = 0
+                """);
         List<Object> args = new java.util.ArrayList<>();
         if (buildingId != null) {
             sql.append(" AND r.building_id = ?");
+            countSql.append(" AND r.building_id = ?");
             args.add(buildingId);
         }
         if (floorId != null) {
             sql.append(" AND r.floor_id = ?");
+            countSql.append(" AND r.floor_id = ?");
             args.add(floorId);
         }
         if (status != null && !status.isBlank()) {
             sql.append(" AND r.rent_status = ?");
+            countSql.append(" AND r.rent_status = ?");
             args.add(status);
         }
         sql.append(" ORDER BY r.room_no ASC, r.id ASC");
-        return ApiResponse.success(jdbcTemplate.queryForList(sql.toString(), args.toArray()));
+        return ApiResponse.success(JdbcPagination.query(jdbcTemplate, sql.toString(), countSql.toString(), args, page, pageSize));
     }
 
     @PostMapping("/rooms")

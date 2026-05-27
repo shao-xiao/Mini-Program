@@ -10,7 +10,7 @@
 
       <el-form :inline="true" :model="query" class="toolbar">
         <el-form-item label="关键词">
-          <el-input v-model.trim="query.keyword" clearable placeholder="车位编号/使用方/车牌" @keyup.enter="load" />
+          <el-input v-model.trim="query.keyword" clearable placeholder="车位编号/使用方/车牌" @keyup.enter="search" />
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" clearable placeholder="全部" style="width: 140px">
@@ -26,7 +26,7 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="load">查询</el-button>
+          <el-button type="primary" @click="search">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
         </el-form-item>
       </el-form>
@@ -65,6 +65,18 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="load"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
 
     <el-dialog v-model="spaceVisible" :title="spaceForm.id ? '编辑车位' : '新增车位'" width="520px" destroy-on-close>
@@ -162,6 +174,7 @@ import {
   updateParkingSpaceStatus
 } from '../../api/parking'
 import request from '../../utils/request'
+import { createPagination, pageParams, readPage, resetToFirstPage } from '../../utils/pagination'
 
 const router = useRouter()
 const list = ref([])
@@ -174,6 +187,7 @@ const bindVisible = ref(false)
 const spaceFormRef = ref(null)
 const bindFormRef = ref(null)
 const currentSpace = ref(null)
+const pagination = reactive(createPagination(20))
 
 const areaOptions = ['A', 'B', 'C', 'D']
 const spaceTypeOptions = [
@@ -219,13 +233,26 @@ const bindRules = {
   }]
 }
 
+function search() {
+  resetToFirstPage(pagination)
+  load()
+}
+
 async function load() {
   loading.value = true
   try {
-    list.value = await listParkingSpaces({ ...query })
+    const data = await listParkingSpaces({ ...query, ...pageParams(pagination) })
+    const page = readPage(data)
+    list.value = page.records
+    pagination.total = page.total
   } finally {
     loading.value = false
   }
+}
+
+function handleSizeChange() {
+  resetToFirstPage(pagination)
+  load()
 }
 
 async function loadTenants() {
@@ -233,6 +260,7 @@ async function loadTenants() {
 }
 
 function resetQuery() {
+  resetToFirstPage(pagination)
   query.keyword = ''
   query.status = ''
   query.area = ''
@@ -379,5 +407,10 @@ onMounted(async () => {
 
 .muted {
   color: #909399;
+}
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 </style>

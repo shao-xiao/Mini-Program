@@ -47,6 +47,7 @@ public class AuthInterceptor implements HandlerInterceptor {
                 || uri.equals("/api/mobile/auth/wechat-login")
                 || uri.startsWith("/api/mobile/announcements")
                 || uri.startsWith("/api/mobile/investment")
+                || uri.startsWith("/api/miniapp/investment-content")
                 || uri.startsWith("/api/files/public/")
                 || uri.startsWith("/api/error");
     }

@@ -1,25 +1,71 @@
 <view class="page">
   <view class="section hero">
-    <view class="hero-title">{{overview.title || '德汇创新中心'}}</view>
-    <view class="hero-subtitle">{{overview.subtitle || '园区介绍、招商政策和预约看房。'}}</view>
-    <view class="hero-address">{{overview.address || '德汇创新中心'}}</view>
+    <block wx:if="{{hero}}">
+      <view class="hero-title">{{hero.title}}</view>
+      <view wx:if="{{hero.subtitle}}" class="hero-subtitle">{{hero.subtitle}}</view>
+      <view wx:if="{{hero.content}}" class="hero-address">{{hero.content}}</view>
+    </block>
+    <block wx:else>
+      <view class="hero-title">招商中心</view>
+      <view class="hero-subtitle">暂无已发布招商内容</view>
+    </block>
   </view>
 
   <view wx:if="{{loading}}" class="card muted">正在加载招商信息...</view>
 
-  <view wx:if="{{overview}}" class="section card">
+  <view wx:if="{{sections.highlight.length}}" class="section card">
     <view class="section-title">园区亮点</view>
     <view class="highlight-grid">
-      <view wx:for="{{overview.highlights}}" wx:key="*this" class="highlight-item">
-        {{item}}
+      <view wx:for="{{sections.highlight}}" wx:key="title" class="highlight-item">
+        <view class="item-title">{{item.title}}</view>
+        <view wx:if="{{item.subtitle}}" class="item-subtitle">{{item.subtitle}}</view>
+        <view wx:if="{{item.content}}" class="item-content">{{item.content}}</view>
       </view>
     </view>
   </view>
 
-  <view wx:if="{{overview}}" class="section card">
+  <view wx:if="{{sections.policy.length}}" class="section card">
     <view class="section-title">招商政策</view>
-    <view wx:for="{{overview.policies}}" wx:key="*this" class="policy-item">
-      {{item}}
+    <view wx:for="{{sections.policy}}" wx:key="title" class="policy-item">
+      <view class="item-title">{{item.title}}</view>
+      <view wx:if="{{item.subtitle}}" class="item-subtitle">{{item.subtitle}}</view>
+      <view wx:if="{{item.content}}" class="item-content">{{item.content}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{sections.introduction.length}}" class="section card">
+    <view class="section-title">园区介绍</view>
+    <view wx:for="{{sections.introduction}}" wx:key="title" class="text-block">
+      <view class="item-title">{{item.title}}</view>
+      <view wx:if="{{item.subtitle}}" class="item-subtitle">{{item.subtitle}}</view>
+      <view wx:if="{{item.content}}" class="item-content">{{item.content}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{sections.location.length}}" class="section card">
+    <view class="section-title">园区地址</view>
+    <view wx:for="{{sections.location}}" wx:key="title" class="text-block">
+      <view class="item-title">{{item.title}}</view>
+      <view wx:if="{{item.subtitle}}" class="item-subtitle">{{item.subtitle}}</view>
+      <view wx:if="{{item.content}}" class="item-content">{{item.content}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{sections.contact.length}}" class="section card">
+    <view class="section-title">联系方式</view>
+    <view wx:for="{{sections.contact}}" wx:key="title" class="text-block">
+      <view class="item-title">{{item.title}}</view>
+      <view wx:if="{{item.subtitle}}" class="item-subtitle">{{item.subtitle}}</view>
+      <view wx:if="{{item.content}}" class="item-content">{{item.content}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{sections.notice.length}}" class="section card">
+    <view class="section-title">招商公告</view>
+    <view wx:for="{{sections.notice}}" wx:key="title" class="policy-item">
+      <view class="item-title">{{item.title}}</view>
+      <view wx:if="{{item.subtitle}}" class="item-subtitle">{{item.subtitle}}</view>
+      <view wx:if="{{item.content}}" class="item-content">{{item.content}}</view>
     </view>
   </view>
 

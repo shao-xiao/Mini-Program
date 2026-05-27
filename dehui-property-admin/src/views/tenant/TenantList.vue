@@ -5,21 +5,39 @@
         <div class="card-header">
           <div>
             <span>租户管理</span>
-            <span class="header-tip">租户可由合同台账自动生成，也可在此维护联系人账号</span>
+            <span class="header-tip">维护租户主档、联系人账号和小程序绑定入口</span>
           </div>
           <el-button type="primary" @click="openCreateDialog">新增租户</el-button>
         </div>
       </template>
 
       <el-table :data="tenants" border style="width: 100%">
-        <el-table-column prop="id" label="租户ID" width="90" />
-        <el-table-column prop="tenantName" label="租户名称" />
-        <el-table-column prop="contactPerson" label="联系人" />
-        <el-table-column prop="contactPhone" label="联系电话" />
-        <el-table-column prop="contactEmail" label="邮箱" />
-        <el-table-column prop="businessLicense" label="营业执照" />
-        <el-table-column prop="status" label="状态" width="100" />
-        <el-table-column label="操作" width="250">
+        <el-table-column prop="tenantCode" label="租户编号" width="140" />
+        <el-table-column prop="tenantName" label="租户名称" min-width="180" />
+        <el-table-column prop="contactPerson" label="联系人" min-width="120" />
+        <el-table-column label="联系电话" min-width="155">
+          <template #default="{ row }">
+            <span :class="{ 'invalid-contact': row.contactPhone && !isValidContactPhone(row.contactPhone) }">
+              {{ contactText(row.contactPhone, 'phone') }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="邮箱" min-width="190">
+          <template #default="{ row }">
+            <span :class="{ 'invalid-contact': row.contactEmail && !isValidEmail(row.contactEmail) }">
+              {{ contactText(row.contactEmail, 'email') }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="businessLicense" label="营业执照 / 统一信用代码" min-width="190" />
+        <el-table-column label="状态" width="105" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'info'" effect="plain">
+              {{ row.status === 'ACTIVE' ? '正常' : '停用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
             <el-button size="small" type="primary" @click="openContactDialog(row)">联系人</el-button>
@@ -29,29 +47,29 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑租户' : '新增租户'" width="520px">
-      <el-form :model="form" label-width="100px">
-        <el-form-item label="租户名称">
+    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑租户' : '新增租户'" width="560px">
+      <el-form ref="tenantFormRef" :model="form" :rules="tenantRules" label-width="120px">
+        <el-form-item label="租户名称" prop="tenantName">
           <el-input v-model="form.tenantName" />
         </el-form-item>
 
-        <el-form-item label="联系人">
+        <el-form-item label="联系人" prop="contactPerson">
           <el-input v-model="form.contactPerson" />
         </el-form-item>
 
-        <el-form-item label="联系电话">
-          <el-input v-model="form.contactPhone" />
+        <el-form-item label="联系电话" prop="contactPhone">
+          <el-input v-model="form.contactPhone" placeholder="例如 13800000000 或 021-88888888" />
         </el-form-item>
 
-        <el-form-item label="邮箱">
-          <el-input v-model="form.contactEmail" />
+        <el-form-item label="邮箱" prop="contactEmail">
+          <el-input v-model="form.contactEmail" placeholder="例如 name@example.com" />
         </el-form-item>
 
-        <el-form-item label="营业执照">
+        <el-form-item label="营业执照" prop="businessLicense">
           <el-input v-model="form.businessLicense" />
         </el-form-item>
 
-        <el-form-item label="状态">
+        <el-form-item label="状态" prop="status">
           <el-select v-model="form.status" style="width: 100%">
             <el-option label="正常" value="ACTIVE" />
             <el-option label="停用" value="INACTIVE" />
@@ -68,7 +86,7 @@
     <el-dialog
       v-model="contactDialogVisible"
       :title="currentTenant ? `联系人账号 - ${currentTenant.tenantName}` : '联系人账号'"
-      width="760px"
+      width="820px"
     >
       <div class="contact-toolbar">
         <el-button type="primary" @click="openContactForm">新增联系人</el-button>
@@ -76,9 +94,22 @@
 
       <el-table :data="contacts" border style="width: 100%">
         <el-table-column prop="name" label="姓名" min-width="120" />
-        <el-table-column prop="phone" label="手机号/账号" min-width="140" />
+        <el-table-column label="手机号 / 账号" min-width="150">
+          <template #default="{ row }">
+            <span :class="{ 'invalid-contact': row.phone && !isValidContactPhone(row.phone) }">
+              {{ contactText(row.phone, 'phone') }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="邮箱" min-width="180">
+          <template #default="{ row }">
+            <span :class="{ 'invalid-contact': row.email && !isValidEmail(row.email) }">
+              {{ contactText(row.email, 'email') }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column prop="role" label="角色" min-width="120" />
-        <el-table-column label="主联系人" width="95" align="center">
+        <el-table-column label="主联系人" width="100" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.isPrimary" type="success">是</el-tag>
             <span v-else>-</span>
@@ -91,8 +122,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="lastBindTime" label="最近绑定" min-width="170" />
-        <el-table-column label="操作" width="220">
+        <el-table-column label="操作" width="230">
           <template #default="{ row }">
             <el-button size="small" @click="editContact(row)">编辑</el-button>
             <el-button size="small" @click="resetPassword(row)">重置密码</el-button>
@@ -104,21 +134,24 @@
       </el-table>
     </el-dialog>
 
-    <el-dialog v-model="contactFormVisible" :title="contactForm.id ? '编辑联系人' : '新增联系人'" width="520px">
-      <el-form :model="contactForm" label-width="110px">
-        <el-form-item label="姓名">
+    <el-dialog v-model="contactFormVisible" :title="contactForm.id ? '编辑联系人' : '新增联系人'" width="540px">
+      <el-form ref="contactFormRef" :model="contactForm" :rules="contactRules" label-width="115px">
+        <el-form-item label="姓名" prop="name">
           <el-input v-model="contactForm.name" />
         </el-form-item>
-        <el-form-item label="手机号">
-          <el-input v-model="contactForm.phone" />
+        <el-form-item label="手机号" prop="phone">
+          <el-input v-model="contactForm.phone" placeholder="例如 13800000000" />
         </el-form-item>
-        <el-form-item label="角色">
-          <el-input v-model="contactForm.role" placeholder="如 财务/行政/负责人" />
+        <el-form-item label="邮箱" prop="email">
+          <el-input v-model="contactForm.email" placeholder="例如 name@example.com" />
         </el-form-item>
-        <el-form-item label="主联系人">
+        <el-form-item label="角色" prop="role">
+          <el-input v-model="contactForm.role" placeholder="如：财务 / 行政 / 负责人" />
+        </el-form-item>
+        <el-form-item label="主联系人" prop="isPrimary">
           <el-switch v-model="contactForm.isPrimary" />
         </el-form-item>
-        <el-form-item label="状态">
+        <el-form-item label="状态" prop="status">
           <el-select v-model="contactForm.status" style="width: 100%">
             <el-option label="正常" value="ACTIVE" />
             <el-option label="停用" value="INACTIVE" />
@@ -142,8 +175,8 @@
 
       <template v-else-if="overview">
         <el-alert
-          :title="overview.miniProgramVisibility?.message || '已发布账单可由已绑定联系人在小程序查看。'"
-          :type="overview.miniProgramVisibility?.visibleContactCount > 0 ? 'success' : 'warning'"
+          :title="overview.miniProgramVisibility?.message || '已维护且启用的联系人，可用于后续小程序绑定和账单查看。'"
+          :type="overview.contacts?.length ? 'success' : 'warning'"
           show-icon
           :closable="false"
           class="overview-alert"
@@ -153,12 +186,8 @@
           <el-tab-pane label="总览" name="summary">
             <div class="summary-grid">
               <div class="summary-card">
-                <div class="summary-label">有效联系人</div>
-                <div class="summary-value">{{ overview.miniProgramVisibility?.hasActiveContact ? '有' : '无' }}</div>
-              </div>
-              <div class="summary-card">
-                <div class="summary-label">已绑定小程序联系人</div>
-                <div class="summary-value">{{ overview.miniProgramVisibility?.boundContactCount || 0 }}</div>
+                <div class="summary-label">联系人数量</div>
+                <div class="summary-value">{{ overview.contacts?.length || 0 }}</div>
               </div>
               <div class="summary-card">
                 <div class="summary-label">已发布账单</div>
@@ -168,14 +197,26 @@
                 <div class="summary-label">待缴金额</div>
                 <div class="summary-value">{{ money(overview.billSummary?.unpaidAmount) }}</div>
               </div>
+              <div class="summary-card">
+                <div class="summary-label">租户状态</div>
+                <div class="summary-value">{{ overview.tenant.status || '-' }}</div>
+              </div>
             </div>
 
             <el-descriptions :column="2" border>
               <el-descriptions-item label="租户名称">{{ overview.tenant.tenantName }}</el-descriptions-item>
               <el-descriptions-item label="状态">{{ overview.tenant.status || '-' }}</el-descriptions-item>
               <el-descriptions-item label="联系人">{{ overview.tenant.contactPerson || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="联系电话">{{ overview.tenant.contactPhone || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="邮箱">{{ overview.tenant.contactEmail || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="联系电话">
+                <span :class="{ 'invalid-contact': overview.tenant.contactPhone && !isValidContactPhone(overview.tenant.contactPhone) }">
+                  {{ contactText(overview.tenant.contactPhone, 'phone') }}
+                </span>
+              </el-descriptions-item>
+              <el-descriptions-item label="邮箱">
+                <span :class="{ 'invalid-contact': overview.tenant.contactEmail && !isValidEmail(overview.tenant.contactEmail) }">
+                  {{ contactText(overview.tenant.contactEmail, 'email') }}
+                </span>
+              </el-descriptions-item>
               <el-descriptions-item label="营业执照">{{ overview.tenant.businessLicense || '-' }}</el-descriptions-item>
             </el-descriptions>
           </el-tab-pane>
@@ -186,20 +227,26 @@
             </div>
             <el-table :data="overview.contacts || []" border>
               <el-table-column prop="name" label="姓名" />
-              <el-table-column prop="phone" label="手机号/账号" />
+              <el-table-column label="手机号 / 账号">
+                <template #default="{ row }">
+                  <span :class="{ 'invalid-contact': row.phone && !isValidContactPhone(row.phone) }">
+                    {{ contactText(row.phone, 'phone') }}
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column label="邮箱">
+                <template #default="{ row }">
+                  <span :class="{ 'invalid-contact': row.email && !isValidEmail(row.email) }">
+                    {{ contactText(row.email, 'email') }}
+                  </span>
+                </template>
+              </el-table-column>
               <el-table-column label="角色">
                 <template #default="{ row }">{{ row.roleText || row.role || '-' }}</template>
               </el-table-column>
               <el-table-column label="主联系人" width="90">
                 <template #default="{ row }"><el-tag v-if="row.isPrimary" type="success">是</el-tag><span v-else>-</span></template>
               </el-table-column>
-              <el-table-column label="小程序绑定" width="120">
-                <template #default="{ row }">
-                  <el-tag :type="row.boundMiniProgram ? 'success' : 'info'">{{ row.boundMiniProgram ? '已绑定' : '未绑定' }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="lastBoundAt" label="最近绑定" />
-              <el-table-column prop="lastLoginAtText" label="最近登录" />
             </el-table>
           </el-tab-pane>
 
@@ -216,16 +263,6 @@
               <el-table-column label="状态" width="100">
                 <template #default="{ row }">{{ row.statusText || row.status }}</template>
               </el-table-column>
-            </el-table>
-
-            <div class="section-title">入驻记录</div>
-            <el-table :data="overview.occupancies || []" border>
-              <el-table-column prop="contractNumber" label="合同" />
-              <el-table-column prop="roomName" label="房间" />
-              <el-table-column prop="checkInDate" label="入驻日期" />
-              <el-table-column prop="plannedEndDate" label="计划结束" />
-              <el-table-column prop="checkoutDate" label="退租日期" />
-              <el-table-column prop="status" label="状态" />
             </el-table>
           </el-tab-pane>
 
@@ -253,28 +290,6 @@
                   <el-tag :type="row.auditStatus === 'APPROVED' ? 'success' : 'warning'">{{ row.auditStatusText }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="小程序可见" width="120">
-                <template #default="{ row }">
-                  <el-tag :type="row.visibleToTenantMiniProgram ? 'success' : 'info'">{{ row.visibleToTenantMiniProgram ? '可见' : '不可见' }}</el-tag>
-                </template>
-              </el-table-column>
-            </el-table>
-          </el-tab-pane>
-
-          <el-tab-pane label="小程序可见性" name="visibility">
-            <el-descriptions :column="1" border>
-              <el-descriptions-item label="说明">{{ overview.miniProgramVisibility?.message }}</el-descriptions-item>
-              <el-descriptions-item label="已绑定联系人">{{ overview.miniProgramVisibility?.boundContactCount || 0 }}</el-descriptions-item>
-              <el-descriptions-item label="可看账单联系人">{{ overview.miniProgramVisibility?.visibleContactCount || 0 }}</el-descriptions-item>
-            </el-descriptions>
-            <div class="section-title">可查看账单的联系人</div>
-            <el-table :data="overview.miniProgramVisibility?.visibleContacts || []" border>
-              <el-table-column prop="name" label="姓名" />
-              <el-table-column prop="phone" label="手机号" />
-              <el-table-column label="角色">
-                <template #default="{ row }">{{ row.roleText || row.role || '-' }}</template>
-              </el-table-column>
-              <el-table-column prop="lastBoundAt" label="最近绑定" />
             </el-table>
           </el-tab-pane>
         </el-tabs>
@@ -284,9 +299,17 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
+import { readPage } from '../../utils/pagination'
+import {
+  isValidContactPhone,
+  isValidEmail,
+  optionalContactPhoneRule,
+  optionalEmailRule,
+  validateContactPhone
+} from '../../utils/contactValidation'
 
 const tenants = ref([])
 const dialogVisible = ref(false)
@@ -298,6 +321,8 @@ const overviewTab = ref('summary')
 const contacts = ref([])
 const currentTenant = ref(null)
 const overview = ref(null)
+const tenantFormRef = ref()
+const contactFormRef = ref()
 
 const form = reactive({
   id: null,
@@ -313,42 +338,73 @@ const contactForm = reactive({
   id: null,
   name: '',
   phone: '',
+  email: '',
   role: '',
   isPrimary: false,
   status: 'ACTIVE'
 })
 
-const resetForm = () => {
-  form.id = null
-  form.tenantName = ''
-  form.contactPerson = ''
-  form.contactPhone = ''
-  form.contactEmail = ''
-  form.businessLicense = ''
-  form.status = 'ACTIVE'
+const requiredContactPhoneRule = {
+  validator(rule, value, callback) {
+    if (!String(value || '').trim()) {
+      callback(new Error('请输入联系电话'))
+      return
+    }
+    validateContactPhone(rule, value, callback)
+  },
+  trigger: 'blur'
 }
 
-const resetContactForm = () => {
-  contactForm.id = null
-  contactForm.name = ''
-  contactForm.phone = ''
-  contactForm.role = ''
-  contactForm.isPrimary = false
-  contactForm.status = 'ACTIVE'
+const tenantRules = {
+  tenantName: [{ required: true, message: '请输入租户名称', trigger: 'blur' }],
+  contactPhone: [optionalContactPhoneRule],
+  contactEmail: [optionalEmailRule]
 }
 
-const loadTenants = async () => {
+const contactRules = {
+  name: [{ required: true, message: '请输入联系人姓名', trigger: 'blur' }],
+  phone: [requiredContactPhoneRule],
+  email: [optionalEmailRule]
+}
+
+function resetForm() {
+  Object.assign(form, {
+    id: null,
+    tenantName: '',
+    contactPerson: '',
+    contactPhone: '',
+    contactEmail: '',
+    businessLicense: '',
+    status: 'ACTIVE'
+  })
+  tenantFormRef.value?.clearValidate()
+}
+
+function resetContactForm() {
+  Object.assign(contactForm, {
+    id: null,
+    name: '',
+    phone: '',
+    email: '',
+    role: '',
+    isPrimary: false,
+    status: 'ACTIVE'
+  })
+  contactFormRef.value?.clearValidate()
+}
+
+async function loadTenants() {
   const data = await request.get('/tenant/list')
-  tenants.value = data || []
+  tenants.value = readPage(data).records
 }
 
-const loadContacts = async () => {
+async function loadContacts() {
   if (!currentTenant.value) return
   const data = await request.get(`/tenant/${currentTenant.value.id}/contacts`)
-  contacts.value = Array.isArray(data) ? data : []
+  contacts.value = readPage(data).records
 }
 
-const loadOverview = async (tenantId) => {
+async function loadOverview(tenantId) {
   overviewLoading.value = true
   try {
     overview.value = await request.get(`/tenant/${tenantId}/overview`)
@@ -357,62 +413,93 @@ const loadOverview = async (tenantId) => {
   }
 }
 
-const openCreateDialog = () => {
+function openCreateDialog() {
   resetForm()
   dialogVisible.value = true
 }
 
-const openEditDialog = (row) => {
+function openEditDialog(row) {
+  resetForm()
   Object.assign(form, row)
   dialogVisible.value = true
 }
 
-const openContactDialog = async (row) => {
+async function openContactDialog(row) {
   currentTenant.value = row
   contactDialogVisible.value = true
   await loadContacts()
 }
 
-const openOverview = async (row) => {
+async function openOverview(row) {
   overview.value = null
   overviewTab.value = 'summary'
   overviewVisible.value = true
   await loadOverview(row.id)
 }
 
-const openContactForm = () => {
+function openContactForm() {
   resetContactForm()
   contactFormVisible.value = true
 }
 
-const editContact = (row) => {
-  Object.assign(contactForm, row)
+function editContact(row) {
+  resetContactForm()
+  Object.assign(contactForm, {
+    id: row.id,
+    name: row.name || '',
+    phone: row.phone || '',
+    email: row.email || '',
+    role: row.role || '',
+    isPrimary: Boolean(row.isPrimary),
+    status: row.status || 'ACTIVE'
+  })
   contactFormVisible.value = true
 }
 
-const saveTenant = async () => {
-  if (!form.tenantName) {
-    ElMessage.warning('请输入租户名称')
+async function saveTenant() {
+  const valid = await tenantFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  if (!isValidContactPhone(form.contactPhone)) {
+    ElMessage.warning('请输入正确的联系电话，例如 13800000000 或 021-88888888')
+    return
+  }
+  if (!isValidEmail(form.contactEmail)) {
+    ElMessage.warning('请输入正确的邮箱地址，例如 name@example.com')
     return
   }
 
-  await request.post('/tenant/save', form)
+  await request.post('/tenant/save', { ...form })
   ElMessage.success('保存成功')
 
   dialogVisible.value = false
   await loadTenants()
+  if (overviewVisible.value && form.id) {
+    await loadOverview(form.id)
+  }
 }
 
-const saveContact = async () => {
+async function saveContact() {
   if (!currentTenant.value) return
-  if (!contactForm.name || !contactForm.phone) {
-    ElMessage.warning('请输入联系人姓名和手机号')
+  const valid = await contactFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  if (!String(contactForm.phone || '').trim()) {
+    ElMessage.warning('请输入联系电话')
+    return
+  }
+  if (!isValidContactPhone(contactForm.phone)) {
+    ElMessage.warning('请输入正确的联系电话，例如 13800000000 或 021-88888888')
+    return
+  }
+  if (!isValidEmail(contactForm.email)) {
+    ElMessage.warning('请输入正确的邮箱地址，例如 name@example.com')
     return
   }
 
   const data = await request.post(`/tenant/${currentTenant.value.id}/contacts`, {
+    id: contactForm.id,
     name: contactForm.name,
     phone: contactForm.phone,
+    email: contactForm.email,
     role: contactForm.role,
     isPrimary: contactForm.isPrimary,
     status: contactForm.status
@@ -430,7 +517,7 @@ const saveContact = async () => {
   }
 }
 
-const deactivateContact = async (row) => {
+async function deactivateContact(row) {
   await ElMessageBox.confirm(`确定停用联系人「${row.name}」吗？停用后无法绑定小程序。`, '停用确认', { type: 'warning' })
   await request.post(`/tenant/contacts/${row.id}/deactivate`)
   ElMessage.success('联系人已停用')
@@ -440,7 +527,7 @@ const deactivateContact = async (row) => {
   }
 }
 
-const resetPassword = async (row) => {
+async function resetPassword(row) {
   await ElMessageBox.confirm(`确定重置联系人「${row.name}」的初始密码吗？`, '重置确认', { type: 'warning' })
   const data = await request.post(`/tenant/contacts/${row.id}/reset-password`)
   await loadContacts()
@@ -450,6 +537,12 @@ const resetPassword = async (row) => {
   if (overviewVisible.value && currentTenant.value) {
     await loadOverview(currentTenant.value.id)
   }
+}
+
+function contactText(value, type) {
+  if (!value) return '-'
+  const valid = type === 'phone' ? isValidContactPhone(value) : isValidEmail(value)
+  return valid ? value : `${value}（格式异常）`
 }
 
 function money(value) {
@@ -485,6 +578,11 @@ onMounted(() => {
   margin-left: 12px;
   color: #909399;
   font-size: 13px;
+}
+
+.invalid-contact {
+  color: #d93025;
+  font-weight: 600;
 }
 
 .contact-toolbar {
@@ -527,12 +625,6 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 12px;
-}
-
-.section-title {
-  margin: 18px 0 10px;
-  color: #303133;
-  font-weight: 600;
 }
 
 @media (max-width: 900px) {

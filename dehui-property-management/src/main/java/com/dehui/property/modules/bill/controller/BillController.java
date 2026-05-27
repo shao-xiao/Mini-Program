@@ -2,8 +2,11 @@ package com.dehui.property.modules.bill.controller;
 
 import com.dehui.property.common.ApiResponse;
 import com.dehui.property.common.BusinessException;
+import com.dehui.property.common.JdbcPagination;
 import com.dehui.property.common.JdbcMaps;
+import com.dehui.property.common.PageResponse;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -22,9 +26,15 @@ public class BillController {
     private final JdbcTemplate jdbcTemplate;
 
     @GetMapping("/bills")
-    public ApiResponse<List<Map<String, Object>>> bills() {
-        return ApiResponse.success(jdbcTemplate.queryForList(
-                """
+    public ApiResponse<PageResponse<Map<String, Object>>> bills(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long tenantId,
+            @RequestParam(required = false) String billType,
+            @RequestParam(required = false) String auditStatus,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer pageSize) {
+        String selectSql = """
                 SELECT b.id,
                        b.code,
                        b.code AS billNumber,
@@ -45,8 +55,47 @@ public class BillController {
                 LEFT JOIN tenant t ON t.id = b.tenant_id
                 LEFT JOIN bill_invoice i ON i.bill_id = b.id AND i.deleted = 0
                 WHERE b.deleted = 0
-                ORDER BY b.due_date DESC, b.updated_at DESC, b.id DESC
-                """
+                """;
+        String countSql = """
+                SELECT COUNT(*)
+                FROM bill b
+                LEFT JOIN tenant t ON t.id = b.tenant_id
+                WHERE b.deleted = 0
+                """;
+        List<Object> args = new ArrayList<>();
+        StringBuilder where = new StringBuilder();
+        if (keyword != null && !keyword.isBlank()) {
+            where.append(" AND (b.code LIKE ? OR t.name LIKE ? OR b.bill_type LIKE ? OR b.source_type LIKE ?)");
+            String likeKeyword = "%" + keyword.trim() + "%";
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+        }
+        if (tenantId != null) {
+            where.append(" AND b.tenant_id = ?");
+            args.add(tenantId);
+        }
+        if (billType != null && !billType.isBlank()) {
+            where.append(" AND b.bill_type = ?");
+            args.add(billType);
+        }
+        if (auditStatus != null && !auditStatus.isBlank()) {
+            where.append(" AND b.audit_status = ?");
+            args.add(auditStatus);
+        }
+        if (status != null && !status.isBlank()) {
+            where.append(" AND b.pay_status = ?");
+            args.add(status);
+        }
+        String orderSql = " ORDER BY b.due_date DESC, b.updated_at DESC, b.id DESC";
+        return ApiResponse.success(JdbcPagination.query(
+                jdbcTemplate,
+                selectSql + where + orderSql,
+                countSql + where,
+                args,
+                page,
+                pageSize
         ));
     }
 
@@ -144,7 +193,31 @@ public class BillController {
 
     @GetMapping("/mobile/bills")
     public ApiResponse<List<Map<String, Object>>> mobileBills() {
-        return bills();
+        return ApiResponse.success(jdbcTemplate.queryForList(
+                """
+                SELECT b.id,
+                       b.code,
+                       b.code AS billNumber,
+                       b.tenant_id AS tenantId,
+                       t.name AS tenantName,
+                       b.contract_id AS contractId,
+                       b.source_type AS sourceType,
+                       b.bill_type AS billType,
+                       b.amount,
+                       b.paid_amount AS paidAmount,
+                       b.due_date AS dueDate,
+                       b.audit_status AS auditStatus,
+                       b.pay_status AS payStatus,
+                       b.pay_status AS status,
+                       b.remark,
+                       CASE WHEN i.id IS NULL THEN 'NONE' ELSE i.invoice_status END AS invoiceStatus
+                FROM bill b
+                LEFT JOIN tenant t ON t.id = b.tenant_id
+                LEFT JOIN bill_invoice i ON i.bill_id = b.id AND i.deleted = 0
+                WHERE b.deleted = 0
+                ORDER BY b.due_date DESC, b.updated_at DESC, b.id DESC
+                """
+        ));
     }
 
     private void updateBill(Long id, String setClause, Object value) {

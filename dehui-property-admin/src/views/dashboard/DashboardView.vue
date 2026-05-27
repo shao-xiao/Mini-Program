@@ -141,6 +141,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import request from '../../utils/request'
+import { readPage } from '../../utils/pagination'
 
   const loading = ref(false)
   const report = ref({})
@@ -582,8 +583,8 @@ async function loadReport() {
 
 async function loadBills() {
   try {
-    const data = await request.get('/bills', { silent: true })
-    bills.value = Array.isArray(data) ? data : []
+    const data = await request.get('/bills', { params: { page: 1, pageSize: 100 }, silent: true })
+    bills.value = readPage(data).records
   } catch {
     bills.value = []
   }

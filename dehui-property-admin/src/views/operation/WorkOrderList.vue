@@ -134,6 +134,18 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="load"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
 
     <el-dialog v-model="visible" title="新增工单" width="560px">
@@ -301,6 +313,7 @@
 import {ref, reactive, onMounted, computed} from 'vue'
 import {ElMessage} from 'element-plus'
 import request from '../../utils/request'
+import { createPagination, pageParams, readPage, resetToFirstPage } from '../../utils/pagination'
 
 const list = ref([])
 const users = ref([])
@@ -310,6 +323,7 @@ const assignVisible = ref(false)
 const completeVisible = ref(false)
 const currentUsername = localStorage.getItem('username') || '当前用户'
 const currentUserId = Number(localStorage.getItem('userId'))
+const pagination = reactive(createPagination(20))
 
 const orderTypeOptions = [
   { label: '维修报修', value: 'REPAIR' },
@@ -455,8 +469,15 @@ const imageSrc = (url)=>{
 const workOrderRowClassName = ({row}) => row.slaOverdue ? 'sla-overdue-row' : ''
 
 const load = async ()=>{
-  const data = await request.get('/workorders')
-  list.value = data || []
+  const data = await request.get('/workorders', { params: pageParams(pagination) })
+  const page = readPage(data)
+  list.value = page.records
+  pagination.total = page.total
+}
+
+const handleSizeChange = () => {
+  resetToFirstPage(pagination)
+  load()
 }
 
 const loadUsers = async ()=>{
@@ -631,5 +652,10 @@ onMounted(()=>{
   width:48px;
   height:48px;
   border-radius:6px;
+}
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 </style>

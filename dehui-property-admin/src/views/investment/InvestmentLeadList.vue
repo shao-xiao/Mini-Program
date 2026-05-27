@@ -60,16 +60,30 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="load"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '../../utils/request'
+import { createPagination, pageParams, readPage, resetToFirstPage } from '../../utils/pagination'
 
 const leads = ref([])
+const pagination = reactive(createPagination(20))
 
 const statusText = (status) => {
   if (status === 'NEW') return '新线索'
@@ -97,8 +111,15 @@ const formatDateTime = (value) => {
 }
 
 const load = async () => {
-  const data = await request.get('/investment/leads')
-  leads.value = data || []
+  const data = await request.get('/investment/leads', { params: pageParams(pagination) })
+  const page = readPage(data)
+  leads.value = page.records
+  pagination.total = page.total
+}
+
+const handleSizeChange = () => {
+  resetToFirstPage(pagination)
+  load()
 }
 
 const updateStatus = async (row, status) => {
@@ -151,5 +172,10 @@ onMounted(load)
   margin-left: 0;
   padding-left: 10px;
   padding-right: 10px;
+}
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 </style>

@@ -1,0 +1,6 @@
+ALTER TABLE tenant
+  ADD COLUMN contact_person VARCHAR(64) DEFAULT NULL COMMENT '联系人' AFTER name,
+  ADD COLUMN contact_email VARCHAR(128) DEFAULT NULL COMMENT '联系邮箱' AFTER contact_phone;
+
+ALTER TABLE tenant_contact
+  ADD COLUMN email VARCHAR(128) DEFAULT NULL COMMENT '邮箱' AFTER phone;

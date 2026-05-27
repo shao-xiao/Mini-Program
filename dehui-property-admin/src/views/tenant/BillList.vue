@@ -26,7 +26,7 @@
               clearable
               placeholder="账单编号/租户/合同/类型"
               style="width: 220px"
-              @keyup.enter="loadBills"
+              @keyup.enter="searchBills"
             />
           </el-form-item>
 
@@ -70,7 +70,7 @@
           </el-form-item>
 
           <el-form-item>
-            <el-button type="primary" @click="loadBills">查询</el-button>
+            <el-button type="primary" @click="searchBills">查询</el-button>
             <el-button @click="resetQuery">重置</el-button>
           </el-form-item>
         </el-form>
@@ -192,6 +192,18 @@
             </template>
           </el-table-column>
         </el-table>
+
+        <div class="pagination-wrapper">
+          <el-pagination
+            v-model:current-page="pagination.currentPage"
+            v-model:page-size="pagination.pageSize"
+            :total="pagination.total"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next, jumper"
+            @current-change="loadBills"
+            @size-change="handleSizeChange"
+          />
+        </div>
       </template>
     </el-card>
 
@@ -293,6 +305,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 import { hasPermission } from '../../utils/permission'
+import { createPagination, pageParams, readPage, resetToFirstPage } from '../../utils/pagination'
 
 const bills = ref([])
 const tenants = ref([])
@@ -304,6 +317,7 @@ const dialogVisible = ref(false)
 const formRef = ref(null)
 const invoiceInputRef = ref(null)
 const currentInvoiceBill = ref(null)
+const pagination = reactive(createPagination(20))
 
 const queryForm = reactive({
   keyword: '',
@@ -371,13 +385,20 @@ const selectableContracts = computed(() => {
   return contracts.value.filter(item => item.status === 'ACTIVE' && (!form.tenantId || item.tenantId === form.tenantId))
 })
 
+function searchBills() {
+  resetToFirstPage(pagination)
+  loadBills()
+}
+
 async function loadBills() {
   if (!hasPermission('bill:view')) return
   loading.value = true
   try {
-    const params = buildQueryParams()
+    const params = { ...buildQueryParams(), ...pageParams(pagination) }
     const data = await request.get('/bills', { params })
-    bills.value = Array.isArray(data) ? data : []
+    const page = readPage(data)
+    bills.value = page.records
+    pagination.total = page.total
   } catch (error) {
     ElMessage.error(error?.response?.data?.message || error?.message || '账单加载失败')
   } finally {
@@ -396,6 +417,7 @@ async function loadContracts() {
 }
 
 function resetQuery() {
+  resetToFirstPage(pagination)
   queryForm.keyword = ''
   queryForm.tenantId = null
   queryForm.billType = ''
@@ -408,6 +430,11 @@ function buildQueryParams() {
   return Object.fromEntries(
     Object.entries(queryForm).filter(([, value]) => value !== null && value !== '')
   )
+}
+
+function handleSizeChange() {
+  resetToFirstPage(pagination)
+  loadBills()
 }
 
 function resetForm() {
@@ -761,5 +788,10 @@ onMounted(async () => {
 
 .hidden-file-input {
   display: none;
+}
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 </style>

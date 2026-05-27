@@ -18,17 +18,17 @@
           </el-select>
         </el-form-item>
         <el-form-item label="楼层">
-          <el-select v-model="query.floorId" class="filter-select" clearable placeholder="全部楼层" @change="loadAssets">
+          <el-select v-model="query.floorId" class="filter-select" clearable placeholder="全部楼层" @change="searchAssets">
             <el-option v-for="item in queryFloors" :key="item.id" :label="formatFloorLabel(item)" :value="item.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="query.status" class="filter-select" clearable placeholder="全部状态" @change="loadAssets">
+          <el-select v-model="query.status" class="filter-select" clearable placeholder="全部状态" @change="searchAssets">
             <el-option v-for="item in assetStatuses" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="loadAssets">查询</el-button>
+          <el-button type="primary" @click="searchAssets">查询</el-button>
         </el-form-item>
       </el-form>
 
@@ -59,6 +59,18 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="loadAssets"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="form.id ? '编辑资产' : '新增资产'" width="680px">
@@ -160,6 +172,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
+import { createPagination, pageParams, readPage, resetToFirstPage } from '../../utils/pagination'
 
 const buildings = ref([])
 const queryFloors = ref([])
@@ -172,6 +185,7 @@ const loading = ref(false)
 const saving = ref(false)
 const dialogVisible = ref(false)
 const transferVisible = ref(false)
+const pagination = reactive(createPagination(20))
 
 const assetStatuses = [
   { label: '使用中', value: 'IN_USE' },
@@ -236,25 +250,31 @@ function formatFloorLabel(floor) {
 
 async function loadBuildings() {
   const data = await request.get('/buildings')
-  buildings.value = Array.isArray(data) ? data : (data?.content || [])
+  buildings.value = readPage(data).records
 }
 
 async function loadFloors(buildingId) {
   if (!buildingId) return []
   const data = await request.get('/floors', { params: { building_id: buildingId } })
-  return Array.isArray(data) ? data : []
+  return readPage(data).records
 }
 
 async function loadRooms(buildingId, floorId) {
   if (!buildingId || !floorId) return []
-  const data = await request.get('/rooms', { params: { building_id: buildingId, floor_id: floorId } })
-  return Array.isArray(data) ? data : []
+  const data = await request.get('/rooms', { params: { building_id: buildingId, floor_id: floorId, page: 1, pageSize: 100 } })
+  return readPage(data).records
 }
 
 async function onQueryBuildingChange() {
+  resetToFirstPage(pagination)
   query.floorId = null
   queryFloors.value = await loadFloors(query.buildingId)
   await loadAssets()
+}
+
+function searchAssets() {
+  resetToFirstPage(pagination)
+  loadAssets()
 }
 
 async function loadAssets() {
@@ -265,10 +285,13 @@ async function loadAssets() {
         keyword: query.keyword || undefined,
         buildingId: query.buildingId || undefined,
         floorId: query.floorId || undefined,
-        status: query.status || undefined
+        status: query.status || undefined,
+        ...pageParams(pagination)
       }
     })
-    assets.value = Array.isArray(data) ? data : []
+    const page = readPage(data)
+    assets.value = page.records
+    pagination.total = page.total
   } finally {
     loading.value = false
   }
@@ -284,6 +307,11 @@ async function onFormBuildingChange() {
 async function onFormFloorChange() {
   form.roomId = null
   formRooms.value = await loadRooms(form.buildingId, form.floorId)
+}
+
+function handleSizeChange() {
+  resetToFirstPage(pagination)
+  loadAssets()
 }
 
 function openCreateDialog() {
@@ -395,5 +423,10 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 12px;
+}
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 </style>

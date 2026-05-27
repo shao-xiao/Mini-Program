@@ -204,6 +204,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
+import { pageParams, readPage } from '../../utils/pagination'
 import {
   createEnergyReading,
   deleteEnergyReading,
@@ -299,33 +300,33 @@ async function loadRecords() {
       roomId: queryForm.roomId || undefined,
       billStatus: queryForm.billStatus || undefined,
       abnormalFlag: queryForm.abnormalFlag === '' ? undefined : queryForm.abnormalFlag,
-      page: pagination.currentPage - 1,
-      size: pagination.pageSize
+      ...pageParams(pagination)
     })
-    records.value = data?.content || []
-    pagination.total = data?.totalElements || 0
+    const page = readPage(data)
+    records.value = page.records
+    pagination.total = page.total
   } finally {
     loading.value = false
   }
 }
 
 async function loadMeters() {
-  meters.value = await getEnergyMeters()
+  meters.value = readPage(await getEnergyMeters({ page: 1, pageSize: 100 })).records
 }
 
 async function loadBuildings() {
   const data = await request.get('/buildings')
-  buildings.value = Array.isArray(data) ? data : (data?.content || [])
+  buildings.value = readPage(data).records
 }
 
 async function loadFloors(buildingId) {
   if (!buildingId) return []
-  return await request.get('/floors', { params: { building_id: buildingId } })
+  return readPage(await request.get('/floors', { params: { building_id: buildingId } })).records
 }
 
 async function loadRooms(buildingId, floorId) {
   if (!buildingId) return []
-  return await request.get('/rooms', { params: { building_id: buildingId, floor_id: floorId || undefined } })
+  return readPage(await request.get('/rooms', { params: { building_id: buildingId, floor_id: floorId || undefined, page: 1, pageSize: 100 } })).records
 }
 
 async function onQueryBuildingChange() {

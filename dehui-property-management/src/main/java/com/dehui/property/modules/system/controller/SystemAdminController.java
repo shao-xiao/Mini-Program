@@ -6,6 +6,7 @@ import com.dehui.property.common.JdbcMaps;
 import com.dehui.property.security.AuthInterceptor;
 import com.dehui.property.security.AuthPrincipal;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -121,20 +122,27 @@ public class SystemAdminController {
 
     @GetMapping("/system/roles")
     public ApiResponse<List<Map<String, Object>>> roles() {
-        return ApiResponse.success(jdbcTemplate.queryForList("SELECT id, code, name, role_type AS roleType, status, remark FROM sys_role WHERE deleted = 0 ORDER BY id DESC"));
+        return ApiResponse.success(jdbcTemplate.queryForList(
+                """
+                SELECT id, code, code AS roleCode, name, name AS roleName, role_type AS roleType, status,
+                       CASE status WHEN 'DISABLED' THEN '禁用' ELSE '启用' END AS statusText,
+                       remark, remark AS description, created_at AS createdTime, updated_at AS updatedTime
+                FROM sys_role WHERE deleted = 0 ORDER BY id DESC
+                """
+        ));
     }
 
     @PostMapping("/system/roles")
     public ApiResponse<Void> createRole(@RequestBody Map<String, Object> body) {
         jdbcTemplate.update(
                 "INSERT INTO sys_role (code, name, role_type, status, created_by, updated_by, remark) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                JdbcMaps.strOr(body, JdbcMaps.code("ROLE"), "code"),
+                JdbcMaps.strOr(body, JdbcMaps.code("ROLE"), "code", "roleCode"),
                 JdbcMaps.requiredStr(body, "Role name is required", "name", "roleName"),
                 JdbcMaps.strOr(body, "BUSINESS", "roleType"),
                 JdbcMaps.strOr(body, "ENABLED", "status"),
                 0L,
                 0L,
-                JdbcMaps.str(body, "remark")
+                JdbcMaps.str(body, "remark", "description")
         );
         return ApiResponse.success();
     }
@@ -147,7 +155,7 @@ public class SystemAdminController {
                 JdbcMaps.strOr(body, "BUSINESS", "roleType"),
                 JdbcMaps.strOr(body, "ENABLED", "status"),
                 0L,
-                JdbcMaps.str(body, "remark"),
+                JdbcMaps.str(body, "remark", "description"),
                 id
         ), "Role not found");
         return ApiResponse.success();
@@ -171,12 +179,23 @@ public class SystemAdminController {
 
     @GetMapping("/system/menus")
     public ApiResponse<List<Map<String, Object>>> menus() {
-        return ApiResponse.success(jdbcTemplate.queryForList("SELECT id, code, parent_id AS parentId, name, path, component, icon, sort_order AS sortOrder, status FROM sys_menu WHERE deleted = 0 ORDER BY sort_order ASC, id ASC"));
+        return ApiResponse.success(menuTree(jdbcTemplate.queryForList(
+                """
+                SELECT id, code, code AS menuCode, parent_id AS parentId, name, name AS menuName,
+                       path, component, icon, sort_order AS sortOrder, status
+                FROM sys_menu WHERE deleted = 0 ORDER BY sort_order ASC, id ASC
+                """
+        )));
     }
 
     @GetMapping("/system/permissions")
     public ApiResponse<List<Map<String, Object>>> permissions() {
-        return ApiResponse.success(jdbcTemplate.queryForList("SELECT id, code, name, module, action, status FROM sys_permission WHERE deleted = 0 ORDER BY module ASC, id ASC"));
+        return ApiResponse.success(jdbcTemplate.queryForList(
+                """
+                SELECT id, code, code AS permissionCode, name, name AS permissionName, module, action, status
+                FROM sys_permission WHERE deleted = 0 ORDER BY module ASC, id ASC
+                """
+        ));
     }
 
     @GetMapping("/system/roles/{id}/menus")
@@ -186,7 +205,7 @@ public class SystemAdminController {
 
     @PostMapping("/system/roles/{id}/menus")
     public ApiResponse<Void> saveRoleMenus(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        jdbcTemplate.update("UPDATE sys_role_menu SET deleted = 1 WHERE role_id = ?", id);
+        jdbcTemplate.update("DELETE FROM sys_role_menu WHERE role_id = ?", id);
         for (Long menuId : ids(body)) {
             jdbcTemplate.update("INSERT INTO sys_role_menu (role_id, menu_id, status, created_by, updated_by) VALUES (?, ?, 'ENABLED', ?, ?)",
                     id, menuId, 0L, 0L);
@@ -201,7 +220,7 @@ public class SystemAdminController {
 
     @PostMapping("/system/roles/{id}/permissions")
     public ApiResponse<Void> saveRolePermissions(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        jdbcTemplate.update("UPDATE sys_role_permission SET deleted = 1 WHERE role_id = ?", id);
+        jdbcTemplate.update("DELETE FROM sys_role_permission WHERE role_id = ?", id);
         for (Long permissionId : ids(body)) {
             jdbcTemplate.update("INSERT INTO sys_role_permission (role_id, permission_id, status, created_by, updated_by) VALUES (?, ?, 'ENABLED', ?, ?)",
                     id, permissionId, 0L, 0L);
@@ -222,6 +241,28 @@ public class SystemAdminController {
             }
         }
         return ids;
+    }
+
+    private List<Map<String, Object>> menuTree(List<Map<String, Object>> rows) {
+        Map<Long, Map<String, Object>> byId = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> node = new LinkedHashMap<>(row);
+            node.put("children", new ArrayList<Map<String, Object>>());
+            byId.put(((Number) node.get("id")).longValue(), node);
+        }
+
+        List<Map<String, Object>> roots = new ArrayList<>();
+        for (Map<String, Object> node : byId.values()) {
+            Object parentId = node.get("parentId");
+            if (parentId instanceof Number number && byId.containsKey(number.longValue())) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> children = (List<Map<String, Object>>) byId.get(number.longValue()).get("children");
+                children.add(node);
+            } else {
+                roots.add(node);
+            }
+        }
+        return roots;
     }
 
     private void ensureUpdated(int updated, String message) {

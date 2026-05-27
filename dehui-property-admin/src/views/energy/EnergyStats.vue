@@ -145,6 +145,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import request from '../../utils/request'
+import { readPage } from '../../utils/pagination'
 import { getEnergyStats, updateAnomalyStatus } from '../../api/energy'
 
 const loading = ref(false)
@@ -248,7 +249,7 @@ async function loadBaseData() {
     request.get('/buildings'),
     request.get('/tenant/list')
   ])
-  buildings.value = Array.isArray(buildingData) ? buildingData : (buildingData?.content || [])
+  buildings.value = readPage(buildingData).records
   tenants.value = Array.isArray(tenantData) ? tenantData : []
 }
 
@@ -256,7 +257,7 @@ async function onBuildingChange() {
   queryForm.floorId = null
   queryForm.roomId = null
   floors.value = queryForm.buildingId
-    ? await request.get('/floors', { params: { building_id: queryForm.buildingId } })
+    ? readPage(await request.get('/floors', { params: { building_id: queryForm.buildingId } })).records
     : []
   rooms.value = []
 }
@@ -264,7 +265,7 @@ async function onBuildingChange() {
 async function onFloorChange() {
   queryForm.roomId = null
   rooms.value = queryForm.buildingId
-    ? await request.get('/rooms', { params: { building_id: queryForm.buildingId, floor_id: queryForm.floorId || undefined } })
+    ? readPage(await request.get('/rooms', { params: { building_id: queryForm.buildingId, floor_id: queryForm.floorId || undefined, page: 1, pageSize: 100 } })).records
     : []
 }
 

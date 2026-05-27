@@ -2,6 +2,7 @@ package com.dehui.property.modules.legacy;
 
 import com.dehui.property.common.ApiResponse;
 import com.dehui.property.common.BusinessException;
+import com.dehui.property.common.PageResponse;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,14 +10,19 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class LegacyWriteController {
 
     @GetMapping({"/assets", "/equipments", "/energy/readings", "/energy/meters", "/energy/stats", "/feerules", "/inspections"})
-    public ApiResponse<List<Object>> legacyLists() {
-        return ApiResponse.success(List.of());
+    public ApiResponse<PageResponse<Object>> legacyLists(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer pageSize) {
+        int normalizedPage = page == null || page < 1 ? 1 : page;
+        int normalizedPageSize = pageSize == null || pageSize < 1 ? 20 : Math.min(pageSize, 100);
+        return ApiResponse.success(new PageResponse<>(List.of(), 0L, normalizedPage, normalizedPageSize));
     }
 
     @PostMapping({"/assets", "/equipments", "/energy/readings", "/feerules", "/inspections"})

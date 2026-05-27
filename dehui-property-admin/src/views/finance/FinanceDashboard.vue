@@ -79,10 +79,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
-  import request from '../../utils/request'
+import request from '../../utils/request'
+import { readPage } from '../../utils/pagination'
   
-  const loading = ref(false)
-  const bills = ref([])
+const loading = ref(false)
+const bills = ref([])
 
 const trendRef = ref(null)
 const sourceRef = ref(null)
@@ -392,8 +393,8 @@ function resizeCharts() {
 async function loadBills() {
   loading.value = true
   try {
-    const billData = await request.get('/bills')
-    bills.value = Array.isArray(billData) ? billData : []
+    const billData = await request.get('/bills', { params: { page: 1, pageSize: 100 } })
+    bills.value = readPage(billData).records
   } catch (e) {
     ElMessage.error(e.message || '加载账务分析数据失败')
   } finally {

@@ -81,7 +81,7 @@
         <el-checkbox-group v-model="selectedPermissionIds">
           <el-checkbox v-for="item in group.items" :key="item.id" :label="item.id">
             {{ formatPermissionName(item) }}
-            <span class="perm-code">{{ item.permissionCode }}</span>
+            <span class="perm-code">{{ item.permissionCode || item.code }}</span>
           </el-checkbox>
         </el-checkbox-group>
       </div>
@@ -125,13 +125,17 @@ const moduleNameMap = {
   announcement: '公告管理',
   asset: '资产管理',
   bill: '账单管理',
+  building: '楼宇房源',
   contract: '合同管理',
   energy: '能耗管理',
   feerule: '收费规则',
   finance: '财务管理',
   inspection: '巡检管理',
+  investment: '招商管理',
   lease: '租赁管理',
   meeting: '会议管理',
+  mobile: '小程序端',
+  operation: '运营管理',
   parking: '停车管理',
   'parking-bill': '停车账单',
   system: '系统管理',
@@ -141,6 +145,7 @@ const moduleNameMap = {
 }
 
 const actionNameMap = {
+  '*': '全部',
   add: '新增',
   assign: '分配',
   'assign-permission': '分配权限',
@@ -167,6 +172,12 @@ const permissionNameMap = {
   'asset:delete': '删除资产',
   'asset:update': '编辑资产',
   'asset:view': '查看资产',
+  'bill:*': '账单管理全部权限',
+  'building:*': '楼宇房源全部权限',
+  'building:create': '新增楼宇房源',
+  'building:delete': '删除楼宇房源',
+  'building:update': '编辑楼宇房源',
+  'building:view': '查看楼宇房源',
   'bill:add': '新增账单',
   'bill:audit': '审核账单',
   'bill:pay': '确认收款',
@@ -191,6 +202,8 @@ const permissionNameMap = {
   'lease:view': '查看租赁',
   'meeting:create': '新增会议预约',
   'meeting:view': '查看会议',
+  'mobile:*': '小程序端全部权限',
+  'mobile:view': '查看小程序端',
   'parking:create': '新增车位',
   'parking:update': '编辑车位',
   'parking:view': '查看车位',
@@ -205,6 +218,7 @@ const permissionNameMap = {
   'system:role:disable': '禁用角色',
   'system:role:update': '编辑角色',
   'system:role:view': '查看角色',
+  'system:*': '系统管理全部权限',
   'system:user:assign-role': '分配用户角色',
   'system:user:create': '新增用户',
   'system:user:delete': '删除用户',
@@ -213,6 +227,7 @@ const permissionNameMap = {
   'system:user:update': '编辑用户',
   'system:user:view': '查看用户',
   'tenant:create': '新增租户',
+  'tenant:*': '租户管理全部权限',
   'tenant:portal:view': '查看租户门户',
   'tenant:view': '查看租户',
   'visitor:view': '查看访客',
@@ -220,7 +235,8 @@ const permissionNameMap = {
   'workorder:close': '关闭工单',
   'workorder:complete': '完成工单',
   'workorder:create': '新增工单',
-  'workorder:view': '查看工单'
+  'workorder:view': '查看工单',
+  'workorder:*': '工单管理全部权限'
 }
 
 const permissionGroups = computed(() => {
@@ -239,9 +255,14 @@ function formatModuleName(module) {
 }
 
 function formatPermissionName(item) {
-  const code = item.permissionCode || ''
+  const code = item.permissionCode || item.code || ''
+  const rawName = item.permissionName || item.name || ''
   if (permissionNameMap[code]) {
     return permissionNameMap[code]
+  }
+
+  if (rawName && !rawName.includes('?')) {
+    return rawName
   }
 
   const parts = code.split(':')
@@ -253,7 +274,7 @@ function formatPermissionName(item) {
     return `${actionText}${moduleNameMap[module]}`
   }
 
-  return item.permissionName || code || '未命名权限'
+  return rawName || code || '未命名权限'
 }
 
 function records(data) {

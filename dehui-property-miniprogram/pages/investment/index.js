@@ -1,5 +1,15 @@
 const api = require('../../utils/request')
 
+const sectionKeys = [
+  'hero',
+  'highlight',
+  'policy',
+  'introduction',
+  'location',
+  'contact',
+  'notice'
+]
+
 function initialLeadForm() {
   return {
     name: '',
@@ -12,11 +22,36 @@ function initialLeadForm() {
   }
 }
 
+function emptySections() {
+  return sectionKeys.reduce((result, key) => {
+    result[key] = []
+    return result
+  }, {})
+}
+
+function normalizeSections(data) {
+  const sections = emptySections()
+  sectionKeys.forEach((key) => {
+    const rows = Array.isArray(data && data[key]) ? data[key] : []
+    sections[key] = rows
+      .map((item) => ({
+        title: item.title || '',
+        subtitle: item.subtitle || '',
+        content: item.content || '',
+        imageUrl: item.imageUrl || '',
+        sortOrder: Number(item.sortOrder || 0)
+      }))
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+  })
+  return sections
+}
+
 Page({
   data: {
     loading: false,
     submitting: false,
-    overview: null,
+    sections: emptySections(),
+    hero: null,
     leadForm: initialLeadForm()
   },
 
@@ -27,8 +62,12 @@ Page({
   async loadInvestment() {
     this.setData({ loading: true })
     try {
-      const overview = await api.get('/mobile/investment/overview')
-      this.setData({ overview })
+      const data = await api.get('/mobile/investment/overview')
+      const sections = normalizeSections(data)
+      this.setData({
+        sections,
+        hero: sections.hero[0] || null
+      })
     } finally {
       this.setData({ loading: false })
     }

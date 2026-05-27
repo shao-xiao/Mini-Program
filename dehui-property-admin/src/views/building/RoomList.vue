@@ -18,24 +18,28 @@
         </el-form-item>
 
         <el-form-item label="楼层">
-          <el-select v-model="query.floorId" class="filter-select" placeholder="请选择楼层" @change="loadRooms">
+          <el-select v-model="query.floorId" class="filter-select" placeholder="请选择楼层" @change="searchRooms">
             <el-option v-for="item in floors" :key="item.id" :label="formatFloorLabel(item)" :value="item.id" />
           </el-select>
         </el-form-item>
 
         <el-form-item label="状态">
-          <el-select v-model="query.status" class="filter-select" clearable placeholder="全部状态" @change="loadRooms">
+          <el-select v-model="query.status" class="filter-select" clearable placeholder="全部状态" @change="searchRooms">
             <el-option v-for="item in roomStatuses" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
 
         <el-form-item>
-          <el-button type="primary" @click="loadRooms">查询</el-button>
+          <el-button type="primary" @click="searchRooms">查询</el-button>
         </el-form-item>
       </el-form>
 
       <el-table v-loading="loading" :data="rooms" border style="width: 100%">
-        <el-table-column type="index" label="序号" width="70" />
+        <el-table-column label="序号" width="70">
+          <template #default="{ $index }">
+            {{ (pagination.currentPage - 1) * pagination.pageSize + $index + 1 }}
+          </template>
+        </el-table-column>
         <el-table-column prop="buildingName" label="楼宇" min-width="130" />
         <el-table-column prop="floorName" label="楼层" min-width="100" />
         <el-table-column prop="roomNumber" label="房间号" min-width="110" />
@@ -54,6 +58,18 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="loadRooms"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="form.id ? '编辑房间' : '新增房间'" width="540px">
@@ -99,6 +115,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
+import { createPagination, pageParams, readPage, resetToFirstPage } from '../../utils/pagination'
 
 const buildings = ref([])
 const floors = ref([])
@@ -106,6 +123,7 @@ const rooms = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const dialogVisible = ref(false)
+const pagination = reactive(createPagination(20))
 
 const roomTypes = [
   { label: '办公', value: 'OFFICE' },
@@ -161,7 +179,7 @@ function roomStatusText(value) {
 
 async function loadBuildings() {
   const data = await request.get('/buildings')
-  buildings.value = Array.isArray(data) ? data : (data?.content || [])
+  buildings.value = readPage(data).records
 }
 
 async function loadFloors() {
@@ -173,19 +191,26 @@ async function loadFloors() {
   const data = await request.get('/floors', {
     params: { building_id: query.buildingId }
   })
-  floors.value = Array.isArray(data) ? data : []
+  floors.value = readPage(data).records
   query.floorId = floors.value[0]?.id || null
 }
 
 async function onBuildingChange() {
+  resetToFirstPage(pagination)
   rooms.value = []
   await loadFloors()
   await loadRooms()
 }
 
+function searchRooms() {
+  resetToFirstPage(pagination)
+  loadRooms()
+}
+
 async function loadRooms() {
   if (!query.buildingId) {
     rooms.value = []
+    pagination.total = 0
     return
   }
   loading.value = true
@@ -193,13 +218,21 @@ async function loadRooms() {
     const params = {
       building_id: query.buildingId,
       floor_id: query.floorId || undefined,
-      status: query.status || undefined
+      status: query.status || undefined,
+      ...pageParams(pagination)
     }
     const data = await request.get('/rooms', { params })
-    rooms.value = Array.isArray(data) ? data : []
+    const page = readPage(data)
+    rooms.value = page.records
+    pagination.total = page.total
   } finally {
     loading.value = false
   }
+}
+
+function handleSizeChange() {
+  resetToFirstPage(pagination)
+  loadRooms()
 }
 
 function openCreateDialog() {
@@ -283,5 +316,11 @@ onMounted(async () => {
 
 .filter-select {
   width: 180px;
+}
+
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 </style>

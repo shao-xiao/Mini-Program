@@ -2,8 +2,11 @@ package com.dehui.property.modules.parking.controller;
 
 import com.dehui.property.common.ApiResponse;
 import com.dehui.property.common.BusinessException;
+import com.dehui.property.common.JdbcPagination;
 import com.dehui.property.common.JdbcMaps;
+import com.dehui.property.common.PageResponse;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -25,15 +28,45 @@ public class ParkingController {
     private final JdbcTemplate jdbcTemplate;
 
     @GetMapping("/parking/spaces")
-    public ApiResponse<List<Map<String, Object>>> spaces() {
-        return ApiResponse.success(jdbcTemplate.queryForList(
-                """
-                SELECT s.id, s.code, s.space_no AS spaceNo, s.location AS floor, s.location,
-                       s.space_type AS type, s.space_type AS spaceType, s.rent_status AS status, s.remark
+    public ApiResponse<PageResponse<Map<String, Object>>> spaces(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String area,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer pageSize) {
+        String selectSql = """
+                SELECT s.id, s.code, s.space_no AS spaceNo, s.location AS floor, s.location, s.location AS area,
+                       s.space_type AS type, s.space_type AS spaceType, s.rent_status AS status, s.remark,
+                       t.name AS partyNameSnapshot, a.car_plate_no AS plateNo
                 FROM parking_space s
+                LEFT JOIN parking_assignment a ON a.parking_space_id = s.id AND a.deleted = 0 AND a.status = 'ACTIVE'
+                LEFT JOIN tenant t ON t.id = a.tenant_id
                 WHERE s.deleted = 0
-                ORDER BY s.space_no ASC, s.id DESC
-                """
+                """;
+        String countSql = "SELECT COUNT(*) FROM parking_space s WHERE s.deleted = 0";
+        StringBuilder where = new StringBuilder();
+        List<Object> args = new ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) {
+            where.append(" AND (s.space_no LIKE ? OR s.location LIKE ?)");
+            String likeKeyword = "%" + keyword.trim() + "%";
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+        }
+        if (status != null && !status.isBlank()) {
+            where.append(" AND s.rent_status = ?");
+            args.add(status);
+        }
+        if (area != null && !area.isBlank()) {
+            where.append(" AND s.location = ?");
+            args.add(area);
+        }
+        return ApiResponse.success(JdbcPagination.query(
+                jdbcTemplate,
+                selectSql + where + " ORDER BY s.space_no ASC, s.id DESC",
+                countSql + where,
+                args,
+                page,
+                pageSize
         ));
     }
 

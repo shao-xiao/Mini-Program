@@ -2,7 +2,9 @@ package com.dehui.property.modules.workorder.controller;
 
 import com.dehui.property.common.ApiResponse;
 import com.dehui.property.common.BusinessException;
+import com.dehui.property.common.JdbcPagination;
 import com.dehui.property.common.JdbcMaps;
+import com.dehui.property.common.PageResponse;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -20,8 +23,28 @@ public class WorkOrderController {
 
     private final JdbcTemplate jdbcTemplate;
 
-    @GetMapping({"/workorders", "/mobile/workorders"})
-    public ApiResponse<List<Map<String, Object>>> workorders() {
+    @GetMapping("/workorders")
+    public ApiResponse<PageResponse<Map<String, Object>>> workorders(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer pageSize) {
+        return ApiResponse.success(JdbcPagination.query(
+                jdbcTemplate,
+                """
+                SELECT id, code, tenant_id AS tenantId, room_id AS roomId, title, category, priority,
+                       work_status AS status, assignee_id AS assigneeId, remark
+                FROM work_order
+                WHERE deleted = 0
+                ORDER BY updated_at DESC, id DESC
+                """,
+                "SELECT COUNT(*) FROM work_order WHERE deleted = 0",
+                List.of(),
+                page,
+                pageSize
+        ));
+    }
+
+    @GetMapping("/mobile/workorders")
+    public ApiResponse<List<Map<String, Object>>> mobileWorkorders() {
         return ApiResponse.success(jdbcTemplate.queryForList(
                 """
                 SELECT id, code, tenant_id AS tenantId, room_id AS roomId, title, category, priority,

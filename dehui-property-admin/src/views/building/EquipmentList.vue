@@ -49,6 +49,18 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="load"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
 
     <el-dialog v-model="visible" :title="form.id ? '编辑设备' : '新增设备'" width="620px">
@@ -111,11 +123,13 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
+import { createPagination, pageParams, readPage, resetToFirstPage } from '../../utils/pagination'
 
 const list = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const visible = ref(false)
+const pagination = reactive(createPagination(20))
 const formRef = ref(null)
 
 const defaultForm = () => ({
@@ -144,13 +158,20 @@ function resetForm() {
 async function load() {
   loading.value = true
   try {
-    const data = await request.get('/equipments')
-    list.value = Array.isArray(data) ? data : []
+    const data = await request.get('/equipments', { params: pageParams(pagination) })
+    const page = readPage(data)
+    list.value = page.records
+    pagination.total = page.total
   } catch (error) {
     ElMessage.error(error?.response?.data?.message || '设备列表加载失败')
   } finally {
     loading.value = false
   }
+}
+
+function handleSizeChange() {
+  resetToFirstPage(pagination)
+  load()
 }
 
 function openDialog() {
@@ -230,5 +251,10 @@ onMounted(load)
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 </style>
