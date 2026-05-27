@@ -41,7 +41,7 @@ Add MySQL driver, Redis starter, Flyway, validation, JPA, Spring Security crypto
 
 - [ ] **Step 2: Add environment-first config**
 
-Configure MySQL and Redis with environment variables. Keep dev/prod split and avoid H2.
+Configure MySQL and Redis with environment variables. Keep dev/prod split and avoid embedded development databases as runtime storage.
 
 ### Task 3: Add Common, Security, And Config Foundation
 

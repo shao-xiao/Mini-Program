@@ -12,6 +12,60 @@
 
 近期重点任务是把原“设备台账”升级为新的“空间资产模型”，但旧 `Equipment` 接口和页面必须保留，新增 `Asset` 与 `AssetOperationLog` 作为新资产体系。
 
+## 最近变更记录
+
+### 2026-05-26 合同、租户、联系人联系方式校验
+
+本次已完成合同管理、租户管理、租户联系人账号维护的联系电话和邮箱校验改造。后续新会话继续相关功能时，应以本段和 `docs/superpowers/plans/2026-05-26-contract-tenant-contact-validation.md` 为准。
+
+影响范围：
+
+- WEB 管理端：
+  - `dehui-property-admin/src/views/tenant/ContractList.vue`
+  - `dehui-property-admin/src/views/tenant/TenantList.vue`
+  - `dehui-property-admin/src/utils/contactValidation.js`
+- 后端：
+  - `dehui-property-management/src/main/java/com/dehui/property/common/ContactValidators.java`
+  - `dehui-property-management/src/main/java/com/dehui/property/modules/contract/controller/ContractController.java`
+  - `dehui-property-management/src/main/java/com/dehui/property/modules/tenant/controller/TenantController.java`
+- 数据库迁移：
+  - `dehui-property-management/src/main/resources/db/migration/V5__tenant_contact_fields.sql`
+
+已完成内容：
+
+1. 合同管理：
+   - 新增/编辑合同时校验联系电话、邮箱。
+   - 增加合同编辑入口。
+   - 增加“恢复”按钮，终止/作废后的合同可以恢复履约。
+   - 合同列表展示历史异常联系方式时标记为“格式异常”。
+2. 租户管理：
+   - 租户新增/编辑时校验联系电话、邮箱。
+   - 租户联系人账号维护中，手机号必填且必须符合格式。
+   - 租户联系人账号维护中，邮箱可为空；填写时必须符合邮箱格式。
+3. 后端统一校验：
+   - `ContactValidators` 统一手机号/座机、邮箱校验规则。
+   - 合同、租户、租户联系人接口均有后端兜底校验。
+   - 错误电话或邮箱返回 HTTP 400，响应消息为 `联系电话格式不正确` 或 `邮箱格式不正确`。
+4. 数据库字段补齐：
+   - `tenant.contact_person`：租户联系人。
+   - `tenant.contact_email`：租户邮箱。
+   - `tenant_contact.email`：租户联系人邮箱。
+
+历史数据原则：
+
+- 已存在的错误电话、错误邮箱不自动删除、不自动清空。
+- 列表和详情页只做“格式异常”提示。
+- 编辑保存时必须修正为合法格式，否则前后端都会拒绝保存。
+
+验证结果：
+
+- 后端全量测试：`mvn test`，40 个测试全部通过。
+- 前端构建：`npm run build` 通过。
+- 后端本地启动正常：`http://localhost:8080/api`。
+- 前端本地启动正常：`http://localhost:5173`。
+- 浏览器已回到 `/contracts` 页面。
+- 合同、租户、租户联系人接口在错误手机号/邮箱时返回 HTTP 400。
+
 ## 2. 当前技术栈
 
 后端：
@@ -21,22 +75,26 @@
 - Spring Boot 3.2.5
 - Spring Web
 - Spring Data JPA
+- JdbcTemplate
 - Spring Validation
 - Lombok
 - Maven
-- H2 Database，当前开发环境使用文件数据库
+- Flyway
+- MySQL 8，当前 dev/prod 均使用 MySQL 作为正式业务数据库
+- Redis，当前 dev/prod 均已接入，用于登录状态、验证码、权限缓存、统计缓存、限流和临时锁
 - 统一接口前缀：`/api`
 - 本地端口：`8080`
 
 数据库：
 
 - 配置文件：`dehui-property-vscode/dehui-property-management/src/main/resources/application-dev.yml`
-- JDBC URL：`jdbc:h2:file:./data/property_dev;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE`
-- 用户名：`sa`
-- 密码：空
-- H2 Console：`http://localhost:8080/api/h2-console`
-- JPA：`ddl-auto: update`
-- 当前没有独立 SQL/Flyway/Liquibase 迁移目录，表结构主要由 JPA 实体自动更新。
+- 默认 JDBC URL：`jdbc:mysql://127.0.0.1:3306/dehui_property_dev?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true`
+- 默认用户名：`dehui`
+- 默认密码：`dehui_dev_password`
+- 可通过环境变量 `MYSQL_URL`、`MYSQL_USERNAME`、`MYSQL_PASSWORD` 覆盖。
+- JPA：`ddl-auto: none`
+- Flyway：启用，迁移目录为 `src/main/resources/db/migration`。
+- Redis 默认连接：`127.0.0.1:6379`，可通过 `REDIS_HOST`、`REDIS_PORT`、`REDIS_PASSWORD`、`REDIS_DATABASE` 覆盖。
 
 后台前端：
 
@@ -102,7 +160,9 @@
 - `src/main/java/com/dehui/property/config`：拦截器、Web 配置、初始化数据。
 - `src/main/java/com/dehui/property/modules`：业务模块目录。
 - `src/main/resources/application.yml`：激活 `dev` profile。
-- `src/main/resources/application-dev.yml`：本地 H2、端口、JPA、日志配置。
+- `src/main/resources/application-dev.yml`：本地 MySQL、Redis、Flyway、JPA、日志配置。
+- `src/main/resources/application-prod.yml`：生产 MySQL、Redis、连接池和日志配置，敏感信息通过环境变量注入。
+- `src/main/resources/db/migration`：Flyway SQL 迁移目录，当前包含 `V1__baseline_schema.sql` 至 `V5__tenant_contact_fields.sql`。
 - `pom.xml`：后端 Maven 配置。
 
 后端主要模块：
@@ -233,6 +293,94 @@
   "message": "操作成功",
   "data": {}
 }
+```
+
+## 13. 2026-05-26 合同与租户联系方式校验
+
+详细记录已合并到本文顶部“最近变更记录”，完整实施记录见：
+
+```text
+docs/superpowers/plans/2026-05-26-contract-tenant-contact-validation.md
+```
+
+核心结论：
+
+- 合同、租户、租户联系人新增/编辑均已接入电话和邮箱校验。
+- 后端统一通过 `ContactValidators` 兜底校验，错误格式返回 HTTP 400。
+- `V5__tenant_contact_fields.sql` 补齐 `tenant.contact_person`、`tenant.contact_email`、`tenant_contact.email`。
+- 历史异常数据只提示，不自动删除。
+- 验证结果：后端全量测试 40 个通过，前端 `npm run build` 通过。
+
+## 12. 2026-05-26 招商内容展示区块改造
+
+本次将“招商内容”从普通表格维护改为按微信小程序招商中心展示区块维护。
+
+后端：
+
+- `investment_display` 通过 `V4__investment_content_sections.sql` 增加：
+  - `section_key`：小程序展示区块
+  - `subtitle`：副标题
+  - `image_url`：图片地址
+- 旧数据保留，迁移脚本按标题关键词尽量映射到 `hero/highlight/policy/introduction/location/contact/notice`，无法识别的默认放入 `highlight`。
+- 管理端接口 `/api/investment/contents` 返回分页数据，字段包含 `sectionKey/sectionName/title/subtitle/content/imageUrl/sortOrder/publishStatus/updatedAt`。
+- 新增管理端预览接口：`GET /api/investment/contents/preview`，返回全部未删除内容并按展示区块分组。
+- 新增生命周期接口：
+  - `POST /api/investment/contents/{id}/publish`
+  - `POST /api/investment/contents/{id}/disable`
+  - `DELETE /api/investment/contents/{id}`
+- 小程序展示接口支持：
+  - `GET /api/mobile/investment/overview`
+  - `GET /api/mobile/investment-content`
+  - `GET /api/miniapp/investment-content`
+- 小程序接口只返回 `publish_status = 'PUBLISHED'` 的内容，并按 `sectionKey` 分组返回：
+  - `hero`
+  - `highlight`
+  - `policy`
+  - `introduction`
+  - `location`
+  - `contact`
+  - `notice`
+
+WEB 管理端：
+
+- `dehui-property-admin/src/views/investment/InvestmentContentList.vue` 已改为展示：
+  - 序号
+  - 展示区块
+  - 标题
+  - 副标题
+  - 排序
+  - 状态
+  - 更新时间
+  - 操作
+- 不再直接展示数据库 ID。
+- 表单字段改为：展示区块、标题、副标题、正文内容、图片地址、排序、状态、后台备注。
+- 操作支持：编辑、预览、发布、停用、删除。
+- 页面右侧增加小程序招商中心预览，管理员能直接看到各区块在小程序端的大致位置。
+
+小程序：
+
+- `dehui-property-miniprogram/pages/investment` 不再使用写死招商亮点、政策、介绍内容。
+- 页面从 `/mobile/investment/overview` 读取后端分组数据。
+- 小程序端按 `hero/highlight/policy/introduction/location/contact/notice` 渲染，并按 `sortOrder` 排序。
+- 预约看房表单保留原有提交流程。
+
+验证：
+
+- 后端新增测试：
+  - `InvestmentControllerTest`
+  - `InvestmentContentSectionsMigrationTest`
+- 已通过针对性后端测试：
+
+```powershell
+cd dehui-property-management
+& "C:\Users\Administrator\Desktop\dehui_\.tools\apache-maven-3.9.11\bin\mvn.cmd" "-Dtest=InvestmentControllerTest,InvestmentContentSectionsMigrationTest" test
+```
+
+- 已通过 WEB 管理端构建：
+
+```powershell
+cd dehui-property-admin
+npm run build
 ```
 
 ## 11. 2026-05-20 分支同步说明
@@ -411,8 +559,10 @@
 
 当前数据库维护方式：
 
-- 没有独立迁移文件。
-- 使用 JPA 实体 + H2 `ddl-auto: update` 自动建表/补字段。
+- MySQL 是 dev/prod 的正式业务数据库。
+- Flyway SQL 迁移是当前表结构维护方式，目录为 `dehui-property-management/src/main/resources/db/migration`。
+- JPA `ddl-auto` 为 `none`，不再依赖实体自动建表/补字段。
+- Redis 只做登录状态、验证码、权限菜单缓存、首页统计缓存、接口限流和临时锁，不存正式业务数据。
 - `BaseEntity` 统一字段：
   - `id`
   - `created_time`
@@ -651,10 +801,9 @@ AssetOperationLog：
 
 缺失/不确定信息：
 
-- 未找到数据库迁移文件。
-- 未找到生产部署脚本。
-- 未运行后端编译和前端构建。
-- 项目 README/AGENTS 部分中文在 PowerShell 输出中有乱码，但核心信息可从代码和已有文档推断。
+- 生产服务器的真实 MySQL、Redis 密码不应写入仓库；需通过服务器环境变量或本机私有配置提供。
+- 未找到完整生产部署脚本，当前已有 `deploy/env/dehui-property.env.example` 和 `deploy/nginx/dehui-property.conf` 可作为部署配置参考。
+- 项目 README/AGENTS 曾存在旧数据库描述，已按当前 MySQL + Redis + Flyway 架构修正。
 
 ## 9. 下一步开发计划
 

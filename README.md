@@ -484,6 +484,35 @@ dehui-property-vscode\dehui-property-admin\src\views\operation\WorkOrderList.vue
 - 会议预约显示申请人类型：内部员工、租户、外部客户。
 - 工单来源文案改为“小程序提交”。
 
+### 7.9 合同、租户、联系人联系方式校验
+
+文件：
+
+```text
+dehui-property-vscode\dehui-property-admin\src\views\tenant\ContractList.vue
+dehui-property-vscode\dehui-property-admin\src\views\tenant\TenantList.vue
+dehui-property-vscode\dehui-property-admin\src\utils\contactValidation.js
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\common\ContactValidators.java
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\contract\controller\ContractController.java
+dehui-property-vscode\dehui-property-management\src\main\java\com\dehui\property\modules\tenant\controller\TenantController.java
+dehui-property-vscode\dehui-property-management\src\main\resources\db\migration\V5__tenant_contact_fields.sql
+```
+
+作用：
+
+- 新增/编辑合同时，联系电话、邮箱必须通过前端校验和后端兜底校验。
+- 合同台账增加编辑入口，并增加“恢复”按钮；终止/作废后的合同可恢复履约。
+- 租户新增/编辑时校验联系电话、邮箱。
+- 租户联系人账号维护中，手机号必填且必须合法；邮箱可为空，填写时必须合法。
+- 历史异常联系方式只在列表和详情中标记“格式异常”，不自动删除、不自动清空。
+- 后端统一错误提示：
+  - `联系电话格式不正确`
+  - `邮箱格式不正确`
+- `V5__tenant_contact_fields.sql` 补齐：
+  - `tenant.contact_person`
+  - `tenant.contact_email`
+  - `tenant_contact.email`
+
 ## 8. 接口约定
 
 统一响应格式：
@@ -519,6 +548,44 @@ dehui-property-vscode\dehui-property-admin\src\views\operation\WorkOrderList.vue
 该接口仅用于 `dev` 环境辅助联调。
 
 ## 9. 验证记录
+
+### 9.1 2026-05-26 合同/租户联系方式校验
+
+已在本地验证：
+
+```powershell
+cd dehui-property-management
+mvn test
+```
+
+结果：
+
+```text
+Tests run: 40, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+后台管理前端构建：
+
+```powershell
+cd dehui-property-admin
+npm run build
+```
+
+结果：
+
+```text
+✓ built
+```
+
+本地服务状态：
+
+- 后端本地端口：`8080`
+- 前端本地端口：`5173`
+- 浏览器验证页面：`/contracts`
+- 合同、租户、租户联系人接口提交错误手机号/邮箱时返回 HTTP 400。
+
+### 9.2 历史验证记录
 
 已在本机验证后台管理前端构建：
 

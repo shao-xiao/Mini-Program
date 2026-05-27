@@ -87,8 +87,10 @@ MINIPROGRAM_PLAN.md
 Spring Boot 3
 Java 21
 Maven
-JPA
-H2 Database（当前开发环境）
+JdbcTemplate / Spring Data JPA（按模块现状使用）
+Flyway SQL migrations
+MySQL 8（dev/prod 正式业务数据库）
+Redis（登录状态、验证码、权限缓存、统计缓存、限流、临时锁）
 ```
 
 后端核心模块：
@@ -410,7 +412,31 @@ grep -R "parking/spaces/stats\|parking/bills/stats\|buildings/.*/stats\|ai/analy
 
 ---
 
-# 十五、项目方向
+# 十五、上下文与记录维护规则
+
+为了保证新的 Codex 会话能准确接续项目现状，每次完成业务功能、接口、数据库迁移、权限规则或测试验证后，必须同步更新本地记录文件。
+
+必须遵守：
+
+- 每次完成稳定功能后，优先更新 `CONTEXT_SUMMARY.md` 的“最近变更记录”。
+- 涉及数据库字段、Flyway 迁移、接口入参/返回、状态流转、权限规则、前端表单校验时，必须同步记录到 `docs/` 或对应上下文文件。
+- 涉及测试和本地启动结果时，必须记录验证命令、结果和端口，例如后端 `8080`、前端 `5173`。
+- 历史异常数据处理原则：只提示、不自动删除、不自动清空；如需清洗，单独写数据清洗脚本并确认。
+- 不要删除已有历史记录；如已有类似内容，应合并去重，保留最新结论和必要背景。
+
+本项目已有的重点记录文件：
+
+```text
+CONTEXT_SUMMARY.md
+CHANGELOG.md
+README.md
+docs/superpowers/plans/*.md
+docs/superpowers/specs/*.md
+```
+
+---
+
+# 十六、项目方向
 
 本项目的发展方向是：
 
