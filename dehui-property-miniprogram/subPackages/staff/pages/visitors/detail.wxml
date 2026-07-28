@@ -1,0 +1,5 @@
+<view class="page">
+  <view wx:if="{{error}}" class="staff-empty">{{error}}</view>
+  <view wx:if="{{detail}}" class="staff-record"><dynamic-detail schema="{{fieldSchema}}" values="{{detail}}" /><view class="staff-record-meta">{{detail.visitorName}} · {{detail.maskedPhone}}</view><view class="staff-actions"><button wx:if="{{canVerify && detail.status === 'REGISTERED'}}" class="staff-button" data-action="enter" bindtap="action">核验到访</button><button wx:if="{{canVerify && detail.status === 'ENTERED'}}" class="staff-button" data-action="leave" bindtap="action">登记离场</button></view></view>
+  <view wx:if="{{detail && detail.passRecords.length}}" class="staff-record"><view class="staff-record-title">核验记录</view><view wx:for="{{detail.passRecords}}" wx:key="passTime" class="staff-record-meta">{{item.passTime}} · {{item.passType}} · {{item.operatorName}}</view></view>
+</view>

@@ -1,0 +1,7 @@
+<view class="page">
+  <view class="staff-header"><view class="staff-header-title">访客预约管理</view><view class="staff-header-desc">手机号脱敏展示，核验人与时间由服务端记录。</view></view>
+  <view class="staff-filter"><view class="staff-filter-item {{status === '' ? 'active' : ''}}" data-status="" bindtap="filter">全部</view><view class="staff-filter-item {{status === 'REGISTERED' ? 'active' : ''}}" data-status="REGISTERED" bindtap="filter">待核验</view><view class="staff-filter-item {{status === 'ENTERED' ? 'active' : ''}}" data-status="ENTERED" bindtap="filter">已到访</view><view class="staff-filter-item {{status === 'LEFT' ? 'active' : ''}}" data-status="LEFT" bindtap="filter">已离场</view></view>
+  <view wx:if="{{error}}" class="staff-empty">{{error}}</view>
+  <view wx:for="{{records}}" wx:key="id" class="staff-record" data-id="{{item.id}}" bindtap="detail"><view class="staff-row"><view class="staff-record-title">{{item.visitorName}} · {{item.maskedPhone}}</view><view class="staff-status">{{item.status}}</view></view><view class="staff-record-meta">{{item.tenantName}} · {{item.applicantName}} · {{item.visitTime}}</view><view class="staff-record-meta">{{item.visitCompany}} · {{item.carPlateNo}} · {{item.visitReason}}</view></view>
+  <view wx:if="{{loading}}" class="staff-empty">正在加载…</view><view wx:if="{{!loading && !records.length}}" class="staff-empty">暂无访客预约</view><view wx:if="{{!hasMore && records.length}}" class="more">没有更多了</view>
+</view>
