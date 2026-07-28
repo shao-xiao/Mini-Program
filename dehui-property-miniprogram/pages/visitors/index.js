@@ -3,6 +3,11 @@ const { refreshCurrentProfile } = require('../../utils/auth')
 const { canAccessFeature, getFeatureAccessState } = require('../../utils/capabilities')
 const { loadModuleFieldSchema, requiredError } = require('../../utils/moduleFieldSchema')
 const { ensurePrivacyAuthorization } = require('../../utils/privacy')
+const {
+  loadReservationCredentials,
+  saveReservationCredential,
+  credentialForCode
+} = require('../../utils/visitorReservationHistory')
 
 const FEATURE_KEY = 'visitor'
 
@@ -65,18 +70,18 @@ function requestFailureState(error) {
   if (code === 401) {
     return {
       pageState: 'login-required',
-      errorMessage: '登录状态已失效，请重新登录后创建访客邀请。'
+      errorMessage: '登录状态已失效，请重新登录后创建访客预约。'
     }
   }
   if (code === 403) {
     return {
       pageState: 'unauthorized',
-      errorMessage: '当前账号没有租户访客邀请资格，请联系物业确认租户联系人状态。'
+      errorMessage: '当前账号没有租户访客预约资格，请联系物业确认租户联系人状态。'
     }
   }
   return {
     pageState: 'error',
-    errorMessage: error && error.message ? error.message : '访客邀请加载失败，请稍后重试。'
+    errorMessage: error && error.message ? error.message : '访客预约加载失败，请稍后重试。'
   }
 }
 
@@ -86,12 +91,12 @@ function deniedState(profile) {
   if (state === 'login-required' || (result && result.loginRequired)) {
     return {
       pageState: 'login-required',
-      errorMessage: '请先登录租户账号，再创建或查看访客邀请。'
+      errorMessage: '请先登录租户账号，再创建或查看访客预约。'
     }
   }
   return {
     pageState: 'unauthorized',
-    errorMessage: '访客邀请仅向已匹配的有效租户联系人开放，当前账号暂无使用资格。'
+    errorMessage: '访客预约仅向已匹配的有效租户联系人开放，当前账号暂无使用资格。'
   }
 }
 
@@ -116,7 +121,9 @@ Page({
     qrPopupVisible: false,
     qrLoading: false,
     qrImagePath: '',
-    qrVisitor: null
+    qrVisitor: null,
+    historyLoading: false,
+    historyError: ''
   },
 
   onLoad(options = {}) {
@@ -135,13 +142,16 @@ Page({
           }
         : {})
     })
-    if (isPublicMode) wx.setNavigationBarTitle({ title: '访客预约记录' })
+    wx.setNavigationBarTitle({ title: '访客预约' })
   },
 
   onShow() {
     this._active = true
-    if (this.data.isPublicMode) return
-    this.loadVisitors()
+    if (this.data.isPublicMode) {
+      this.loadPublicVisitors()
+    } else {
+      this.loadVisitors()
+    }
   },
 
   onUnload() {
@@ -189,6 +199,7 @@ Page({
       if (!this.isCurrentRequest(requestId)) return
       const incoming = (data.records || data.visitors || []).map(item => ({
         ...item,
+        recordKey: String(item.id || item.code),
         visitReason: item.visitReason || item.remark || '',
         visitTimeText: toDateTimeText(item.visitAt || `${item.visitDate || ''}T${item.visitTime || ''}`),
         leaveTimeText: toDateTimeText(item.leaveTime),
@@ -220,13 +231,59 @@ Page({
     }
   },
 
+  async loadPublicVisitors() {
+    const credentials = loadReservationCredentials()
+    if (!credentials.length) {
+      this.safeSetData({
+        visitors: [],
+        total: 0,
+        historyLoading: false,
+        historyError: ''
+      })
+      return
+    }
+    const requestId = Number(this._loadSequence || 0) + 1
+    this._loadSequence = requestId
+    this.safeSetData({ historyLoading: true, historyError: '' })
+    try {
+      const data = await api.post(
+        '/mobile/public/visitors/history',
+        { appointments: credentials },
+        { silent: true }
+      )
+      if (!this.isCurrentRequest(requestId)) return
+      const visitors = (data.records || []).map(item => ({
+        ...item,
+        recordKey: item.code,
+        visitReason: item.visitReason || item.remark || '',
+        visitTimeText: toDateTimeText(item.visitAt),
+        cancellable: false,
+        statusText: this.toStatusText(item.status),
+        statusClass: this.toStatusClass(item.status)
+      }))
+      this.safeSetData({
+        visitors,
+        total: Number(data.total || visitors.length),
+        historyLoading: false,
+        historyError: ''
+      })
+    } catch (error) {
+      if (!this.isCurrentRequest(requestId)) return
+      this.safeSetData({
+        historyLoading: false,
+        historyError: error?.message || '个人预约历史加载失败，请下拉刷新重试'
+      })
+    }
+  },
+
   retryLoad() {
-    this.loadVisitors()
+    if (this.data.isPublicMode) this.loadPublicVisitors()
+    else this.loadVisitors()
   },
 
   onPullDownRefresh() {
     if (this.data.isPublicMode) {
-      wx.stopPullDownRefresh()
+      this.loadPublicVisitors().finally(() => wx.stopPullDownRefresh())
       return
     }
     this.loadVisitors().finally(() => wx.stopPullDownRefresh())
@@ -322,38 +379,58 @@ Page({
     this.safeSetData({ submitting: true })
     try {
       const dynamicPayload = schemaForm ? schemaForm.getPayload() : form
-      const created = await api.post(
-        this.data.isPublicMode ? '/mobile/public/visitors' : '/mobile/visitors',
-        {
+      const payload = {
         visitorName: dynamicPayload.visitorName,
         visitorPhone: dynamicPayload.visitorPhone,
-        visitDate: dynamicPayload.visitDate || form.visitDate,
-        visitTime: dynamicPayload.visitTime || form.visitClock,
         carPlateNo: dynamicPayload.plateNumber || form.carPlateNo,
         visitCompany: dynamicPayload.companyName || form.visitCompany,
         visitReason: dynamicPayload.visitReason,
         remark: dynamicPayload.remark,
         ...(this.data.isPublicMode
-          ? { submissionToken: this.data.submissionToken }
-          : { customFields: dynamicPayload.customFields })
-        }
+          ? {
+              visitTime: toApiDateTime(form.visitDate, form.visitClock),
+              submissionToken: this.data.submissionToken
+            }
+          : {
+              visitDate: dynamicPayload.visitDate || form.visitDate,
+              visitTime: dynamicPayload.visitTime || form.visitClock,
+              customFields: dynamicPayload.customFields
+            })
+      }
+      const created = await api.post(
+        this.data.isPublicMode ? '/mobile/public/visitors' : '/mobile/visitors',
+        payload
       )
       if (!this._active) return
       const identifier = created.invitationCode || created.visitCode || created.code || created.id
+      const storedCredential = this.data.isPublicMode && identifier
+        ? saveReservationCredential({
+            code: identifier,
+            submissionToken: this.data.submissionToken
+          })
+        : true
       wx.showModal({
-        title: this.data.isPublicMode ? '预约已提交' : '邀请已创建',
+        title: '预约已提交',
         content: this.data.isPublicMode
-          ? (identifier ? `预约编号：${identifier}\n预约已提交，请等待物业审核。` : '预约已提交，请等待物业审核。')
+          ? (identifier
+              ? `预约编号：${identifier}\n${storedCredential
+                ? '已保存到本机“个人预约历史记录”，请等待物业审核。'
+                : '本机保存失败，请截图保存预约编号并联系物业。'}`
+              : '预约已提交，请等待物业审核。')
           : (identifier
-              ? `邀请记录：${identifier}\n审核通过后，物业会上传门禁二维码。`
-              : '预约已提交，可在“我的访客邀请”查看审核状态。'),
+              ? `预约编号：${identifier}\n审核通过后，物业会上传门禁二维码。`
+              : '预约已提交，可在“个人预约历史记录”查看审核状态。'),
         showCancel: false
       })
       this.safeSetData({
         form: initialForm(),
         ...(this.data.isPublicMode ? { submissionToken: createSubmissionToken() } : {})
       })
-      if (!this.data.isPublicMode) this.loadVisitors()
+      if (this.data.isPublicMode) await this.loadPublicVisitors()
+      else await this.loadVisitors()
+      if (typeof wx.pageScrollTo === 'function') {
+        wx.pageScrollTo({ scrollTop: 0, duration: 300 })
+      }
     } catch (error) {
       this.handleAccessError(error)
     } finally {
@@ -371,16 +448,16 @@ Page({
     const id = Number(event.currentTarget.dataset.id)
     const visitor = this.data.visitors.find(item => Number(item.id) === id)
     wx.showModal({
-      title: '取消邀请',
-      content: visitor ? `确定取消“${visitor.visitorName}”的访客邀请吗？` : '确定取消该邀请吗？',
-      confirmText: '取消邀请',
+      title: '取消预约',
+      content: visitor ? `确定取消“${visitor.visitorName}”的访客预约吗？` : '确定取消该预约吗？',
+      confirmText: '取消预约',
       confirmColor: '#d93025',
       success: async res => {
         if (!res.confirm) return
         try {
           await api.post(`/mobile/visitors/${id}/cancel`)
           if (!this._active) return
-          wx.showToast({ title: '邀请已取消', icon: 'success' })
+          wx.showToast({ title: '预约已取消', icon: 'success' })
           this.loadVisitors()
         } catch (error) {
           this.handleAccessError(error)
@@ -394,10 +471,15 @@ Page({
   },
 
   async showQrCode(event) {
-    const id = Number(event.currentTarget.dataset.id)
-    const visitor = this.data.visitors.find(item => Number(item.id) === id)
+    const recordKey = String(event.currentTarget.dataset.key || '')
+    const visitor = this.data.visitors.find(item => String(item.recordKey) === recordKey)
     if (!visitor || !visitor.qrCodeUrl) {
       wx.showToast({ title: '门禁二维码尚未上传', icon: 'none' })
+      return
+    }
+    const credential = this.data.isPublicMode ? credentialForCode(visitor.code) : null
+    if (this.data.isPublicMode && !credential) {
+      wx.showToast({ title: '本机预约凭证已丢失，请联系物业', icon: 'none' })
       return
     }
     this.safeSetData({
@@ -407,8 +489,17 @@ Page({
       qrVisitor: visitor
     })
     try {
-      const path = await api.download(visitor.qrCodeUrl, `visitor-qr-${id}.png`, { silent: true })
-      if (!this._active || Number(this.data.qrVisitor?.id) !== id) return
+      const path = await api.download(
+        visitor.qrCodeUrl,
+        `visitor-qr-${visitor.code || visitor.id}.png`,
+        {
+          silent: true,
+          ...(credential
+            ? { header: { 'X-Visitor-Submission-Token': credential.submissionToken } }
+            : {})
+        }
+      )
+      if (!this._active || String(this.data.qrVisitor?.recordKey) !== recordKey) return
       this.safeSetData({ qrLoading: false, qrImagePath: path })
     } catch (error) {
       if (!this._active) return

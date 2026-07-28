@@ -280,6 +280,8 @@ const formRef = ref(null)
 const schemaFormRef = ref(null)
 const schemaFields = ref([])
 let schemaPayload = {}
+const VISITOR_AUTO_REFRESH_MS = 15_000
+let visitorRefreshTimer = null
 const listState = useWorkspaceListRequestState({
   hasResults: () => list.value.length > 0,
   clearResults: () => {
@@ -416,6 +418,20 @@ async function loadVisitors() {
     if (!listRequestGuard.isCurrent(requestId) || !listState.isCurrent(requestContext)) return
     listState.fail(requestContext, error?.response?.data?.message || '访客记录加载失败，请稍后重试')
   }
+}
+
+async function refreshVisitorsInBackground() {
+  if (document.visibilityState === 'hidden' || loading.value) return
+  try {
+    const data = await request.get('/visitors', { silent: true })
+    list.value = readPage(data).records
+  } catch {
+    // Keep the last successful snapshot; the explicit refresh action still surfaces errors.
+  }
+}
+
+function refreshVisitorsWhenVisible() {
+  if (document.visibilityState === 'visible') refreshVisitorsInBackground()
 }
 
 async function loadTenants() {
@@ -558,9 +574,15 @@ async function cancel(row) {
 
 onMounted(async () => {
   await Promise.allSettled([loadTenants(), loadVisitors()])
+  window.addEventListener('focus', refreshVisitorsWhenVisible)
+  document.addEventListener('visibilitychange', refreshVisitorsWhenVisible)
+  visitorRefreshTimer = window.setInterval(refreshVisitorsInBackground, VISITOR_AUTO_REFRESH_MS)
 })
 
 onBeforeUnmount(() => {
+  if (visitorRefreshTimer !== null) window.clearInterval(visitorRefreshTimer)
+  window.removeEventListener('focus', refreshVisitorsWhenVisible)
+  document.removeEventListener('visibilitychange', refreshVisitorsWhenVisible)
   listRequestGuard.dispose()
   disposeQueryLifecycle()
 })

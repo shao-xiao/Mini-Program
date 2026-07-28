@@ -2,14 +2,49 @@
   <block wx:if="{{isPublicMode}}">
     <view class="section card public-visitor-intro">
       <view class="public-visitor-heading">
-        <view class="title">访客预约记录</view>
+        <view class="title">访客预约</view>
         <view class="public-visitor-badge">免登录</view>
       </view>
-      <view class="empty-desc">无需登录即可提交。请填写真实联系手机号，信息仅用于预约联系和到访核验；提交后请保存预约编号。</view>
+      <view class="empty-desc">无需登录即可预约；提交后，本机会持续显示物业审核状态和门禁二维码。</view>
+    </view>
+
+    <view class="section card reservation-history-card">
+      <view class="section-title history-title">个人预约历史记录</view>
+      <view class="history-scope-tip">仅显示本机提交并保存的预约；更换设备后请凭预约编号联系物业。</view>
+      <view wx:if="{{historyLoading}}" class="history-state">正在刷新预约记录…</view>
+      <view wx:elif="{{historyError}}" class="history-state history-error">
+        <text>{{historyError}}</text>
+        <button class="history-retry" size="mini" bindtap="retryLoad">重试</button>
+      </view>
+      <view wx:elif="{{visitors.length === 0}}" class="history-state">暂无个人预约记录</view>
+      <view wx:else>
+        <view wx:for="{{visitors}}" wx:key="recordKey" class="visitor-card compact-history-card">
+          <view class="visitor-head">
+            <view>
+              <view class="visitor-title">{{item.visitorName}}</view>
+              <view class="visitor-phone">{{item.visitorPhone}}</view>
+            </view>
+            <view class="status {{item.statusClass}}">{{item.statusText}}</view>
+          </view>
+          <view class="visitor-meta">预约编号：{{item.code}}</view>
+          <view class="visitor-meta">来访时间：{{item.visitTimeText}}</view>
+          <view class="visitor-desc">{{item.visitReason}}</view>
+          <view wx:if="{{item.carPlateNo}}" class="visitor-meta">车牌号：{{item.carPlateNo}}</view>
+          <view wx:if="{{item.status === 'PENDING'}}" class="review-tip pending-tip">预约已提交，等待物业审核</view>
+          <view wx:elif="{{item.status === 'REGISTERED' && !item.qrCodeUrl}}" class="review-tip approved-tip">审核已通过，门禁二维码待物业上传</view>
+          <view wx:elif="{{item.status === 'REJECTED'}}" class="review-tip rejected-tip">驳回原因：{{item.reviewRemark || '请联系物业了解详情'}}</view>
+          <button
+            wx:if="{{item.qrCodeUrl}}"
+            class="qr-button"
+            data-key="{{item.recordKey}}"
+            catchtap="showQrCode"
+          >出示门禁二维码</button>
+        </view>
+      </view>
     </view>
 
     <view class="section card public-visitor-form">
-      <view class="section-title public-section-title">预约信息</view>
+      <view class="section-title public-section-title">新增访客预约</view>
       <view class="public-field-grid">
         <input
           class="input public-input"
@@ -85,7 +120,7 @@
         bindinput="onInput"
       />
       <view class="public-submit-row">
-        <view class="public-privacy-tip">提交前会展示隐私说明；匿名预约不提供公开查询。</view>
+        <view class="public-privacy-tip">提交前会展示隐私说明；本机凭证仅用于回查该笔预约。</view>
         <button
           class="button-primary submit-button public-submit-button"
           loading="{{submitting}}"
@@ -95,152 +130,97 @@
       </view>
     </view>
   </block>
-  <block wx:else>
-  <view class="section card">
-    <view class="title">访客邀请</view>
-    <view class="subtitle">{{identityText || '租户登录后'}}可创建邀请并查看访客到访状态</view>
-  </view>
-
-  <view wx:if="{{pageState === 'login-required'}}" class="card section">
-    <view class="empty-title">登录后创建访客邀请</view>
-    <view class="empty-desc">{{errorMessage}}</view>
-    <button class="button-primary bind-button" bindtap="goProfile">去登录</button>
-  </view>
-
-  <view wx:elif="{{pageState === 'unauthorized'}}" class="card section">
-    <view class="empty-title">当前账号暂无访客邀请资格</view>
-    <view class="empty-desc">{{errorMessage}}</view>
-    <button class="button-primary bind-button" bindtap="goProfile">查看账号</button>
-  </view>
-
-  <view wx:elif="{{pageState === 'error'}}" class="card section">
-    <view class="empty-title">访客邀请加载失败</view>
-    <view class="empty-desc">{{errorMessage}}</view>
-    <button class="button-primary bind-button" bindtap="retryLoad">重新加载</button>
-  </view>
-
-  <view wx:elif="{{pageState === 'loading'}}" class="card muted">正在加载访客邀请...</view>
 
   <block wx:else>
     <view class="section card">
-      <view class="section-title">邀请信息</view>
-      <dynamic-form id="schemaForm" module-key="visitors" schema="{{fieldSchema}}" values="{{form}}" bind:change="onSchemaChange" bind:uploadstate="onUploadState" />
-      <block wx:if="{{false}}">
-      <input
-        class="input"
-        placeholder-class="input-placeholder"
-        placeholder="访客姓名"
-        value="{{form.visitorName}}"
-        data-field="visitorName"
-        bindinput="onInput"
-      />
-      <input
-        class="input"
-        placeholder-class="input-placeholder"
-        placeholder="访客手机号"
-        type="number"
-        maxlength="20"
-        value="{{form.visitorPhone}}"
-        data-field="visitorPhone"
-        bindinput="onInput"
-      />
-      <input
-        class="input"
-        placeholder-class="input-placeholder"
-        placeholder="来访单位，可不填"
-        value="{{form.visitCompany}}"
-        data-field="visitCompany"
-        bindinput="onInput"
-      />
-      <input
-        class="input"
-        placeholder-class="input-placeholder"
-        placeholder="来访事由"
-        value="{{form.visitReason}}"
-        data-field="visitReason"
-        bindinput="onInput"
-      />
-
-      <view class="picker-grid">
-        <calendar-date-field
-          class="picker-field"
-          value="{{form.visitDate}}"
-          min-date="{{today}}"
-          bind:change="onVisitDateChange"
-        />
-        <calendar-time-field
-          class="picker-field"
-          value="{{form.visitClock}}"
-          title="选择来访时间"
-          placeholder="选择来访时间"
-          bind:change="onVisitTimeChange"
-        />
-      </view>
-
-      <input
-        class="input"
-        placeholder-class="input-placeholder"
-        placeholder="车牌号，可不填"
-        value="{{form.carPlateNo}}"
-        data-field="carPlateNo"
-        bindinput="onInput"
-      />
-      <input
-        class="input"
-        placeholder-class="input-placeholder"
-        placeholder="备注，可不填"
-        value="{{form.remark}}"
-        data-field="remark"
-        bindinput="onInput"
-      />
-      </block>
-      <button
-        class="button-primary submit-button"
-        loading="{{submitting}}"
-        disabled="{{submitting}}"
-        bindtap="submitVisitor"
-      >
-        创建邀请
-      </button>
+      <view class="title">访客预约</view>
+      <view class="subtitle">{{identityText || '租户登录后'}}可提交预约并查看访客到访状态</view>
     </view>
 
-    <view wx:if="{{visitors.length === 0}}" class="card muted">
-      暂无访客邀请
+    <view wx:if="{{pageState === 'login-required'}}" class="card section">
+      <view class="empty-title">登录后提交访客预约</view>
+      <view class="empty-desc">{{errorMessage}}</view>
+      <button class="button-primary bind-button" bindtap="goProfile">去登录</button>
     </view>
 
-    <view wx:else class="section">
-      <view class="section-title">我的访客邀请</view>
-    <view wx:for="{{visitors}}" wx:key="id" class="visitor-card" data-id="{{item.id}}" bindtap="openDetail">
-        <view class="visitor-head">
-          <view>
-            <view class="visitor-title">{{item.visitorName}}</view>
-            <view class="visitor-phone">{{item.visitorPhone}}</view>
-          </view>
-          <view class="status {{item.statusClass}}">{{item.statusText}}</view>
-        </view>
-        <view class="visitor-meta">来访时间：{{item.visitTimeText}}</view>
-        <view wx:if="{{item.tenantName}}" class="visitor-meta">拜访租户：{{item.tenantName}}</view>
-        <view class="visitor-desc">{{item.visitReason}}</view>
-        <view wx:if="{{item.carPlateNo}}" class="visitor-meta">车牌号：{{item.carPlateNo}}</view>
-        <view wx:if="{{item.leaveTime}}" class="visitor-meta">离场时间：{{item.leaveTimeText}}</view>
-        <view wx:if="{{item.status === 'PENDING'}}" class="review-tip pending-tip">预约已提交，等待物业审核</view>
-        <view wx:elif="{{item.status === 'REGISTERED' && !item.qrCodeUrl}}" class="review-tip approved-tip">审核已通过，门禁二维码待物业上传</view>
-        <view wx:elif="{{item.status === 'REJECTED'}}" class="review-tip rejected-tip">驳回原因：{{item.reviewRemark || '请联系物业了解详情'}}</view>
-        <button
-          wx:if="{{item.qrCodeUrl}}"
-          class="qr-button"
+    <view wx:elif="{{pageState === 'unauthorized'}}" class="card section">
+      <view class="empty-title">当前账号暂无访客预约资格</view>
+      <view class="empty-desc">{{errorMessage}}</view>
+      <button class="button-primary bind-button" bindtap="goProfile">查看账号</button>
+    </view>
+
+    <view wx:elif="{{pageState === 'error'}}" class="card section">
+      <view class="empty-title">访客预约加载失败</view>
+      <view class="empty-desc">{{errorMessage}}</view>
+      <button class="button-primary bind-button" bindtap="retryLoad">重新加载</button>
+    </view>
+
+    <view wx:elif="{{pageState === 'loading'}}" class="card muted">正在加载访客预约…</view>
+
+    <block wx:else>
+      <view class="section reservation-history-section">
+        <view class="section-title history-title">个人预约历史记录</view>
+        <view wx:if="{{visitors.length === 0}}" class="card history-state">暂无个人预约记录</view>
+        <view
+          wx:for="{{visitors}}"
+          wx:key="recordKey"
+          class="visitor-card"
           data-id="{{item.id}}"
-          catchtap="showQrCode"
-        >出示门禁二维码</button>
-        <view wx:if="{{item.cancellable}}" class="visitor-actions">
-      <button class="cancel-button" size="mini" data-id="{{item.id}}" catchtap="cancelVisitor">
-            取消邀请
-          </button>
+          bindtap="openDetail"
+        >
+          <view class="visitor-head">
+            <view>
+              <view class="visitor-title">{{item.visitorName}}</view>
+              <view class="visitor-phone">{{item.visitorPhone}}</view>
+            </view>
+            <view class="status {{item.statusClass}}">{{item.statusText}}</view>
+          </view>
+          <view class="visitor-meta">来访时间：{{item.visitTimeText}}</view>
+          <view wx:if="{{item.tenantName}}" class="visitor-meta">拜访租户：{{item.tenantName}}</view>
+          <view class="visitor-desc">{{item.visitReason}}</view>
+          <view wx:if="{{item.carPlateNo}}" class="visitor-meta">车牌号：{{item.carPlateNo}}</view>
+          <view wx:if="{{item.leaveTime}}" class="visitor-meta">离场时间：{{item.leaveTimeText}}</view>
+          <view wx:if="{{item.status === 'PENDING'}}" class="review-tip pending-tip">预约已提交，等待物业审核</view>
+          <view wx:elif="{{item.status === 'REGISTERED' && !item.qrCodeUrl}}" class="review-tip approved-tip">审核已通过，门禁二维码待物业上传</view>
+          <view wx:elif="{{item.status === 'REJECTED'}}" class="review-tip rejected-tip">驳回原因：{{item.reviewRemark || '请联系物业了解详情'}}</view>
+          <button
+            wx:if="{{item.qrCodeUrl}}"
+            class="qr-button"
+            data-key="{{item.recordKey}}"
+            catchtap="showQrCode"
+          >出示门禁二维码</button>
+          <view wx:if="{{item.cancellable}}" class="visitor-actions">
+            <button class="cancel-button" size="mini" data-id="{{item.id}}" catchtap="cancelVisitor">
+              取消预约
+            </button>
+          </view>
         </view>
       </view>
-    </view>
-    <view class="more">{{loadingMore ? '加载中…' : (noMore && total > 0 ? '没有更多数据' : '上拉加载更多')}}</view>
-  </block>
+      <view class="more">{{loadingMore ? '加载中…' : (noMore && total > 0 ? '没有更多数据' : '上拉加载更多')}}</view>
+
+      <view class="section card">
+        <view class="section-title">新增访客预约</view>
+        <dynamic-form id="schemaForm" module-key="visitors" schema="{{fieldSchema}}" values="{{form}}" bind:change="onSchemaChange" bind:uploadstate="onUploadState" />
+        <block wx:if="{{false}}">
+          <input class="input" placeholder-class="input-placeholder" placeholder="访客姓名" value="{{form.visitorName}}" data-field="visitorName" bindinput="onInput" />
+          <input class="input" placeholder-class="input-placeholder" placeholder="访客手机号" type="number" maxlength="20" value="{{form.visitorPhone}}" data-field="visitorPhone" bindinput="onInput" />
+          <input class="input" placeholder-class="input-placeholder" placeholder="来访单位，可不填" value="{{form.visitCompany}}" data-field="visitCompany" bindinput="onInput" />
+          <input class="input" placeholder-class="input-placeholder" placeholder="来访事由" value="{{form.visitReason}}" data-field="visitReason" bindinput="onInput" />
+          <view class="picker-grid">
+            <calendar-date-field class="picker-field" value="{{form.visitDate}}" min-date="{{today}}" bind:change="onVisitDateChange" />
+            <calendar-time-field class="picker-field" value="{{form.visitClock}}" title="选择来访时间" placeholder="选择来访时间" bind:change="onVisitTimeChange" />
+          </view>
+          <input class="input" placeholder-class="input-placeholder" placeholder="车牌号，可不填" value="{{form.carPlateNo}}" data-field="carPlateNo" bindinput="onInput" />
+          <input class="input" placeholder-class="input-placeholder" placeholder="备注，可不填" value="{{form.remark}}" data-field="remark" bindinput="onInput" />
+        </block>
+        <button
+          class="button-primary submit-button"
+          loading="{{submitting}}"
+          disabled="{{submitting}}"
+          bindtap="submitVisitor"
+        >提交预约</button>
+      </view>
+    </block>
   </block>
 
   <view wx:if="{{qrPopupVisible}}" class="qr-mask" catchtap="closeQrCode">

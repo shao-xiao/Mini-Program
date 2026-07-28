@@ -92,7 +92,8 @@ public class VisitorController {
                        qr_uploaded_by AS qrUploadedBy, qr_uploaded_at AS qrUploadedAt
                 FROM visitor_appointment
                 WHERE deleted = 0
-                ORDER BY visit_time DESC, id DESC
+                ORDER BY CASE WHEN appointment_status = 'PENDING' THEN 0 ELSE 1 END,
+                         created_at DESC, id DESC
                 """
         ));
     }
@@ -230,7 +231,7 @@ public class VisitorController {
                 principal.userId()
         );
         if (rows.isEmpty()) {
-            throw new BusinessException(404, "访客邀请不存在或无权访问");
+            throw new BusinessException(404, "访客预约不存在或无权访问");
         }
         List<Map<String, Object>> decorated = customFieldProjectionService == null
                 ? rows

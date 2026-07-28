@@ -71,6 +71,55 @@
   box-shadow: 0 8rpx 24rpx rgba(31, 27, 27, 0.06);
 }
 
+.reservation-history-card {
+  margin-bottom: 14rpx;
+}
+
+.reservation-history-section {
+  margin-bottom: 10rpx;
+}
+
+.history-title {
+  margin-bottom: 8rpx;
+}
+
+.history-scope-tip {
+  margin-bottom: 16rpx;
+  color: #73767a;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.history-state {
+  padding: 22rpx 0;
+  color: #909399;
+  font-size: 24rpx;
+  text-align: center;
+}
+
+.history-error {
+  color: #b42318;
+}
+
+.history-retry {
+  display: inline-block;
+  margin: 12rpx 0 0;
+  border: 1rpx solid #dcdfe6;
+  background: #ffffff;
+  color: #303133;
+}
+
+.compact-history-card {
+  margin-bottom: 14rpx;
+  padding: 20rpx;
+  border: 1rpx solid #ebeef5;
+  box-shadow: none;
+}
+
+.compact-history-card:last-child {
+  margin-bottom: 0;
+}
+
 .visitor-head {
   display: flex;
   align-items: flex-start;
@@ -400,10 +449,7 @@
 }
 
 .public-submit-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 210rpx;
-  align-items: center;
-  gap: 14rpx;
+  display: block;
   margin-top: 14rpx;
 }
 
@@ -418,11 +464,16 @@
 }
 
 .public-submit-button {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   height: 68rpx;
-  margin: 0;
+  margin: 12rpx 0 0;
   padding: 0 12rpx;
+  overflow: hidden;
   font-size: 24rpx;
   line-height: 68rpx;
+  white-space: nowrap;
 }
 
 .public-submit-button::after {

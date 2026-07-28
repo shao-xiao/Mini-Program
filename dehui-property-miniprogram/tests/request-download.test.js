@@ -83,6 +83,37 @@ test('download does not duplicate the api prefix on protected mobile file URLs',
   assert.equal(filePath, downloadOptions.filePath)
 })
 
+test('download merges an anonymous reservation capability header without requiring login', async () => {
+  let downloadOptions
+  global.wx = {
+    env: { USER_DATA_PATH: path.join('C:', 'tmp', 'wechat') },
+    getStorageSync(key) {
+      if (key === 'apiBaseURL') return 'http://localhost:8080/api'
+      return ''
+    },
+    downloadFile(options) {
+      downloadOptions = options
+      options.success({ statusCode: 200, tempFilePath: options.filePath })
+    },
+    showToast() {}
+  }
+  delete require.cache[require.resolve('../utils/request')]
+  delete require.cache[require.resolve('../config/env')]
+
+  const api = require('../utils/request')
+  await api.download(
+    '/mobile/public/visitors/PVR-ABCDEF0123456789ABCDEF0123456789/qr',
+    'visitor-qr.png',
+    { header: { 'X-Visitor-Submission-Token': 'public-visitor-token-0001' } }
+  )
+
+  assert.equal(downloadOptions.header.Authorization, undefined)
+  assert.equal(
+    downloadOptions.header['X-Visitor-Submission-Token'],
+    'public-visitor-token-0001'
+  )
+})
+
 test('upload uses requestURL so stored api base url applies to file uploads', async () => {
   let uploadOptions
   global.wx = {

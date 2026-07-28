@@ -202,7 +202,10 @@ function download(url, filename, options = {}) {
     const filePath = downloadFilePath(url, filename)
     const downloadOptions = {
       url: requestURL(url),
-      header: token ? { Authorization: token } : {},
+      header: {
+        ...(token ? { Authorization: token } : {}),
+        ...(options.header || {})
+      },
       success(res) {
         const statusCode = numericCode(res.statusCode)
         const downloadedPath = res.filePath || res.tempFilePath
