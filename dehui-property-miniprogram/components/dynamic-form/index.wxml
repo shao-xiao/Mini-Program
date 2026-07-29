@@ -1,0 +1,26 @@
+<view class="dynamic-form {{compact ? 'dynamic-form--compact' : ''}}">
+  <view wx:for="{{fields}}" wx:key="fieldKey" class="field field-{{item.dataType}} field-key-{{item.fieldKey}}">
+    <view class="label">{{item.label}}<text wx:if="{{item.required}}" class="required">*</text></view>
+    <textarea wx:if="{{item.dataType === 'TEXTAREA'}}" data-key="{{item.fieldKey}}" value="{{model[item.fieldKey]}}" disabled="{{readonly || !item.editable}}" maxlength="{{item.validation.maxLength || 10000}}" bindinput="onInput" />
+    <input wx:elif="{{item.dataType === 'TEXT' || item.dataType === 'EMAIL' || item.dataType === 'URL'}}" data-key="{{item.fieldKey}}" value="{{model[item.fieldKey]}}" disabled="{{readonly || !item.editable}}" bindinput="onInput" />
+    <input wx:elif="{{item.dataType === 'NUMBER'}}" type="number" data-key="{{item.fieldKey}}" value="{{model[item.fieldKey]}}" disabled="{{readonly || !item.editable}}" bindinput="onInput" />
+    <picker wx:elif="{{item.dataType === 'DATE'}}" mode="date" data-key="{{item.fieldKey}}" value="{{model[item.fieldKey]}}" disabled="{{readonly || !item.editable}}" bindchange="onInput"><view class="picker">{{model[item.fieldKey] || '请选择'}}</view></picker>
+    <picker wx:elif="{{item.dataType === 'TIME'}}" mode="time" data-key="{{item.fieldKey}}" value="{{model[item.fieldKey]}}" disabled="{{readonly || !item.editable}}" bindchange="onInput"><view class="picker">{{model[item.fieldKey] || '请选择'}}</view></picker>
+    <picker wx:elif="{{item.dataType === 'SELECT'}}" range="{{item.options}}" range-key="label" data-key="{{item.fieldKey}}" disabled="{{readonly || !item.editable}}" bindchange="onPicker"><view class="picker">{{model[item.fieldKey] || '请选择'}}</view></picker>
+    <checkbox-group wx:elif="{{item.dataType === 'MULTISELECT'}}" data-key="{{item.fieldKey}}" bindchange="onMultiSelect">
+      <label wx:for="{{item.options}}" wx:for-item="option" wx:key="value"><checkbox value="{{option.value}}" checked="{{model[item.fieldKey].includes(option.value)}}" />{{option.label}}</label>
+    </checkbox-group>
+    <switch wx:elif="{{item.dataType === 'BOOLEAN'}}" data-key="{{item.fieldKey}}" checked="{{model[item.fieldKey]}}" disabled="{{readonly || !item.editable}}" bindchange="onSwitch" />
+    <view wx:elif="{{item.dataType === 'IMAGE' || item.dataType === 'ATTACHMENT'}}" class="files">
+      <view wx:for="{{model[item.fieldKey].files}}" wx:for-item="file" wx:key="fileId" class="file">
+        <image wx:if="{{item.dataType === 'IMAGE' && file.url}}" src="{{file.url}}" mode="aspectFill" data-key="{{item.fieldKey}}" data-index="{{index}}" bindtap="previewFile" />
+        <text wx:else>{{file.name || ('文件 #' + file.fileId)}}</text>
+        <button wx:if="{{!readonly && item.editable}}" size="mini" data-key="{{item.fieldKey}}" data-index="{{index}}" bindtap="removeFile">删除</button>
+      </view>
+      <button wx:if="{{!readonly && item.editable}}" size="mini" loading="{{uploading}}" data-key="{{item.fieldKey}}" bindtap="chooseFile">上传{{item.dataType === 'IMAGE' ? '图片' : '附件'}}</button>
+    </view>
+    <input wx:else data-key="{{item.fieldKey}}" value="{{model[item.fieldKey]}}" disabled="{{readonly || !item.editable}}" bindinput="onInput" />
+    <view wx:if="{{errors[item.fieldKey]}}" class="error">{{errors[item.fieldKey]}}</view>
+    <view wx:if="{{item.description}}" class="help">{{item.description}}</view>
+  </view>
+</view>

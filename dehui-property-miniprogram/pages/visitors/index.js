@@ -522,7 +522,12 @@ Page({
 
   toIdentityText(profile) {
     if (!profile) return ''
-    return `租户：${profile.boundTenantName || profile.nickname || ''}`
+    const tenantName = profile.tenantInfo?.name
+      || profile.boundTenantName
+      || profile.nickname
+      || profile.name
+      || ''
+    return tenantName ? `租户：${tenantName}` : '当前租户'
   },
 
   toStatusText(status) {

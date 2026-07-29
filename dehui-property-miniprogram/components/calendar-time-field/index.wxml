@@ -1,0 +1,27 @@
+<view class="time-field">
+  <view class="time-trigger {{displayValue ? '' : 'time-placeholder'}}" bindtap="openPanel">
+    {{displayValue || placeholder}}
+  </view>
+
+  <view wx:if="{{visible}}" class="time-mask" bindtap="closePanel">
+    <view class="time-panel" catchtap="stopPanelTap">
+      <view class="time-toolbar">
+        <view class="time-title">{{title}}</view>
+      </view>
+
+      <picker-view class="time-picker-view" indicator-class="time-picker-indicator" value="{{pickerValue}}" bindchange="onPickerChange">
+        <picker-view-column>
+          <view wx:for="{{hours}}" wx:key="*this" class="time-option">{{item}} 时</view>
+        </picker-view-column>
+        <picker-view-column>
+          <view wx:for="{{minutes}}" wx:key="*this" class="time-option">{{item}} 分</view>
+        </picker-view-column>
+      </picker-view>
+
+      <view class="time-footer">
+        <view class="time-button time-button--muted" bindtap="closePanel">取消</view>
+        <view class="time-button time-button--primary" bindtap="confirmTime">确定</view>
+      </view>
+    </view>
+  </view>
+</view>

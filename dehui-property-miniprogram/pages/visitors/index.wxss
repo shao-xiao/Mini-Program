@@ -341,6 +341,238 @@
   line-height: 1.6;
 }
 
+.tenant-visitor-page {
+  padding: 16rpx;
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+}
+
+.tenant-visitor-page .section {
+  margin-bottom: 14rpx;
+}
+
+.tenant-visitor-page .card {
+  padding: 20rpx;
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 14rpx rgba(31, 41, 51, 0.04);
+}
+
+.tenant-history-panel {
+  overflow: hidden;
+}
+
+.tenant-history-heading,
+.tenant-form-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.tenant-history-heading {
+  padding-bottom: 14rpx;
+}
+
+.tenant-history-heading .history-title,
+.tenant-form-title {
+  margin: 0;
+  font-size: 28rpx;
+  line-height: 38rpx;
+}
+
+.tenant-history-identity,
+.tenant-form-tip {
+  max-width: 500rpx;
+  margin-top: 3rpx;
+  overflow: hidden;
+  color: #7b8794;
+  font-size: 21rpx;
+  line-height: 30rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-history-count,
+.tenant-required-tip {
+  flex: none;
+  padding: 5rpx 12rpx;
+  border-radius: 999rpx;
+  background: #f3f5f7;
+  color: #52606d;
+  font-size: 20rpx;
+  line-height: 28rpx;
+}
+
+.tenant-required-tip text {
+  color: #e4312b;
+}
+
+.tenant-history-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  padding: 13rpx 16rpx;
+  border-radius: 10rpx;
+  background: #f7f8fa;
+  text-align: left;
+}
+
+.tenant-empty-title {
+  flex: none;
+  color: #52606d;
+  font-size: 23rpx;
+  font-weight: 600;
+}
+
+.tenant-empty-desc {
+  overflow: hidden;
+  color: #98a2b3;
+  font-size: 20rpx;
+  line-height: 28rpx;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-history-item {
+  margin: 0;
+  padding: 16rpx 0;
+  border-top: 1rpx solid #edf0f3;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.tenant-history-item:last-of-type {
+  padding-bottom: 0;
+}
+
+.tenant-visitor-main {
+  min-width: 0;
+}
+
+.tenant-visitor-name-row {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 10rpx;
+}
+
+.tenant-history-item .visitor-title {
+  overflow: hidden;
+  font-size: 27rpx;
+  line-height: 36rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-history-item .visitor-phone,
+.tenant-history-item .visitor-meta {
+  margin-top: 0;
+  color: #7b8794;
+  font-size: 21rpx;
+  line-height: 30rpx;
+}
+
+.tenant-history-item .visitor-phone {
+  flex: none;
+}
+
+.tenant-status-column {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5rpx;
+}
+
+.tenant-history-item .status {
+  padding: 4rpx 10rpx;
+  font-size: 20rpx;
+  line-height: 28rpx;
+}
+
+.tenant-detail-hint {
+  color: #98a2b3;
+  font-size: 19rpx;
+  line-height: 26rpx;
+}
+
+.tenant-visitor-desc {
+  display: -webkit-box;
+  margin-top: 6rpx;
+  overflow: hidden;
+  color: #334e68;
+  font-size: 22rpx;
+  line-height: 30rpx;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.tenant-visitor-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4rpx 14rpx;
+  margin-top: 5rpx;
+  color: #7b8794;
+  font-size: 20rpx;
+  line-height: 28rpx;
+}
+
+.tenant-review-tip {
+  display: inline-block;
+  margin-top: 7rpx;
+  padding: 5rpx 9rpx;
+  font-size: 20rpx;
+  line-height: 28rpx;
+}
+
+.tenant-visitor-actions {
+  display: flex;
+  gap: 10rpx;
+  margin-top: 9rpx;
+}
+
+.tenant-action-button {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 140rpx;
+  height: 56rpx;
+  margin: 0;
+  padding: 0 18rpx;
+  font-size: 22rpx;
+  line-height: 54rpx;
+}
+
+.tenant-action-button::after {
+  border: 0;
+}
+
+.tenant-history-more {
+  padding: 13rpx 0 0;
+  border-top: 1rpx solid #edf0f3;
+  font-size: 21rpx;
+}
+
+.tenant-visitor-form {
+  margin-bottom: 0;
+}
+
+.tenant-form-heading {
+  margin-bottom: 14rpx;
+}
+
+.tenant-submit-button {
+  height: 68rpx;
+  margin-top: 16rpx;
+  border-radius: 10rpx;
+  font-size: 25rpx;
+  line-height: 68rpx;
+}
+
+.tenant-submit-button::after {
+  border: 0;
+}
+
 .public-visitor-intro {
   border: 1rpx solid #ffd7d5;
   background: #fff8f7;

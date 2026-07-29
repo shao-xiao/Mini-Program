@@ -13,7 +13,7 @@ test('tenant visitor page waits for approval and downloads protected QR images',
 
   assert.match(script, /status === 'PENDING'\) return '待审核'/)
   assert.match(script, /status === 'REJECTED'\) return '已驳回'/)
-  assert.match(script, /api\.download\(visitor\.qrCodeUrl/)
+  assert.match(script, /api\.download\(\s*visitor\.qrCodeUrl/)
   assert.match(script, /visitDate:\s*dynamicPayload\.visitDate \|\| form\.visitDate/)
   assert.match(script, /visitTime:\s*dynamicPayload\.visitTime \|\| form\.visitClock/)
   assert.match(markup, /出示门禁二维码/)

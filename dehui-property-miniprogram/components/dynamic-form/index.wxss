@@ -1,0 +1,58 @@
+.field{margin-bottom:24rpx}.label{font-size:26rpx;color:#334155;margin-bottom:10rpx}.required,.error{color:#dc2626}.field input,.field textarea,.picker{box-sizing:border-box;width:100%;min-height:76rpx;padding:18rpx;border:1rpx solid #dbe3ee;border-radius:12rpx;background:#fff}.field textarea{height:180rpx}.help{font-size:22rpx;color:#94a3b8;margin-top:8rpx}.error{font-size:22rpx;margin-top:8rpx}.files{display:flex;flex-direction:column;gap:12rpx}.file{display:flex;align-items:center;gap:12rpx}.file image{width:140rpx;height:140rpx;border-radius:10rpx}
+
+.dynamic-form--compact {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14rpx 16rpx;
+}
+
+.dynamic-form--compact .field {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.dynamic-form--compact .field-TEXTAREA,
+.dynamic-form--compact .field-MULTISELECT,
+.dynamic-form--compact .field-IMAGE,
+.dynamic-form--compact .field-ATTACHMENT {
+  grid-column: 1 / -1;
+}
+
+.dynamic-form--compact .label {
+  margin-bottom: 6rpx;
+  overflow: hidden;
+  color: #52606d;
+  font-size: 23rpx;
+  line-height: 30rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dynamic-form--compact .field input,
+.dynamic-form--compact .field textarea,
+.dynamic-form--compact .picker {
+  min-height: 68rpx;
+  padding: 12rpx 14rpx;
+  border-color: #e1e7ef;
+  border-radius: 10rpx;
+  background: #f8fafc;
+  font-size: 24rpx;
+}
+
+.dynamic-form--compact .field textarea {
+  height: 92rpx;
+  min-height: 92rpx;
+  line-height: 32rpx;
+}
+
+.dynamic-form--compact .field-key-visitReason textarea {
+  height: 108rpx;
+  min-height: 108rpx;
+}
+
+.dynamic-form--compact .help,
+.dynamic-form--compact .error {
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  line-height: 28rpx;
+}
