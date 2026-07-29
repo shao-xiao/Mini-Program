@@ -20,6 +20,12 @@ public class VisitorApprovalService {
 
     @Transactional
     public Map<String, Object> approve(Long appointmentId, String reviewRemark, AuthPrincipal principal) {
+        return approveByStaff(appointmentId, reviewRemark, requireActor(principal == null ? null : principal.userId()));
+    }
+
+    @Transactional
+    public Map<String, Object> approveByStaff(Long appointmentId, String reviewRemark, Long actorSysUserId) {
+        Long actorId = requireActor(actorSysUserId);
         Map<String, Object> appointment = lockAppointment(appointmentId);
         requireStatus(appointment, "PENDING", "仅待审核预约可以通过");
         String remark = normalizedOptionalRemark(reviewRemark);
@@ -30,7 +36,7 @@ public class VisitorApprovalService {
                     reviewed_by = ?, reviewed_at = NOW(), review_remark = ?, updated_by = ?
                 WHERE id = ? AND appointment_status = 'PENDING' AND deleted = 0
                 """,
-                principal.userId(), remark, principal.userId(), appointmentId
+                actorId, remark, actorId, appointmentId
         );
         if (updated != 1) {
             throw new BusinessException(409, "预约审核状态已变化，请刷新后重试");
@@ -40,6 +46,12 @@ public class VisitorApprovalService {
 
     @Transactional
     public Map<String, Object> reject(Long appointmentId, String reviewRemark, AuthPrincipal principal) {
+        return rejectByStaff(appointmentId, reviewRemark, requireActor(principal == null ? null : principal.userId()));
+    }
+
+    @Transactional
+    public Map<String, Object> rejectByStaff(Long appointmentId, String reviewRemark, Long actorSysUserId) {
+        Long actorId = requireActor(actorSysUserId);
         Map<String, Object> appointment = lockAppointment(appointmentId);
         requireStatus(appointment, "PENDING", "仅待审核预约可以驳回");
         String remark = requiredRemark(reviewRemark);
@@ -50,7 +62,7 @@ public class VisitorApprovalService {
                     reviewed_by = ?, reviewed_at = NOW(), review_remark = ?, updated_by = ?
                 WHERE id = ? AND appointment_status = 'PENDING' AND deleted = 0
                 """,
-                principal.userId(), remark, principal.userId(), appointmentId
+                actorId, remark, actorId, appointmentId
         );
         if (updated != 1) {
             throw new BusinessException(409, "预约审核状态已变化，请刷新后重试");
@@ -60,51 +72,71 @@ public class VisitorApprovalService {
 
     @Transactional
     public Map<String, Object> attachQrCode(Long appointmentId, Long fileId, AuthPrincipal principal) {
+        return attachQrCode(
+                appointmentId,
+                fileId,
+                requireActor(principal == null ? null : principal.userId()),
+                false
+        );
+    }
+
+    @Transactional
+    public Map<String, Object> attachStaffQrCode(Long appointmentId, Long fileId, Long actorSysUserId) {
+        return attachQrCode(appointmentId, fileId, requireActor(actorSysUserId), true);
+    }
+
+    private Map<String, Object> attachQrCode(
+            Long appointmentId,
+            Long fileId,
+            Long actorSysUserId,
+            boolean staffDraft
+    ) {
         if (fileId == null || fileId <= 0) {
             throw new BusinessException(400, "请选择有效的二维码图片");
         }
         Map<String, Object> appointment = lockAppointment(appointmentId);
         requireStatus(appointment, "REGISTERED", "仅审核通过且尚未入场的预约可以上传二维码");
         Long oldFileId = longValue(appointment.get("qrCodeFileId"));
+        String draftContract = staffDraft
+                ? "biz_type = 'STAFF_DRAFT' AND workspace_key IS NULL"
+                : "biz_type = 'CUSTOM_FIELD_IMAGE' AND workspace_key = 'visitors'";
 
         List<Map<String, Object>> files = jdbcTemplate.queryForList(
-                """
+                ("""
                 SELECT id, original_name AS originalName, mime_type AS mimeType, file_size AS fileSize
                 FROM file_upload
                 WHERE id = ?
-                  AND biz_type = 'CUSTOM_FIELD_IMAGE'
+                  AND %s
                   AND biz_id IS NULL
-                  AND workspace_key = 'visitors'
                   AND access_scope = 'INTERNAL'
                   AND owner_sys_user_id = ?
                   AND mime_type IN ('image/jpeg', 'image/png', 'image/webp')
                   AND status = 'ENABLED'
                   AND deleted = 0
                 FOR UPDATE
-                """,
+                """).formatted(draftContract),
                 fileId,
-                principal.userId()
+                actorSysUserId
         );
         if (files.isEmpty()) {
             throw new BusinessException(400, "二维码图片不存在、已被使用或不属于当前操作人");
         }
 
         int claimed = jdbcTemplate.update(
-                """
+                ("""
                 UPDATE file_upload
-                SET biz_type = 'VISITOR', biz_id = ?, updated_by = ?
+                SET biz_type = 'VISITOR', biz_id = ?, workspace_key = 'visitors', updated_by = ?
                 WHERE id = ?
-                  AND biz_type = 'CUSTOM_FIELD_IMAGE'
+                  AND %s
                   AND biz_id IS NULL
-                  AND workspace_key = 'visitors'
                   AND owner_sys_user_id = ?
                   AND status = 'ENABLED'
                   AND deleted = 0
-                """,
+                """).formatted(draftContract),
                 appointmentId,
-                principal.userId(),
+                actorSysUserId,
                 fileId,
-                principal.userId()
+                actorSysUserId
         );
         if (claimed != 1) {
             throw new BusinessException(409, "二维码图片绑定状态已变化，请重新选择");
@@ -117,8 +149,8 @@ public class VisitorApprovalService {
                 WHERE id = ? AND appointment_status = 'REGISTERED' AND deleted = 0
                 """,
                 fileId,
-                principal.userId(),
-                principal.userId(),
+                actorSysUserId,
+                actorSysUserId,
                 appointmentId
         );
         if (updated != 1) {
@@ -132,7 +164,7 @@ public class VisitorApprovalService {
                     SET status = 'DISABLED', updated_by = ?
                     WHERE id = ? AND biz_type = 'VISITOR' AND biz_id = ? AND deleted = 0
                     """,
-                    principal.userId(),
+                    actorSysUserId,
                     oldFileId,
                     appointmentId
             );
@@ -143,7 +175,7 @@ public class VisitorApprovalService {
         response.put("name", file.get("originalName"));
         response.put("mimeType", file.get("mimeType"));
         response.put("size", file.get("fileSize"));
-        response.put("url", "/api/files/" + fileId);
+        response.put("url", (staffDraft ? "/api/mobile/files/" : "/api/files/") + fileId);
         return response;
     }
 
@@ -199,5 +231,12 @@ public class VisitorApprovalService {
         if (value instanceof Number number) return number.longValue();
         if (value == null || String.valueOf(value).isBlank()) return null;
         return Long.valueOf(String.valueOf(value));
+    }
+
+    private Long requireActor(Long actorSysUserId) {
+        if (actorSysUserId == null || actorSysUserId <= 0) {
+            throw BusinessException.forbidden("审核人账号无效");
+        }
+        return actorSysUserId;
     }
 }

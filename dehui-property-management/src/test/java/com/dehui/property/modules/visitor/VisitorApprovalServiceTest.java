@@ -112,4 +112,44 @@ class VisitorApprovalServiceTest {
         assertEquals(409, error.getCode());
         verify(jdbcTemplate, never()).update(anyString(), any(Object[].class));
     }
+
+    @Test
+    void mobileStaffClaimsItsInternalDraftAndUsesSystemStaffIdentity() {
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
+                .thenReturn(List.of(Map.of(
+                        "id", 13L,
+                        "status", "REGISTERED"
+                )))
+                .thenReturn(List.of(Map.of(
+                        "id", 24L,
+                        "originalName", "mobile-access-qr.png",
+                        "mimeType", "image/png",
+                        "fileSize", 4096L
+                )));
+        when(jdbcTemplate.update(anyString(), any(Object[].class))).thenReturn(1);
+
+        Map<String, Object> result = service.attachStaffQrCode(13L, 24L, 109L);
+
+        assertEquals(24L, result.get("qrCodeFileId"));
+        assertEquals("/api/mobile/files/24", result.get("url"));
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate, org.mockito.Mockito.times(2)).update(sql.capture(), any(Object[].class));
+        assertTrue(sql.getAllValues().stream().anyMatch(value -> value.contains("biz_type = 'STAFF_DRAFT'")));
+        assertTrue(sql.getAllValues().stream().anyMatch(value -> value.contains("workspace_key = 'visitors'")));
+    }
+
+    @Test
+    void mobileStaffApprovalRejectsASecondStateTransition() {
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(
+                Map.of("id", 14L, "status", "REGISTERED")
+        ));
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> service.approveByStaff(14L, null, 109L)
+        );
+
+        assertEquals(409, error.getCode());
+        verify(jdbcTemplate, never()).update(anyString(), any(Object[].class));
+    }
 }

@@ -1,5 +1,75 @@
-<view class="page">
+<view class="page visitor-detail-page">
   <view wx:if="{{error}}" class="staff-empty">{{error}}</view>
-  <view wx:if="{{detail}}" class="staff-record"><dynamic-detail schema="{{fieldSchema}}" values="{{detail}}" /><view class="staff-record-meta">{{detail.visitorName}} · {{detail.maskedPhone}}</view><view class="staff-actions"><button wx:if="{{canVerify && detail.status === 'REGISTERED'}}" class="staff-button" data-action="enter" bindtap="action">核验到访</button><button wx:if="{{canVerify && detail.status === 'ENTERED'}}" class="staff-button" data-action="leave" bindtap="action">登记离场</button></view></view>
-  <view wx:if="{{detail && detail.passRecords.length}}" class="staff-record"><view class="staff-record-title">核验记录</view><view wx:for="{{detail.passRecords}}" wx:key="passTime" class="staff-record-meta">{{item.passTime}} · {{item.passType}} · {{item.operatorName}}</view></view>
+
+  <view wx:if="{{detail}}" class="visitor-status-bar status-{{detail.status}}">
+    <view>
+      <view class="visitor-status-label">当前状态</view>
+      <view class="visitor-status-value">{{detail.statusText}}</view>
+    </view>
+    <view class="visitor-code">{{detail.invitationNumber}}</view>
+  </view>
+
+  <view wx:if="{{detail}}" class="staff-record visitor-detail-card">
+    <dynamic-detail schema="{{fieldSchema}}" values="{{detail}}" />
+    <view class="staff-record-meta visitor-phone">{{detail.visitorName}} · {{detail.maskedPhone}}</view>
+  </view>
+
+  <view wx:if="{{detail && detail.status === 'PENDING' && canVerify}}" class="staff-record review-card">
+    <view class="staff-record-title">预约审核</view>
+    <view class="staff-hint">通过意见可选；驳回时必须填写原因。</view>
+    <textarea
+      class="review-textarea"
+      maxlength="500"
+      placeholder="填写审核意见或驳回原因"
+      value="{{reviewRemark}}"
+      bindinput="onRemarkInput"
+      disabled="{{submitting}}"
+    />
+    <view class="review-count">{{reviewRemark.length}} / 500</view>
+    <view class="staff-actions review-actions">
+      <button class="staff-button secondary reject-button" bindtap="reject" loading="{{submitting}}" disabled="{{submitting}}">驳回</button>
+      <button class="staff-button approve-button" bindtap="approve" loading="{{submitting}}" disabled="{{submitting}}">审核通过</button>
+    </view>
+  </view>
+
+  <view wx:if="{{detail && detail.reviewedAt}}" class="staff-record audit-card">
+    <view class="staff-record-title">审核记录</view>
+    <view class="audit-row"><text>审核人</text><text>{{detail.reviewerName || '物业员工'}}</text></view>
+    <view class="audit-row"><text>审核时间</text><text>{{detail.reviewedAt}}</text></view>
+    <view class="audit-row"><text>审核意见</text><text>{{detail.reviewRemark || '无'}}</text></view>
+  </view>
+
+  <view wx:if="{{detail && detail.status === 'REGISTERED' && canVerify}}" class="staff-record qr-card">
+    <view class="staff-row">
+      <view>
+        <view class="staff-record-title">门禁二维码</view>
+        <view class="staff-hint">{{detail.qrCodeFileId ? '二维码已上传，可预览或替换。' : '审核通过后上传访客门禁二维码。'}}</view>
+      </view>
+      <view wx:if="{{detail.qrUploadedAt}}" class="qr-time">{{detail.qrUploadedAt}}</view>
+    </view>
+    <view wx:if="{{detail.qrCodeUrl}}" class="qr-preview" bindtap="previewQr">
+      <image wx:if="{{detail.qrLocalPath}}" src="{{detail.qrLocalPath}}" mode="aspectFit" />
+      <view wx:else class="qr-placeholder">二维码已保存</view>
+      <view>点击全屏预览</view>
+    </view>
+    <view class="staff-actions qr-actions">
+      <button class="staff-button secondary" bindtap="uploadQr" loading="{{submitting}}" disabled="{{submitting}}">
+        {{detail.qrCodeFileId ? '替换二维码' : '上传二维码'}}
+      </button>
+      <button class="staff-button" data-action="enter" bindtap="action" loading="{{submitting}}" disabled="{{submitting}}">核验到访</button>
+    </view>
+  </view>
+
+  <view wx:if="{{detail && canVerify && detail.status === 'ENTERED'}}" class="staff-record">
+    <view class="staff-actions single-action">
+      <button class="staff-button" data-action="leave" bindtap="action" loading="{{submitting}}" disabled="{{submitting}}">登记离场</button>
+    </view>
+  </view>
+
+  <view wx:if="{{detail && detail.passRecords && detail.passRecords.length}}" class="staff-record">
+    <view class="staff-record-title">核验记录</view>
+    <view wx:for="{{detail.passRecords}}" wx:key="passTime" class="staff-record-meta">
+      {{item.passTime}} · {{item.passType === 'ENTER' ? '到访' : '离场'}} · {{item.operatorName}}
+    </view>
+  </view>
 </view>

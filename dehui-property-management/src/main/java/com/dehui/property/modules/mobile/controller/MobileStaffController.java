@@ -10,6 +10,7 @@ import com.dehui.property.modules.customfield.application.CustomFieldProjectionS
 import com.dehui.property.modules.customfield.application.ModuleFieldSubmissionValidator;
 import com.dehui.property.modules.mobile.service.MobileCustomFieldValueService;
 import com.dehui.property.modules.mobile.service.MobileStaffFileService;
+import com.dehui.property.modules.visitor.application.VisitorApprovalService;
 import com.dehui.property.security.AuthInterceptor;
 import com.dehui.property.security.AuthPrincipal;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -63,6 +64,7 @@ public class MobileStaffController {
     private final AssetChargeBasisService chargeBasisService;
     private final ObjectMapper objectMapper;
     private ModuleFieldSubmissionValidator moduleFieldSubmissionValidator;
+    private VisitorApprovalService visitorApprovalService;
 
     public MobileStaffController(
             JdbcTemplate jdbcTemplate,
@@ -83,6 +85,11 @@ public class MobileStaffController {
     @Autowired(required = false)
     void setModuleFieldSubmissionValidator(ModuleFieldSubmissionValidator service) {
         this.moduleFieldSubmissionValidator = service;
+    }
+
+    @Autowired(required = false)
+    void setVisitorApprovalService(VisitorApprovalService service) {
+        this.visitorApprovalService = service;
     }
 
     @GetMapping("/mobile/staff/workbench")
@@ -838,7 +845,9 @@ public class MobileStaffController {
         }
         return ApiResponse.success(JdbcPagination.query(
                 jdbcTemplate,
-                visitorSelect() + where + " ORDER BY appointment.visit_time DESC, appointment.id DESC",
+                visitorSelect() + where
+                        + " ORDER BY CASE WHEN appointment.appointment_status = 'PENDING' THEN 0 ELSE 1 END,"
+                        + " appointment.created_at DESC, appointment.id DESC",
                 "SELECT COUNT(*) FROM visitor_appointment appointment" + where,
                 args,
                 page,
@@ -873,6 +882,48 @@ public class MobileStaffController {
                 id
         ));
         return ApiResponse.success(detail);
+    }
+
+    @PostMapping("/mobile/staff/visitors/{id}/approve")
+    public ApiResponse<Map<String, Object>> visitorApprove(
+            @RequestAttribute(AuthInterceptor.PRINCIPAL_ATTRIBUTE) AuthPrincipal principal,
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body
+    ) {
+        require(principal, "visitor.staff.verify");
+        return ApiResponse.success(visitorApprovalService().approveByStaff(
+                id,
+                body == null ? null : JdbcMaps.str(body, "reviewRemark"),
+                staff(principal)
+        ));
+    }
+
+    @PostMapping("/mobile/staff/visitors/{id}/reject")
+    public ApiResponse<Map<String, Object>> visitorReject(
+            @RequestAttribute(AuthInterceptor.PRINCIPAL_ATTRIBUTE) AuthPrincipal principal,
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body
+    ) {
+        require(principal, "visitor.staff.verify");
+        return ApiResponse.success(visitorApprovalService().rejectByStaff(
+                id,
+                body == null ? null : JdbcMaps.str(body, "reviewRemark"),
+                staff(principal)
+        ));
+    }
+
+    @PostMapping("/mobile/staff/visitors/{id}/qr-code")
+    public ApiResponse<Map<String, Object>> visitorQrCode(
+            @RequestAttribute(AuthInterceptor.PRINCIPAL_ATTRIBUTE) AuthPrincipal principal,
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body
+    ) {
+        require(principal, "visitor.staff.verify");
+        return ApiResponse.success(visitorApprovalService().attachStaffQrCode(
+                id,
+                JdbcMaps.longVal(body, "fileId"),
+                staff(principal)
+        ));
     }
 
     @PostMapping("/mobile/staff/visitors/{id}/enter")
@@ -1376,6 +1427,15 @@ public class MobileStaffController {
                        contact.name AS applicantName,
                        appointment.visit_time AS visitTime,
                        appointment.visit_reason AS visitReason,
+                       appointment.review_remark AS reviewRemark,
+                       appointment.reviewed_at AS reviewedAt,
+                       reviewer.real_name AS reviewerName,
+                       appointment.qr_code_file_id AS qrCodeFileId,
+                       qr_file.original_name AS qrCodeFileName,
+                       appointment.qr_uploaded_at AS qrUploadedAt,
+                       CASE WHEN appointment.qr_code_file_id IS NULL THEN NULL
+                            ELSE CONCAT('/api/mobile/files/', appointment.qr_code_file_id)
+                       END AS qrCodeUrl,
                        CASE
                          WHEN DATE(appointment.visit_time) < CURRENT_DATE
                           AND appointment.appointment_status IN ('PENDING','REGISTERED') THEN 'EXPIRED'
@@ -1391,6 +1451,14 @@ public class MobileStaffController {
                  AND bind_record.deleted = 0
                 LEFT JOIN tenant_contact contact
                   ON contact.id = bind_record.tenant_contact_id AND contact.deleted = 0
+                LEFT JOIN sys_user reviewer
+                  ON reviewer.id = appointment.reviewed_by AND reviewer.deleted = 0
+                LEFT JOIN file_upload qr_file
+                  ON qr_file.id = appointment.qr_code_file_id
+                 AND qr_file.biz_type = 'VISITOR'
+                 AND qr_file.access_scope = 'INTERNAL'
+                 AND qr_file.status = 'ENABLED'
+                 AND qr_file.deleted = 0
                 """;
     }
 
@@ -1489,6 +1557,13 @@ public class MobileStaffController {
 
     private Long staff(AuthPrincipal principal) {
         return MobileApiSupport.requireStaffUserId(jdbcTemplate, principal);
+    }
+
+    private VisitorApprovalService visitorApprovalService() {
+        if (visitorApprovalService == null) {
+            throw new BusinessException(500, "访客审核服务不可用");
+        }
+        return visitorApprovalService;
     }
 
     private String staffName(Long staffUserId) {

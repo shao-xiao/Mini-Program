@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "访客预约详情",
+  "usingComponents": {
+    "dynamic-detail": "/components/dynamic-detail/index"
+  }
+}

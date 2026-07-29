@@ -1,0 +1,46 @@
+.visitor-filter-scroll {
+  margin-bottom: 18rpx;
+  white-space: nowrap;
+}
+
+.visitor-filter-scroll .staff-filter {
+  width: max-content;
+  margin-bottom: 0;
+}
+
+.visitor-record {
+  border: 1rpx solid #edf0f3;
+  box-shadow: 0 6rpx 18rpx rgba(30, 50, 70, 0.04);
+}
+
+.visitor-record-title {
+  min-width: 0;
+  padding-right: 16rpx;
+}
+
+.staff-status.status-pending {
+  background: #fff1e8;
+  color: #c05621;
+}
+
+.staff-status.status-ready {
+  background: #e8f3ff;
+  color: #1769aa;
+}
+
+.staff-status.status-entered {
+  background: #e7f8ef;
+  color: #178a50;
+}
+
+.staff-status.status-left,
+.staff-status.status-cancelled,
+.staff-status.status-expired {
+  background: #edf2f7;
+  color: #627d98;
+}
+
+.staff-status.status-rejected {
+  background: #fff0f0;
+  color: #c53030;
+}

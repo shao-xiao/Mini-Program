@@ -1,0 +1,128 @@
+.visitor-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18rpx;
+  padding: 24rpx 28rpx;
+  border-radius: 16rpx;
+  background: #334e68;
+  color: #fff;
+}
+
+.visitor-status-label {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 22rpx;
+}
+
+.visitor-status-value {
+  margin-top: 4rpx;
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.visitor-code {
+  max-width: 350rpx;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 22rpx;
+  text-align: right;
+  word-break: break-all;
+}
+
+.visitor-phone {
+  padding-top: 16rpx;
+  border-top: 1rpx solid #edf0f3;
+}
+
+.review-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 170rpx;
+  margin-top: 18rpx;
+  padding: 18rpx 20rpx;
+  border: 1rpx solid #d9e2ec;
+  border-radius: 12rpx;
+  background: #fbfcfd;
+  color: #1f2933;
+  font-size: 28rpx;
+}
+
+.review-count {
+  margin-top: 8rpx;
+  color: #829ab1;
+  font-size: 22rpx;
+  text-align: right;
+}
+
+.review-actions,
+.qr-actions {
+  justify-content: flex-end;
+}
+
+.review-actions .staff-button,
+.qr-actions .staff-button {
+  flex: 1;
+}
+
+.reject-button {
+  border: 1rpx solid #e4312b;
+  background: #fff !important;
+  color: #e4312b !important;
+}
+
+.audit-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #edf0f3;
+  color: #52667a;
+  font-size: 26rpx;
+}
+
+.audit-row:last-child {
+  border-bottom: 0;
+}
+
+.audit-row text:last-child {
+  flex: 1;
+  color: #1f2933;
+  text-align: right;
+}
+
+.qr-time {
+  max-width: 260rpx;
+  color: #829ab1;
+  font-size: 22rpx;
+  text-align: right;
+}
+
+.qr-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20rpx;
+  padding: 24rpx;
+  border: 1rpx dashed #bcccdc;
+  border-radius: 14rpx;
+  color: #627d98;
+  font-size: 24rpx;
+}
+
+.qr-preview image {
+  width: 280rpx;
+  height: 280rpx;
+  margin-bottom: 12rpx;
+  background: #fff;
+}
+
+.qr-placeholder {
+  margin-bottom: 12rpx;
+  padding: 50rpx 36rpx;
+  border-radius: 12rpx;
+  background: #f0f4f8;
+  color: #486581;
+}
+
+.single-action .staff-button {
+  width: 100%;
+}
