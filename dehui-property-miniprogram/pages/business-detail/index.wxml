@@ -1,0 +1,285 @@
+<view class="page">
+  <view class="state" wx:if="{{loading}}">正在加载详情…</view>
+  <view class="state error" wx:elif="{{pageState === 'error'}}">{{errorMessage}}<button bindtap="retryLoad">重试</button></view>
+  <view class="state" wx:elif="{{pageState === 'empty'}}">暂无详情数据</view>
+  <block wx:elif="{{bill}}">
+    <view class="panel bill-summary">
+      <view class="bill-number">{{bill.billNumber}}</view>
+      <view class="bill-title">{{bill.title || '财务账单'}}</view>
+      <view class="amount-row"><text>计算金额</text><text>¥{{bill.calculatedTotalText}}</text></view>
+      <view class="amount-row adjustment"><text>调整金额</text><text>¥{{bill.adjustmentTotalText}}</text></view>
+      <view class="amount-row final"><text>最终金额</text><text>¥{{bill.finalAmountText}}</text></view>
+      <view class="amount-row"><text>已缴金额</text><text>¥{{bill.paidAmountText}}</text></view>
+      <view class="row"><text class="label">到期日</text><text class="value">{{bill.dueDate || '-'}}</text></view>
+      <view class="row"><text class="label">支付状态</text><text class="value">{{bill.status}}</text></view>
+    </view>
+    <view class="section-title">费用明细与来源快照</view>
+    <view wx:if="{{lineItems.length}}" class="panel">
+      <view wx:for="{{lineItems}}" wx:key="id" class="line-item">
+        <view class="line-title">{{item.description || item.chargeItemType}}</view>
+        <view class="line-meta">费用类型：{{item.chargeItemType || '-'}}</view>
+        <view class="line-meta">计算 ¥{{item.calculatedAmountText}}　调整 ¥{{item.adjustmentAmountText}}　最终 ¥{{item.finalAmountText}}</view>
+        <view wx:if="{{item.adjustmentReason}}" class="line-reason">调整原因：{{item.adjustmentReason}}</view>
+      </view>
+    </view>
+    <view wx:else class="panel muted">暂无费用明细</view>
+    <view class="section-title">发票与历史版本</view>
+    <view wx:if="{{invoices.length}}" class="panel">
+      <view wx:for="{{invoices}}" wx:key="id" class="invoice-item">
+        <view>
+          <view class="line-title">版本 {{item.versionNo}} · {{item.invoiceNumber}}</view>
+          <view class="line-meta">¥{{item.amountText}} · {{item.invoiceStatus}}</view>
+        </view>
+        <button wx:if="{{item.downloadUrl}}" size="mini" data-id="{{item.id}}" data-url="{{item.downloadUrl}}" data-filename="{{item.invoiceFileName}}" loading="{{downloadingInvoiceId === item.id}}" bindtap="downloadInvoice">下载</button>
+        <text wx:else class="muted">已作废</text>
+      </view>
+    </view>
+    <view wx:else class="panel muted">暂无可下载发票</view>
+  </block>
+  <block wx:elif="{{contract}}">
+    <view class="panel">
+      <view class="row"><text class="label">合同编号</text><text class="value">{{contract.contractNumber}}</text></view>
+      <view class="row"><text class="label">租户</text><text class="value">{{contract.tenantName}}</text></view>
+      <view class="row"><text class="label">合同状态</text><text class="value">{{contract.status}}</text></view>
+      <view class="row"><text class="label">合同期限</text><text class="value">{{contract.startDate}} 至 {{contract.endDate}}</text></view>
+      <view class="row"><text class="label">租赁房间</text><text class="value">{{contract.rooms.length || 0}} 间</text></view>
+    </view>
+    <view class="section-title">电子合同附件</view>
+    <view wx:if="{{contractAttachments.length}}" class="panel">
+      <view wx:for="{{contractAttachments}}" wx:key="attachmentId" class="invoice-item">
+        <view>
+          <view class="line-title">{{item.typeText}}</view>
+          <view class="line-meta">{{item.fileName}}</view>
+        </view>
+        <button
+          size="mini"
+          data-id="{{item.attachmentId}}"
+          data-url="{{item.downloadUrl}}"
+          data-filename="{{item.fileName}}"
+          loading="{{downloadingContractAttachmentId === item.attachmentId}}"
+          bindtap="downloadContractAttachment"
+        >查看</button>
+      </view>
+    </view>
+    <view wx:else class="panel muted">暂无合同附件</view>
+  </block>
+  <block wx:elif="{{workorder}}">
+    <view class="workorder-hero workorder-tone-{{workorder.statusTone}}">
+      <view class="workorder-hero-main">
+        <view class="workorder-kicker">维修工单</view>
+        <view class="workorder-title">{{workorder.title}}</view>
+        <view class="workorder-number">{{workorder.orderNumber || '暂无工单编号'}}</view>
+      </view>
+      <view class="workorder-status">{{workorder.statusText}}</view>
+      <view class="workorder-tags">
+        <text>{{workorder.categoryText}}</text>
+        <text>{{workorder.priorityText}}</text>
+      </view>
+    </view>
+
+    <view class="workorder-section panel">
+      <view class="workorder-section-heading">
+        <view>
+          <view class="workorder-section-title">工单信息</view>
+          <view class="workorder-section-subtitle">报修信息与当前处理状态</view>
+        </view>
+        <view class="workorder-section-count">{{coreRows.length}} 项</view>
+      </view>
+      <view class="workorder-detail-row" wx:for="{{coreRows}}" wx:key="key">
+        <text class="workorder-detail-label">{{item.label}}</text>
+        <text class="workorder-detail-value" selectable>{{item.value}}</text>
+      </view>
+    </view>
+
+    <view class="workorder-section panel">
+      <view class="workorder-section-heading">
+        <view>
+          <view class="workorder-section-title">{{workorderImageLabel}}</view>
+          <view class="workorder-section-subtitle">提交报修时保存的原始现场资料</view>
+        </view>
+        <view class="workorder-section-count">{{workorderImages.length}} 张</view>
+      </view>
+      <view wx:if="{{workorderImages.length}}" class="workorder-image-grid">
+        <view
+          wx:for="{{workorderImages}}"
+          wx:key="fileId"
+          class="workorder-image-card"
+          data-scope="report-images"
+          data-index="{{index}}"
+          bindtap="previewWorkOrderImage"
+        >
+          <image wx:if="{{item.previewUrl}}" class="workorder-image" src="{{item.previewUrl}}" mode="aspectFill" />
+          <view wx:else class="workorder-image-state">{{item.previewError ? '照片加载失败' : '照片加载中'}}</view>
+          <text class="workorder-image-name">{{item.name || ('现场照片' + (index + 1))}}</text>
+        </view>
+      </view>
+      <view wx:else class="workorder-empty">本次报修未提交现场照片</view>
+    </view>
+
+    <view
+      wx:for="{{customImageGroups}}"
+      wx:for-item="group"
+      wx:key="key"
+      class="workorder-section panel"
+    >
+      <view class="workorder-section-heading">
+        <view>
+          <view class="workorder-section-title">{{group.label}}（补充信息）</view>
+          <view class="workorder-section-subtitle">后台字段平台保存的补充图片</view>
+        </view>
+        <view class="workorder-section-count">{{group.files.length}} 张</view>
+      </view>
+      <view class="workorder-image-grid">
+        <view
+          wx:for="{{group.files}}"
+          wx:for-item="file"
+          wx:for-index="fileIndex"
+          wx:key="fileId"
+          class="workorder-image-card"
+          data-scope="custom-images"
+          data-group-key="{{group.key}}"
+          data-index="{{fileIndex}}"
+          bindtap="previewWorkOrderImage"
+        >
+          <image wx:if="{{file.previewUrl}}" class="workorder-image" src="{{file.previewUrl}}" mode="aspectFill" />
+          <view wx:else class="workorder-image-state">{{file.previewError ? '照片加载失败' : '照片加载中'}}</view>
+          <text class="workorder-image-name">{{file.name || ('补充照片' + (fileIndex + 1))}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{workorderFiles.length || customFileGroups.length}}" class="workorder-section panel">
+      <view class="workorder-section-heading">
+        <view>
+          <view class="workorder-section-title">工单附件</view>
+          <view class="workorder-section-subtitle">点击附件可通过身份校验后查看</view>
+        </view>
+      </view>
+      <button
+        wx:for="{{workorderFiles}}"
+        wx:key="fileId"
+        class="workorder-file-button"
+        data-scope="report-files"
+        data-index="{{index}}"
+        loading="{{openingWorkorderFileKey}}"
+        disabled="{{openingWorkorderFileKey}}"
+        bindtap="openWorkOrderFile"
+      >{{item.name || ('附件' + (index + 1))}}</button>
+      <block wx:for="{{customFileGroups}}" wx:for-item="group" wx:key="key">
+        <view class="workorder-file-group-title">{{group.label}}（补充信息）</view>
+        <button
+          wx:for="{{group.files}}"
+          wx:for-item="file"
+          wx:for-index="fileIndex"
+          wx:key="fileId"
+          class="workorder-file-button"
+          data-scope="custom-files"
+          data-group-key="{{group.key}}"
+          data-index="{{fileIndex}}"
+          loading="{{openingWorkorderFileKey}}"
+          disabled="{{openingWorkorderFileKey}}"
+          bindtap="openWorkOrderFile"
+        >{{file.name || ('附件' + (fileIndex + 1))}}</button>
+      </block>
+    </view>
+
+    <view class="workorder-section panel">
+      <view class="workorder-section-heading">
+        <view>
+          <view class="workorder-section-title">处理历史</view>
+          <view class="workorder-section-subtitle">按最新处理时间倒序堆叠展示</view>
+        </view>
+        <view class="workorder-section-count">{{workorderRecords.length}} 条</view>
+      </view>
+      <view wx:if="{{workorderRecords.length}}" class="workorder-record-stack">
+        <view wx:for="{{workorderRecords}}" wx:key="id" class="workorder-record-item">
+          <view class="workorder-record-rail">
+            <view class="workorder-record-dot"></view>
+            <view wx:if="{{index < workorderRecords.length - 1}}" class="workorder-record-line"></view>
+          </view>
+          <view class="workorder-record-card">
+            <view class="workorder-record-head">
+              <text class="workorder-record-action">{{item.actionText}}</text>
+              <text class="workorder-record-time">{{item.createdTimeText}}</text>
+            </view>
+            <view class="workorder-record-operator">处理人：{{item.operatorText}}</view>
+            <view wx:if="{{item.contentText}}" class="workorder-record-content" selectable>{{item.contentText}}</view>
+            <view wx:if="{{item.images.length}}" class="workorder-record-media-title">{{item.imageGroupLabel}}</view>
+            <view wx:if="{{item.images.length}}" class="workorder-record-image-grid">
+              <view
+                wx:for="{{item.images}}"
+                wx:for-item="file"
+                wx:for-index="fileIndex"
+                wx:key="fileId"
+                class="workorder-record-image-card"
+                data-scope="record-images"
+                data-record-id="{{item.id}}"
+                data-index="{{fileIndex}}"
+                bindtap="previewWorkOrderImage"
+              >
+                <image wx:if="{{file.previewUrl}}" class="workorder-record-image" src="{{file.previewUrl}}" mode="aspectFill" />
+                <view wx:else class="workorder-record-image-state">{{file.previewError ? '照片加载失败' : '照片加载中'}}</view>
+              </view>
+            </view>
+            <button
+              wx:for="{{item.files}}"
+              wx:for-item="file"
+              wx:for-index="fileIndex"
+              wx:key="fileId"
+              class="workorder-file-button record-file-button"
+              data-scope="record-files"
+              data-record-id="{{item.id}}"
+              data-index="{{fileIndex}}"
+              loading="{{openingWorkorderFileKey}}"
+              disabled="{{openingWorkorderFileKey}}"
+              bindtap="openWorkOrderFile"
+            >{{file.name || ('处理附件' + (fileIndex + 1))}}</button>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="workorder-empty">暂无处理记录</view>
+    </view>
+
+    <view wx:if="{{customRows.length}}" class="workorder-section panel">
+      <view class="workorder-section-heading">
+        <view>
+          <view class="workorder-section-title">补充信息</view>
+          <view class="workorder-section-subtitle">字段名称来自后台字段平台</view>
+        </view>
+      </view>
+      <view class="workorder-detail-row" wx:for="{{customRows}}" wx:key="key">
+        <text class="workorder-detail-label">{{item.label}}</text>
+        <text class="workorder-detail-value" selectable>{{item.value}}</text>
+      </view>
+    </view>
+  </block>
+  <block wx:else>
+    <view wx:if="{{meetingReview}}" class="meeting-review-panel review-{{meetingReview.tone}}">
+      <view class="meeting-review-head">
+        <view>
+          <view class="meeting-review-kicker">PROPERTY REVIEW</view>
+          <view class="meeting-review-title">物业审核回复</view>
+        </view>
+        <view class="meeting-review-status">{{meetingReview.statusText}}</view>
+      </view>
+      <text class="meeting-review-copy" selectable>{{meetingReview.reply}}</text>
+      <view class="meeting-review-meta">
+        <text wx:if="{{meetingReview.bookingNumber}}">预约编号 {{meetingReview.bookingNumber}}</text>
+        <text wx:if="{{meetingReview.reviewedAtText}}">审核时间 {{meetingReview.reviewedAtText}}</text>
+      </view>
+      <button
+        wx:if="{{meetingReview.cancellable}}"
+        class="meeting-cancel-button"
+        loading="{{cancellingMeeting}}"
+        disabled="{{cancellingMeeting}}"
+        bindtap="cancelMeetingBooking"
+      >取消预约</button>
+    </view>
+    <view class="panel">
+      <view class="row" wx:for="{{rows}}" wx:key="key">
+        <text class="label">{{item.label}}</text>
+        <text class="value" selectable>{{item.value}}</text>
+      </view>
+    </view>
+  </block>
+</view>

@@ -20,6 +20,32 @@ function requestURL(url) {
   return `${baseURL}${relative.startsWith('/') ? relative : `/${relative}`}`
 }
 
+function httpOrigin(url) {
+  const matched = String(url || '').match(/^(https?):\/\/([^/?#]+)/i)
+  return matched ? `${matched[1].toLowerCase()}://${matched[2].toLowerCase()}` : ''
+}
+
+function isTrustedApiURL(url) {
+  const targetOrigin = httpOrigin(requestURL(url))
+  const apiOrigin = httpOrigin(getBaseURL())
+  return Boolean(targetOrigin && apiOrigin && targetOrigin === apiOrigin)
+}
+
+function authorizedHeaders(url, token, supplied = {}) {
+  const header = { ...supplied }
+  let suppliedAuthorization = ''
+  Object.keys(header).forEach(key => {
+    if (key.toLowerCase() === 'authorization') {
+      suppliedAuthorization = String(header[key] || suppliedAuthorization)
+      delete header[key]
+    }
+  })
+  if (isTrustedApiURL(url) && (token || suppliedAuthorization)) {
+    header.Authorization = token || suppliedAuthorization
+  }
+  return header
+}
+
 function downloadFilePath(url, filename) {
   if (!wx.env || !wx.env.USER_DATA_PATH) {
     return ''
@@ -130,14 +156,10 @@ function responseError(response, data, silent, fallback, requestToken) {
 function request(options = {}) {
   const token = wx.getStorageSync('token')
   const silent = options.silent === true
-  const header = {
+  const header = authorizedHeaders(options.url, token, {
     'content-type': 'application/json',
     ...(options.header || {})
-  }
-
-  if (token) {
-    header.Authorization = token
-  }
+  })
 
   return new Promise((resolve, reject) => {
     wx.request({
@@ -199,13 +221,10 @@ function download(url, filename, options = {}) {
   const token = wx.getStorageSync('token')
   const silent = options.silent === true
   return new Promise((resolve, reject) => {
-    const filePath = downloadFilePath(url, filename)
+    const filePath = options.temporary === true ? '' : downloadFilePath(url, filename)
     const downloadOptions = {
       url: requestURL(url),
-      header: {
-        ...(token ? { Authorization: token } : {}),
-        ...(options.header || {})
-      },
+      header: authorizedHeaders(url, token, options.header || {}),
       success(res) {
         const statusCode = numericCode(res.statusCode)
         const downloadedPath = res.filePath || res.tempFilePath
@@ -237,7 +256,7 @@ function upload(url, filePath, name = 'file', options = {}) {
       url: requestURL(url),
       filePath,
       name,
-      header: token ? { Authorization: token } : {},
+      header: authorizedHeaders(url, token, options.header || {}),
       formData: options.formData || {},
       success(res) {
         let data = res.data

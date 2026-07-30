@@ -1,0 +1,116 @@
+.ui-card {
+  border: 1rpx solid var(--dhic-border-card);
+  border-radius: var(--dhic-radius-section);
+  background: var(--dhic-surface);
+  box-shadow: var(--dhic-shadow-card);
+}
+
+.ui-card--compact {
+  padding: 20rpx 22rpx;
+}
+
+.ui-card--tech {
+  border-color: transparent;
+  background: var(--dhic-gradient-tech);
+  color: var(--dhic-text-inverse);
+  box-shadow: var(--dhic-shadow-raised);
+}
+
+.ui-section-heading {
+  color: var(--dhic-text-primary);
+  font-size: var(--dhic-font-title);
+  font-weight: var(--dhic-weight-title);
+  line-height: 1.35;
+}
+
+.ui-data-number {
+  color: var(--dhic-tech-800);
+  font-size: var(--dhic-font-metric);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--dhic-weight-data);
+  letter-spacing: -0.02em;
+}
+
+.ui-button--primary,
+.ui-button--secondary,
+.ui-button--ghost,
+.ui-button--danger {
+  border: 0;
+  border-radius: var(--dhic-radius-section);
+  font-size: var(--dhic-font-body);
+  font-weight: var(--dhic-weight-heading);
+}
+
+.ui-button--primary {
+  background: var(--dhic-action-primary);
+  color: var(--dhic-text-inverse);
+  box-shadow: var(--dhic-shadow-action);
+}
+
+.ui-button--secondary {
+  background: var(--dhic-tech-800);
+  color: var(--dhic-text-inverse);
+}
+
+.ui-button--ghost {
+  background: var(--dhic-action-soft);
+  color: var(--dhic-action-primary);
+}
+
+.ui-button--danger {
+  background: var(--dhic-danger-soft);
+  color: var(--dhic-danger);
+}
+
+.ui-button--primary[disabled],
+.ui-button--secondary[disabled],
+.ui-button--ghost[disabled],
+.ui-button--danger[disabled] {
+  opacity: 0.48;
+  box-shadow: none;
+}
+
+.ui-tag--success,
+.ui-tag--warning,
+.ui-tag--info,
+.ui-tag--danger,
+.ui-tag--neutral {
+  display: inline-flex;
+  align-items: center;
+  padding: 6rpx 14rpx;
+  border-radius: var(--dhic-radius-pill);
+  font-size: var(--dhic-font-meta);
+  font-weight: var(--dhic-weight-medium);
+}
+
+.ui-tag--success {
+  background: var(--dhic-success-soft);
+  color: var(--dhic-success);
+}
+
+.ui-tag--warning {
+  background: var(--dhic-warning-soft);
+  color: var(--dhic-warning);
+}
+
+.ui-tag--info {
+  background: var(--dhic-info-soft);
+  color: var(--dhic-info);
+}
+
+.ui-tag--danger {
+  background: var(--dhic-danger-soft);
+  color: var(--dhic-danger);
+}
+
+.ui-tag--neutral {
+  background: var(--dhic-neutral-soft);
+  color: var(--dhic-neutral);
+}
+
+.ui-empty {
+  color: var(--dhic-text-tertiary);
+  font-size: var(--dhic-font-body);
+  line-height: 1.6;
+  text-align: center;
+}

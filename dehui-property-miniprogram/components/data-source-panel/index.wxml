@@ -1,0 +1,36 @@
+<view class="source-panel tone-{{tone}}">
+  <view class="source-grid"></view>
+  <view class="source-orbit source-orbit-one"></view>
+  <view class="source-orbit source-orbit-two"></view>
+
+  <view class="source-content">
+    <view class="source-heading">
+      <view class="source-copy">
+        <view class="source-kicker">
+          <view class="source-signal">
+            <view class="source-signal-core"></view>
+          </view>
+          <text>DHIC DATA SERVICE</text>
+        </view>
+        <view class="source-title">{{title}}</view>
+        <view wx:if="{{description}}" class="source-description">{{description}}</view>
+      </view>
+      <view wx:if="{{status}}" class="source-status">
+        <view class="source-status-dot"></view>
+        <text>{{status}}</text>
+      </view>
+    </view>
+
+    <view class="source-trace">
+      <view class="source-trace-item">
+        <text class="source-trace-label">信息源</text>
+        <text class="source-trace-value">{{source || '物业业务平台'}}</text>
+      </view>
+      <view wx:if="{{scope}}" class="source-trace-divider"></view>
+      <view wx:if="{{scope}}" class="source-trace-item source-scope-item">
+        <text class="source-trace-label">数据范围</text>
+        <text class="source-trace-value">{{scope}}</text>
+      </view>
+    </view>
+  </view>
+</view>

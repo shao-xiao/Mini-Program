@@ -1,0 +1,111 @@
+page,
+:host {
+  /* DHIC brand */
+  --dhic-brand-primary: #D71920;
+  --dhic-brand-strong: #B5161B;
+  --dhic-brand-light: #E5484D;
+  --dhic-brand-soft: #FFF1F2;
+  --dhic-brand-rgb: 215, 25, 32;
+
+  /* Smart park technology palette */
+  --dhic-tech-950: #0B2239;
+  --dhic-tech-900: #102A43;
+  --dhic-tech-800: #163B5C;
+  --dhic-tech-700: #1F4E79;
+  --dhic-tech-primary: #1E496F;
+  --dhic-tech-600: #28658F;
+  --dhic-tech-500: #2F7FA3;
+  --dhic-tech-accent: #25A7C7;
+  --dhic-tech-cyan: #38BDF8;
+  --dhic-tech-soft: #EAF4F8;
+  --dhic-tech-rgb: 22, 59, 92;
+  --dhic-tech-primary-rgb: 30, 73, 111;
+  --dhic-tech-600-rgb: 40, 101, 143;
+  --dhic-accent-rgb: 37, 167, 199;
+
+  /* Neutral surfaces */
+  --dhic-page-bg: #F5F7FA;
+  --dhic-surface: #FFFFFF;
+  --dhic-surface-raised: #FBFDFF;
+  --dhic-surface-subtle: #F8FAFC;
+  --dhic-surface-muted: #F1F5F9;
+  --dhic-surface-pressed: #EAF0F5;
+  --dhic-border-light: #E8EEF3;
+  --dhic-border: #DCE5EC;
+  --dhic-border-strong: #CBD5E1;
+
+  /* Typography */
+  --dhic-text-primary: #1F2937;
+  --dhic-text-heading: #334155;
+  --dhic-text-secondary: #64748B;
+  --dhic-text-tertiary: #94A3B8;
+  --dhic-text-disabled: #B8C2CC;
+  --dhic-text-inverse: #FFFFFF;
+  --dhic-white-rgb: 255, 255, 255;
+  --dhic-ink-rgb: 15, 35, 55;
+
+  /* Semantic states */
+  --dhic-info: #2563A6;
+  --dhic-info-soft: #EAF2FB;
+  --dhic-info-rgb: 37, 99, 166;
+  --dhic-success: #16835D;
+  --dhic-success-soft: #E9F7F1;
+  --dhic-warning: #D97706;
+  --dhic-warning-soft: #FFF5E6;
+  --dhic-danger: #D71920;
+  --dhic-danger-soft: #FFF1F2;
+  --dhic-orange: #C66A16;
+  --dhic-orange-strong: #A65313;
+  --dhic-orange-soft: #FFF2E7;
+  --dhic-orange-rgb: 166, 83, 19;
+  --dhic-purple: #6758C7;
+  --dhic-purple-soft: #F1EEFF;
+  --dhic-neutral: #64748B;
+  --dhic-neutral-soft: #EEF2F6;
+  --dhic-success-rgb: 22, 131, 93;
+  --dhic-warning-rgb: 217, 119, 6;
+  --dhic-purple-rgb: 103, 88, 199;
+
+  /* Page-level action palette. Pages override these aliases by service module. */
+  --dhic-action-primary: var(--dhic-page-action-primary, var(--dhic-tech-primary));
+  --dhic-action-soft: var(--dhic-page-action-soft, var(--dhic-tech-soft));
+  --dhic-action-rgb: var(--dhic-page-action-rgb, var(--dhic-tech-primary-rgb));
+
+  /* Gradients */
+  --dhic-gradient-tech: linear-gradient(135deg, #102A43 0%, #163B5C 52%, #1E496F 100%);
+  --dhic-gradient-tech-soft: linear-gradient(135deg, #F8FBFD 0%, #EAF4F8 100%);
+  --dhic-gradient-brand: linear-gradient(135deg, #B5161B 0%, #D71920 58%, #E5484D 100%);
+  --dhic-gradient-success: linear-gradient(135deg, #127052 0%, #16835D 100%);
+
+  /* Radius and elevation */
+  --dhic-radius-xs: 8rpx;
+  --dhic-radius-control: 12rpx;
+  --dhic-radius-card: 16rpx;
+  --dhic-radius-panel: 20rpx;
+  --dhic-radius-hero: 24rpx;
+  --dhic-radius-section: 32rpx;
+  --dhic-radius-pill: 999rpx;
+  --dhic-border-card: rgba(15, 35, 55, 0.055);
+  --dhic-shadow-card: 0 10rpx 30rpx rgba(15, 35, 55, 0.075);
+  --dhic-shadow-section: 0 10rpx 30rpx rgba(15, 35, 55, 0.075);
+  --dhic-shadow-card-hover: 0 12rpx 30rpx rgba(15, 35, 55, 0.11);
+  --dhic-shadow-raised: 0 16rpx 40rpx rgba(15, 35, 55, 0.15);
+  --dhic-shadow-action: 0 10rpx 24rpx rgba(var(--dhic-action-rgb), 0.18);
+  --dhic-shadow-focus: 0 0 0 4rpx rgba(37, 167, 199, 0.14);
+
+  /* Type scale */
+  --dhic-font-caption: 20rpx;
+  --dhic-font-meta: 22rpx;
+  --dhic-font-body: 24rpx;
+  --dhic-font-body-lg: 26rpx;
+  --dhic-font-emphasis: 28rpx;
+  --dhic-font-title: 32rpx;
+  --dhic-font-hero: 36rpx;
+  --dhic-font-metric: 40rpx;
+  --dhic-font-metric-lg: 48rpx;
+  --dhic-weight-body: 400;
+  --dhic-weight-medium: 500;
+  --dhic-weight-heading: 600;
+  --dhic-weight-title: 700;
+  --dhic-weight-data: 700;
+}

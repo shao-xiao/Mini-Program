@@ -1,3 +1,8 @@
 {
-  "navigationBarTitleText": "报修服务"
+  "navigationBarTitleText": "报修服务",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "dynamic-form": "../../components/dynamic-form/index",
+    "data-source-panel": "../../components/data-source-panel/index"
+  }
 }

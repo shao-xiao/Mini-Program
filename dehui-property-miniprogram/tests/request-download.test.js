@@ -83,6 +83,72 @@ test('download does not duplicate the api prefix on protected mobile file URLs',
   assert.equal(filePath, downloadOptions.filePath)
 })
 
+test('temporary protected image download keeps auth without creating a persistent user-data file', async () => {
+  let downloadOptions
+  global.wx = {
+    env: { USER_DATA_PATH: path.join('C:', 'tmp', 'wechat') },
+    getStorageSync(key) {
+      if (key === 'token') return 'tenant-token'
+      if (key === 'apiBaseURL') return 'http://localhost:8080/api'
+      return ''
+    },
+    downloadFile(options) {
+      downloadOptions = options
+      options.success({ statusCode: 200, tempFilePath: 'wxfile://tmp/tenant-logo' })
+    },
+    showToast() {}
+  }
+  delete require.cache[require.resolve('../utils/request')]
+  delete require.cache[require.resolve('../config/env')]
+
+  const api = require('../utils/request')
+  const filePath = await api.download(
+    '/api/mobile/files/31',
+    'tenant-logo.png',
+    { temporary: true, silent: true }
+  )
+
+  assert.equal(downloadOptions.url, 'http://localhost:8080/api/mobile/files/31')
+  assert.equal(downloadOptions.header.Authorization, 'tenant-token')
+  assert.equal(Object.hasOwn(downloadOptions, 'filePath'), false)
+  assert.equal(filePath, 'wxfile://tmp/tenant-logo')
+})
+
+test('external file download never forwards the current session token', async () => {
+  let downloadOptions
+  global.wx = {
+    getStorageSync(key) {
+      if (key === 'token') return 'tenant-token'
+      if (key === 'apiBaseURL') return 'http://localhost:8080/api'
+      return ''
+    },
+    downloadFile(options) {
+      downloadOptions = options
+      options.success({ statusCode: 200, tempFilePath: 'wxfile://tmp/external-image' })
+    },
+    showToast() {}
+  }
+  delete require.cache[require.resolve('../utils/request')]
+  delete require.cache[require.resolve('../config/env')]
+
+  const api = require('../utils/request')
+  await api.download(
+    'https://files.example.invalid/legacy-image.jpg',
+    'legacy-image.jpg',
+    {
+      temporary: true,
+      header: {
+        Authorization: 'caller-supplied-token',
+        authorization: 'lowercase-token'
+      }
+    }
+  )
+
+  assert.equal(downloadOptions.url, 'https://files.example.invalid/legacy-image.jpg')
+  assert.equal(downloadOptions.header.Authorization, undefined)
+  assert.equal(downloadOptions.header.authorization, undefined)
+})
+
 test('download merges an anonymous reservation capability header without requiring login', async () => {
   let downloadOptions
   global.wx = {

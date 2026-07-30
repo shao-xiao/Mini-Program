@@ -1,56 +1,127 @@
 const api = require('../../utils/request')
-const { getBaseURL } = require('../../config/env')
+const { ensurePrivacyAuthorization } = require('../../utils/privacy')
+const { refreshCurrentProfile } = require('../../utils/auth')
+const { canAccessFeature, getFeatureAccessState } = require('../../utils/capabilities')
+const { loadModuleFieldSchema, fieldOptions, fieldValidation } = require('../../utils/moduleFieldSchema')
+
+const FEATURE_KEY = 'workorder'
+const MAX_IMAGE_COUNT = 6
+const HISTORY_PREVIEW_COUNT = 3
+
+function pad(value) {
+  return String(value).padStart(2, '0')
+}
+
+function currentDateTimeValue(now = new Date()) {
+  return [
+    `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+  ].join(' ')
+}
 
 function toDateTimeText(value) {
   if (!value) return '-'
-  const [date, time = ''] = value.replace('T', ' ').split(' ')
+  const [date, time = ''] = String(value).replace('T', ' ').split(' ')
   const [year, month, day] = date.split('-')
-  return `${year}年${month}月${day}日 ${time.slice(0, 5)}`
+  const [hour = '00', minute = '00', second = '00'] = time.split(':')
+  return `${year}年${month}月${day}日 ${hour}时${minute}分${second.slice(0, 2)}秒`
 }
 
 function initialForm() {
   return {
-    title: '',
-    location: '',
-    category: 'WATER',
-    priority: 'NORMAL',
-    contactPhone: '',
-    description: ''
+    problemCategory: 'WATER',
+    reporterName: '',
+    companyName: '',
+    reportedAt: currentDateTimeValue(),
+    description: '',
+    remark: '',
+    customFields: {}
   }
 }
 
-function imageUrl(url) {
-  if (!url) return ''
-  if (url.startsWith('http')) return url
-  return `${getBaseURL()}${url}`
+function applyProfileDefaults(profile, form = {}) {
+  const displayProfile = profile && profile.profile || profile || {}
+  const tenantInfo = profile && profile.tenantInfo || displayProfile.tenantInfo || {}
+  return {
+    reporterName: form.reporterName || displayProfile.name || displayProfile.contactName || displayProfile.nickname || '',
+    companyName: form.companyName || tenantInfo.name || displayProfile.boundTenantName || '',
+    reportedAt: form.reportedAt || currentDateTimeValue()
+  }
 }
 
-const MAX_IMAGE_COUNT = 6
+function customOnlySchema(schema) {
+  return {
+    ...(schema || {}),
+    fields: ((schema && schema.fields) || []).filter(field => field && field.source === 'CUSTOM')
+  }
+}
+
+function categoryText(options, value) {
+  const matched = options.find(option => option.value === value)
+  return matched && matched.label ? matched.label : '其他'
+}
 
 function compressImage(filePath) {
-  if (!wx.compressImage) {
-    return Promise.resolve(filePath)
-  }
-  return new Promise((resolve) => {
+  if (!wx.compressImage) return Promise.resolve(filePath)
+  return new Promise(resolve => {
     wx.compressImage({
       src: filePath,
       quality: 75,
-      success: (res) => resolve(res.tempFilePath || filePath),
+      success: res => resolve(res.tempFilePath || filePath),
       fail: () => resolve(filePath)
     })
   })
 }
 
+function requestFailureState(error) {
+  const code = Number(error && (error.code || error.statusCode || error.status))
+  if (code === 401) {
+    return {
+      pageState: 'login-required',
+      errorMessage: '登录状态已失效，请重新登录后使用报修服务。'
+    }
+  }
+  if (code === 403) {
+    return {
+      pageState: 'unauthorized',
+      errorMessage: '当前账号没有租户报修资格，请联系物业确认租户联系人状态。'
+    }
+  }
+  return {
+    pageState: 'error',
+    errorMessage: error && error.message ? error.message : '报修服务加载失败，请稍后重试。'
+  }
+}
+
+function deniedState(profile) {
+  const result = getFeatureAccessState(FEATURE_KEY, profile)
+  const state = typeof result === 'string' ? result : result && (result.state || result.reason)
+  if (state === 'login-required' || (result && result.loginRequired)) {
+    return {
+      pageState: 'login-required',
+      errorMessage: '请先登录租户账号，再提交或查看报修。'
+    }
+  }
+  return {
+    pageState: 'unauthorized',
+    errorMessage: '报修服务仅向已匹配的有效租户联系人开放，当前账号暂无使用资格。'
+  }
+}
+
 Page({
   data: {
-    loading: false,
+    pageState: 'loading',
+    loading: true,
     submitting: false,
+    uploadingImages: false,
+    customUploading: false,
     errorMessage: '',
     identityText: '',
     form: initialForm(),
+    reportedAtText: '',
     selectedImages: [],
     maxImageCount: MAX_IMAGE_COUNT,
-    imageTip: `最多上传${MAX_IMAGE_COUNT}张，系统会压缩后提交`,
+    imageTip: `最多上传${MAX_IMAGE_COUNT}张，上传完成后再提交`,
     evaluationVisible: false,
     evaluationForm: {
       workOrderId: null,
@@ -73,113 +144,278 @@ Page({
       { label: '较高', value: 'HIGH' },
       { label: '紧急', value: 'URGENT' }
     ],
-    workOrders: []
+    fieldSchema: { fields: [] },
+    customFieldSchema: { fields: [] },
+    workOrders: [],
+    visibleWorkOrders: [],
+    historyExpanded: false,
+    historyPreviewCount: HISTORY_PREVIEW_COUNT,
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    noMore: false,
+    loadingMore: false
+  },
+
+  onLoad() {
+    this._active = true
+    this._loadSequence = 0
   },
 
   onShow() {
+    this._active = true
     this.loadWorkOrders()
   },
 
-  async loadWorkOrders() {
-    this.setData({ loading: true, errorMessage: '' })
+  onUnload() {
+    this._active = false
+    this._loadSequence = Number(this._loadSequence || 0) + 1
+  },
+
+  safeSetData(payload, callback) {
+    if (!this._active) return
+    this.setData(payload, callback)
+  },
+
+  isCurrentRequest(requestId) {
+    return this._active && requestId === this._loadSequence
+  },
+
+  async loadWorkOrders(append = false) {
+    if (append && (this.data.loadingMore || this.data.noMore)) return
+    const requestId = Number(this._loadSequence || 0) + 1
+    this._loadSequence = requestId
+    this.safeSetData(append ? { loadingMore: true } : {
+      pageState: 'loading',
+      loading: true,
+      errorMessage: '',
+      identityText: '',
+      workOrders: [],
+      visibleWorkOrders: [],
+      evaluationVisible: false
+    })
+
     try {
-      const data = await api.get('/mobile/workorders')
-      const workOrders = (data.workOrders || []).map(item => ({
-        ...item,
-        createdTimeText: toDateTimeText(item.createdTime),
-        statusClass: this.toStatusClass(item.status),
-        cancellable: item.status === 'CREATED',
-        evaluable: (item.status === 'COMPLETED' || item.status === 'CLOSED') && !item.rating,
-        ratingStars: this.ratingStars(item.rating),
-        timeline: this.buildTimeline(item),
-        imageUrls: (item.imageUrls || []).map(imageUrl)
-      }))
-      this.setData({
-        identityText: this.toIdentityText(data.profile),
-        workOrders
+      const profile = await refreshCurrentProfile()
+      if (!this.isCurrentRequest(requestId)) return
+      if (!canAccessFeature(FEATURE_KEY, profile)) {
+        this.safeSetData({
+          ...deniedState(profile),
+          loading: false
+        })
+        return
+      }
+
+      const page = append ? this.data.page + 1 : 1
+      const [data, fieldSchema] = await Promise.all([
+        api.get('/mobile/workorders', { page, pageSize: this.data.pageSize }),
+        append ? Promise.resolve(this.data.fieldSchema) : loadModuleFieldSchema('workorders')
+      ])
+      if (!this.isCurrentRequest(requestId)) return
+      const effectiveProfile = data.profile || profile || {}
+      const categories = fieldOptions(fieldSchema, 'problemCategory', this.data.categories)
+      const incoming = (data.records || data.workOrders || []).map(item => {
+        const hasRating = item.rating !== null && item.rating !== undefined
+        return {
+          ...item,
+          reportedAtText: toDateTimeText(item.reportedAt || item.createdTime),
+          createdTimeText: toDateTimeText(item.createdTime),
+          categoryText: categoryText(categories, item.problemCategory || item.category),
+          statusText: this.toStatusText(item.status),
+          statusClass: this.toStatusClass(item.status),
+          cancellable: item.status === 'CREATED' || item.status === 'SUBMITTED',
+          evaluable: (item.status === 'COMPLETED' || item.status === 'CLOSED') && !hasRating,
+          ratingStars: this.ratingStars(item.rating),
+          timeline: this.buildTimeline(item)
+        }
+      })
+      const workOrders = append ? this.data.workOrders.concat(incoming) : incoming
+      const form = {
+        ...this.data.form,
+        ...applyProfileDefaults(effectiveProfile, this.data.form)
+      }
+      const visibleWorkOrders = this.data.historyExpanded
+        ? workOrders
+        : workOrders.slice(0, HISTORY_PREVIEW_COUNT)
+      this.safeSetData({
+        pageState: workOrders.length ? 'success' : 'empty',
+        loading: false,
+        loadingMore: false,
+        page: Number(data.page || page),
+        total: Number(data.total || 0),
+        noMore: workOrders.length >= Number(data.total || 0),
+        identityText: this.toIdentityText(effectiveProfile),
+        form,
+        reportedAtText: toDateTimeText(form.reportedAt),
+        fieldSchema,
+        customFieldSchema: customOnlySchema(fieldSchema),
+        categories,
+        maxImageCount: Number(fieldValidation(fieldSchema, 'images').maxFiles) || MAX_IMAGE_COUNT,
+        workOrders,
+        visibleWorkOrders
       })
     } catch (error) {
-      this.setData({
-        errorMessage: error && error.message ? error.message : '请先登录后提交报修',
-        workOrders: []
+      if (!this.isCurrentRequest(requestId)) return
+      this.safeSetData({
+        ...requestFailureState(error),
+        loading: false,
+        loadingMore: false,
+        identityText: '',
+        workOrders: [],
+        visibleWorkOrders: []
       })
-    } finally {
-      this.setData({ loading: false })
     }
+  },
+
+  retryLoad() {
+    this.loadWorkOrders()
+  },
+
+  onPullDownRefresh() {
+    this.loadWorkOrders().finally(() => wx.stopPullDownRefresh())
+  },
+
+  onReachBottom() {
+    if (this.data.historyExpanded) this.loadWorkOrders(true)
+  },
+
+  openDetail(event) {
+    wx.navigateTo({ url: `/pages/business-detail/index?type=workorder&id=${event.currentTarget.dataset.id}` })
+  },
+
+  toggleHistory() {
+    if (!Number(this.data.total || 0)) return
+    const historyExpanded = !this.data.historyExpanded
+    this.safeSetData({
+      historyExpanded,
+      visibleWorkOrders: historyExpanded
+        ? this.data.workOrders
+        : this.data.workOrders.slice(0, HISTORY_PREVIEW_COUNT)
+    })
+  },
+
+  handleAccessError(error) {
+    const state = requestFailureState(error)
+    if (state.pageState === 'error') return false
+    this.safeSetData({
+      ...state,
+      loading: false,
+      identityText: '',
+      workOrders: [],
+      evaluationVisible: false
+    })
+    return true
+  },
+
+  showActionError(error, fallbackMessage) {
+    if (this.handleAccessError(error) || !this._active) return
+    wx.showToast({
+      title: error && error.message ? error.message : fallbackMessage,
+      icon: 'none'
+    })
   },
 
   onInput(event) {
     const field = event.currentTarget.dataset.field
-    this.setData({
-      [`form.${field}`]: event.detail.value
-    })
+    this.safeSetData({ [`form.${field}`]: event.detail.value })
   },
 
   selectCategory(event) {
-    this.setData({
-      'form.category': event.currentTarget.dataset.value
-    })
+    this.safeSetData({ 'form.problemCategory': event.currentTarget.dataset.value })
   },
 
-  selectPriority(event) {
-    this.setData({
-      'form.priority': event.currentTarget.dataset.value
-    })
-  },
-
-  chooseImages() {
-    const remaining = MAX_IMAGE_COUNT - this.data.selectedImages.length
+  async chooseImages() {
+    if (this.data.uploadingImages) return
+    const maximum = Number(this.data.maxImageCount) || MAX_IMAGE_COUNT
+    const remaining = maximum - this.data.selectedImages.length
     if (remaining <= 0) {
       wx.showToast({ title: `最多上传${MAX_IMAGE_COUNT}张照片`, icon: 'none' })
       return
     }
+
+    const authorized = await ensurePrivacyAuthorization('workorderImage')
+    if (!this._active) return
+    if (!authorized) {
+      wx.showToast({ title: '同意隐私说明后可添加照片', icon: 'none' })
+      return
+    }
+
     wx.chooseImage({
       count: remaining,
       sizeType: ['compressed'],
       sourceType: ['album', 'camera'],
-      success: async (res) => {
-        wx.showLoading({ title: '压缩图片中', mask: true })
-        const compressedImages = await Promise.all(res.tempFilePaths.map(compressImage))
-        wx.hideLoading()
-        const nextImages = this.data.selectedImages.concat(compressedImages).slice(0, MAX_IMAGE_COUNT)
-        this.setData({
-          selectedImages: nextImages
-        })
-        if (res.tempFilePaths.length > remaining) {
-          wx.showToast({ title: `最多保留${MAX_IMAGE_COUNT}张照片`, icon: 'none' })
+      success: async res => {
+        this.safeSetData({ uploadingImages: true })
+        wx.showLoading({ title: '上传照片中', mask: true })
+        try {
+          const uploadedImages = []
+          for (const filePath of res.tempFilePaths) {
+            const compressedPath = await compressImage(filePath)
+            const uploaded = await api.upload('/mobile/files', compressedPath, 'file', {
+              formData: { fieldType: 'IMAGE' },
+              silent: true
+            })
+            const fileId = Number(uploaded && (uploaded.fileId || uploaded.id))
+            if (!fileId) throw new Error('照片上传结果无效')
+            uploadedImages.push({
+              fileId,
+              url: compressedPath,
+              name: uploaded.name || `现场照片${this.data.selectedImages.length + uploadedImages.length + 1}`,
+              sortOrder: this.data.selectedImages.length + uploadedImages.length
+            })
+          }
+          if (!this._active) return
+          this.safeSetData({
+            selectedImages: this.data.selectedImages.concat(uploadedImages).slice(0, maximum)
+          })
+        } catch (error) {
+          if (!this.handleAccessError(error)) {
+            wx.showToast({ title: error && error.message || '照片上传失败，请重试', icon: 'none' })
+          }
+        } finally {
+          wx.hideLoading()
+          this.safeSetData({ uploadingImages: false })
         }
       }
     })
   },
 
   removeSelectedImage(event) {
-    const index = event.currentTarget.dataset.index
+    const index = Number(event.currentTarget.dataset.index)
     const selectedImages = this.data.selectedImages.filter((_, itemIndex) => itemIndex !== index)
-    this.setData({ selectedImages })
+    this.safeSetData({ selectedImages })
   },
 
   previewSelectedImage(event) {
-    const current = event.currentTarget.dataset.url
+    const urls = this.data.selectedImages.map(item => item.url).filter(Boolean)
     wx.previewImage({
-      current,
-      urls: this.data.selectedImages
+      current: event.currentTarget.dataset.url,
+      urls
     })
   },
 
-  previewWorkOrderImage(event) {
-    const current = event.currentTarget.dataset.url
-    const urls = event.currentTarget.dataset.urls || []
-    wx.previewImage({ current, urls })
-  },
-
   async submitWorkOrder() {
-    const form = this.data.form
-    if (!form.title.trim()) {
-      wx.showToast({ title: '请填写报修标题', icon: 'none' })
+    if (this.data.uploadingImages || this.data.customUploading) {
+      wx.showToast({ title: '照片或附件仍在上传，请稍候', icon: 'none' })
       return
     }
-    if (!form.location.trim()) {
-      wx.showToast({ title: '请填写报修位置', icon: 'none' })
+    const schemaForm = this.selectComponent('#schemaForm')
+    const validation = schemaForm && schemaForm.validate()
+    if (validation && !validation.valid) {
+      wx.showToast({ title: validation.uploading ? '文件上传中，请稍候' : '请完善报修信息', icon: 'none' })
+      return
+    }
+    const form = this.data.form
+    if (!form.reporterName.trim()) {
+      wx.showToast({ title: '请填写报修人', icon: 'none' })
+      return
+    }
+    if (!form.companyName.trim()) {
+      wx.showToast({ title: '请填写公司名称', icon: 'none' })
+      return
+    }
+    if (!form.problemCategory) {
+      wx.showToast({ title: '请选择问题类型', icon: 'none' })
       return
     }
     if (!form.description.trim()) {
@@ -187,49 +423,84 @@ Page({
       return
     }
 
-    this.setData({ submitting: true })
+    this.safeSetData({ submitting: true })
     try {
-      const created = await api.post('/mobile/workorders', form)
-      for (const imagePath of this.data.selectedImages) {
-        await api.upload(`/mobile/workorders/${created.id}/images`, imagePath)
-      }
+      const dynamicPayload = schemaForm ? schemaForm.getPayload() : { customFields: {} }
+      const created = await api.post('/mobile/workorders', {
+        reporterName: form.reporterName.trim(),
+        companyName: form.companyName.trim(),
+        reportedAt: form.reportedAt,
+        problemCategory: form.problemCategory,
+        description: form.description.trim(),
+        remark: form.remark.trim(),
+        images: {
+          version: 1,
+          files: this.data.selectedImages.map((item, sortOrder) => ({
+            fileId: item.fileId,
+            sortOrder
+          }))
+        },
+        customFields: dynamicPayload.customFields || {}
+      })
+      if (!this._active) return
       wx.showModal({
         title: '报修已提交',
-        content: `工单号：${created.orderNumber}`,
+        content: created.orderNumber ? `工单号：${created.orderNumber}` : '可在“我的报修”查看处理进度。',
         showCancel: false
       })
-      this.setData({ form: initialForm(), selectedImages: [] })
+      const nextForm = initialForm()
+      this.safeSetData({
+        form: nextForm,
+        reportedAtText: toDateTimeText(nextForm.reportedAt),
+        selectedImages: []
+      })
       this.loadWorkOrders()
+    } catch (error) {
+      this.showActionError(error, '报修提交失败，请稍后重试')
     } finally {
-      this.setData({ submitting: false })
+      this.safeSetData({ submitting: false })
     }
   },
 
+  onSchemaChange(event) {
+    this.safeSetData({
+      'form.customFields': {
+        ...this.data.form.customFields,
+        ...((event.detail && event.detail.values) || {})
+      }
+    })
+  },
+
+  onUploadState(event) {
+    this.safeSetData({ customUploading: Boolean(event.detail && event.detail.uploading) })
+  },
+
   cancelWorkOrder(event) {
-    const id = event.currentTarget.dataset.id
-    const workOrder = this.data.workOrders.find(item => item.id === id)
+    const id = Number(event.currentTarget.dataset.id)
+    const workOrder = this.data.workOrders.find(item => Number(item.id) === id)
     wx.showModal({
       title: '撤回报修',
       content: workOrder ? `确定撤回“${workOrder.title}”吗？` : '确定撤回该报修吗？',
       confirmText: '撤回',
-      confirmColor: '#d93025',
-      success: async (res) => {
+      confirmColor: '#D71920',
+      success: async res => {
         if (!res.confirm) return
         try {
           await api.post(`/mobile/workorders/${id}/cancel`)
+          if (!this._active) return
           wx.showToast({ title: '已撤回', icon: 'success' })
           this.loadWorkOrders()
         } catch (error) {
-          // request.js already shows the backend message.
+          this.showActionError(error, '报修撤回失败，请稍后重试')
         }
       }
     })
   },
 
   openEvaluation(event) {
-    const id = event.currentTarget.dataset.id
-    const workOrder = this.data.workOrders.find(item => item.id === id)
-    this.setData({
+    const id = Number(event.currentTarget.dataset.id)
+    const workOrder = this.data.workOrders.find(item => Number(item.id) === id)
+    this.safeSetData({
       evaluationVisible: true,
       evaluationForm: {
         workOrderId: id,
@@ -241,21 +512,17 @@ Page({
   },
 
   closeEvaluation() {
-    this.setData({ evaluationVisible: false })
+    this.safeSetData({ evaluationVisible: false })
   },
 
   noop() {},
 
   selectRating(event) {
-    this.setData({
-      'evaluationForm.rating': Number(event.currentTarget.dataset.value)
-    })
+    this.safeSetData({ 'evaluationForm.rating': Number(event.currentTarget.dataset.value) })
   },
 
   onEvaluationInput(event) {
-    this.setData({
-      'evaluationForm.content': event.detail.value
-    })
+    this.safeSetData({ 'evaluationForm.content': event.detail.value })
   },
 
   async submitEvaluation() {
@@ -266,11 +533,12 @@ Page({
         rating: form.rating,
         content: form.content
       })
-      wx.showToast({ title: '评价成功', icon: 'success' })
-      this.setData({ evaluationVisible: false })
+      if (!this._active) return
+      wx.showToast({ title: '评价已提交', icon: 'success' })
+      this.safeSetData({ evaluationVisible: false })
       this.loadWorkOrders()
     } catch (error) {
-      // request.js already shows the backend message.
+      this.showActionError(error, '评价提交失败，请稍后重试')
     }
   },
 
@@ -280,9 +548,9 @@ Page({
 
   toIdentityText(profile) {
     if (!profile) return ''
-    if (profile.userType === 'INTERNAL') return `内部员工：${profile.boundSysRealName || profile.boundSysUsername || profile.nickname || ''}`
-    if (profile.userType === 'TENANT') return `租户：${profile.boundTenantName || profile.nickname || ''}`
-    return `访客：${profile.nickname || ''}`
+    const displayProfile = profile.profile || profile
+    const tenantInfo = profile.tenantInfo || displayProfile.tenantInfo || {}
+    return tenantInfo.name || displayProfile.boundTenantName || ''
   },
 
   toStatusClass(status) {
@@ -290,6 +558,16 @@ Page({
     if (status === 'COMPLETED' || status === 'CLOSED') return 'done'
     if (status === 'PROCESSING' || status === 'ASSIGNED') return 'processing'
     return 'created'
+  },
+
+  toStatusText(status) {
+    if (status === 'CREATED' || status === 'SUBMITTED') return '已提交'
+    if (status === 'ASSIGNED') return '已受理'
+    if (status === 'PROCESSING') return '处理中'
+    if (status === 'COMPLETED') return '已完成'
+    if (status === 'CLOSED') return '已关闭'
+    if (status === 'CANCELLED') return '已撤回'
+    return '状态更新'
   },
 
   buildTimeline(item) {
