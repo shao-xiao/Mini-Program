@@ -1,0 +1,5 @@
+{
+  "navigationBarTitleText": "企业能耗",
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 100
+}

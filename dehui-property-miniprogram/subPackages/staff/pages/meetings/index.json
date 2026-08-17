@@ -1,0 +1,5 @@
+{
+  "navigationBarTitleText": "会议预约管理",
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 100
+}

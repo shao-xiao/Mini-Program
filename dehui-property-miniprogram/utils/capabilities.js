@@ -141,7 +141,7 @@ const FEATURE_DEFINITIONS = Object.freeze({
   }),
   staffInspection: Object.freeze({
     key: 'staffInspection',
-    title: '日常巡检',
+    title: '巡检记录',
     description: '巡检记录、异常处理与现场照片',
     url: '/subPackages/staff/pages/inspections/index',
     capability: 'inspection.staff.view',

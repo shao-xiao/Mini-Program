@@ -1,4 +1,4 @@
-# WEB Pagination and Room Identifier Implementation Plan
+﻿# WEB Pagination and Room Identifier Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -206,3 +206,8 @@ Open `http://localhost:5173/rooms`. Confirm the room table shows a sequence colu
 - [ ] **Step 3: Browser verify a second target page**
 
 Open one additional target page, such as `http://localhost:5173/bills` or `http://localhost:5173/parking/spaces`, and confirm the pagination footer is visible and the page loads without API shape errors.
+
+## 2026-07-24 记录更新
+
+- 已修复登录提交适配：dehui-property-admin/src/views/Login.vue 改为提交 JSON Body（username/password），并指定 Content-Type: application/json，避免后端 HttpMessageNotReadableException。
+- 已新增演示数据脚本：dehui-property-management/scripts/seed_demo_building_tenants_energy.sql（1 个楼宇、3 层、3 间房、3 家租户、6 个表具、18 条近三月读数）用于楼宇/租户水电联动演示。

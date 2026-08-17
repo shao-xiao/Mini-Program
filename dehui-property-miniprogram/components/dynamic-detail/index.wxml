@@ -1,0 +1,6 @@
+<view class="dynamic-detail">
+  <view wx:for="{{rows}}" wx:key="field.fieldKey" class="row">
+    <text class="label">{{item.field.label}}</text>
+    <field-renderer field="{{item.field}}" value="{{item.value}}" />
+  </view>
+</view>

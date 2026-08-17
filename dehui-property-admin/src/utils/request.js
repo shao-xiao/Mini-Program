@@ -1,5 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { clearAdminSession } from './authStorage.js'
+import { requestErrorMessage } from './requestError.js'
 
 const request = axios.create({
   baseURL: '/api',
@@ -30,6 +32,7 @@ request.interceptors.response.use(
       if (res.code !== 200) {
         if (!silent) {
           ElMessage.error(res.message || '请求失败')
+          res.requestMessageShown = true
         }
         return Promise.reject(res)
       }
@@ -49,18 +52,17 @@ request.interceptors.response.use(
 
     if (status === 401) {
       ElMessage.error('未登录或登录已过期')
+      error.requestMessageShown = true
 
-      localStorage.removeItem('token')
-      localStorage.removeItem('username')
-      localStorage.removeItem('role')
-      localStorage.removeItem('roles')
-      localStorage.removeItem('userId')
+      clearAdminSession()
 
       window.location.href = '/login'
     } else if (status === 403) {
       ElMessage.error('无权限访问')
+      error.requestMessageShown = true
     } else {
-      ElMessage.error(error.message || '网络请求失败')
+      ElMessage.error(requestErrorMessage(error, '网络请求失败'))
+      error.requestMessageShown = true
     }
 
     return Promise.reject(error)

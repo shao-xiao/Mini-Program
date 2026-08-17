@@ -3,9 +3,9 @@ package com.dehui.property.modules.system.controller;
 import com.dehui.property.common.ApiResponse;
 import com.dehui.property.modules.system.dto.LoginRequest;
 import com.dehui.property.modules.system.dto.LoginResponse;
+import com.dehui.property.modules.system.dto.UserAccessResponse;
 import com.dehui.property.modules.system.service.SystemAuthService;
 import com.dehui.property.security.AuthInterceptor;
-import com.dehui.property.security.AuthPrincipal;
 import com.dehui.property.security.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -29,8 +29,13 @@ public class AuthController {
     }
 
     @GetMapping("/auth/me")
-    public ApiResponse<AuthPrincipal> me(@RequestAttribute(AuthInterceptor.PRINCIPAL_ATTRIBUTE) AuthPrincipal principal) {
-        return ApiResponse.success(principal);
+    public ApiResponse<LoginResponse> me(@RequestAttribute(AuthInterceptor.PRINCIPAL_ATTRIBUTE) com.dehui.property.security.AuthPrincipal principal) {
+        return ApiResponse.success(systemAuthService.currentUser(principal));
+    }
+
+    @GetMapping("/system/user/access")
+    public ApiResponse<UserAccessResponse> userAccess(@RequestAttribute(AuthInterceptor.PRINCIPAL_ATTRIBUTE) com.dehui.property.security.AuthPrincipal principal) {
+        return ApiResponse.success(systemAuthService.currentAccess(principal));
     }
 
     @PostMapping("/auth/logout")

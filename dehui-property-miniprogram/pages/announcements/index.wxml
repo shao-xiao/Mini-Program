@@ -1,16 +1,39 @@
-<view class="page">
-  <view class="section card">
-    <view class="title">公告通知</view>
-    <view class="subtitle">园区公告、活动通知和运营提醒</view>
+<view class="page announcement-page">
+  <view class="section">
+    <data-source-panel
+      title="园区信息中心"
+      description="聚合园区公告、活动通知与物业运营提醒"
+      source="园区运营后台"
+      scope="当前园区已发布内容"
+      status="内容同步"
+      tone="service"
+    />
   </view>
 
-  <view wx:if="{{loading}}" class="card muted">正在加载公告...</view>
-
-  <view wx:elif="{{announcements.length === 0}}" class="card muted">
-    暂无已发布公告
+  <view wx:if="{{pageState === 'loading'}}" class="card state-card" aria-busy="true">
+    <view class="state-title">正在加载公告</view>
+    <view class="state-desc">请稍候，正在获取园区最新信息。</view>
   </view>
 
-  <view wx:else class="section">
+  <view wx:elif="{{pageState === 'error' || pageState === 'login-required' || pageState === 'unauthorized'}}" class="card state-card">
+    <view class="state-title">{{pageState === 'unauthorized' ? '当前账号无法查看公告' : '公告暂时无法加载'}}</view>
+    <view class="state-desc">{{errorMessage}}</view>
+    <button class="button-primary state-action" bindtap="retry">重新加载</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'empty'}}" class="card state-card">
+    <view class="state-title">暂无已发布公告</view>
+    <view class="state-desc">物业发布新公告后会在这里展示。</view>
+  </view>
+
+  <view wx:elif="{{pageState === 'success'}}" class="section">
+    <view class="announcement-overview">
+      <view>
+        <view class="overview-label">信息流</view>
+        <view class="overview-title">最新发布</view>
+      </view>
+      <view class="overview-count">{{announcements.length}} 条</view>
+    </view>
     <view
       wx:for="{{announcements}}"
       wx:key="id"
@@ -18,12 +41,29 @@
       data-id="{{item.id}}"
       bindtap="openDetail"
     >
-      <view class="announcement-head">
-        <view class="announcement-title">{{item.title}}</view>
-        <view class="announcement-type">{{item.typeText}}</view>
+      <view class="announcement-source">
+        <view class="source-node"></view>
+        <text>信息源 · 物业管理系统公告模块</text>
+        <text class="source-sequence">{{item.code || item.id}}</text>
       </view>
-      <view class="announcement-content">{{item.summary}}</view>
-      <view class="announcement-time">{{item.publishTimeText}}</view>
+      <view class="announcement-body">
+        <view class="announcement-copy">
+          <view class="announcement-head">
+            <view class="announcement-type">{{item.typeText}}</view>
+            <view class="announcement-sync">已发布</view>
+          </view>
+          <view class="announcement-title">{{item.title}}</view>
+          <view class="announcement-content">{{item.summary}}</view>
+        </view>
+        <image wx:if="{{item.coverImageUrl}}" class="announcement-cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
+      </view>
+      <view class="announcement-footer">
+        <view class="announcement-time">
+          <view class="time-node"></view>
+          <text>发布时间 · {{item.publishTimeText}}</text>
+        </view>
+        <view class="announcement-action">查看详情 ›</view>
+      </view>
     </view>
   </view>
 </view>

@@ -1,0 +1,106 @@
+<view class="page">
+  <view wx:if="{{pageState === 'loading'}}" class="empty">正在加载房源...</view>
+  <view wx:elif="{{pageState === 'error' || pageState === 'login-required' || pageState === 'unauthorized'}}" class="empty">
+    <view class="empty-title">{{pageState === 'unauthorized' ? '当前账号无法查看房源' : '房源暂时无法加载'}}</view>
+    <view class="empty-desc">{{errorMessage}}</view>
+    <button class="inline-button" bindtap="retryDetail">重新加载</button>
+  </view>
+  <view wx:elif="{{pageState === 'empty'}}" class="empty">
+    <view class="empty-title">房源不存在或已下架</view>
+    <view class="empty-desc">请返回招商中心查看其他已发布房源。</view>
+  </view>
+  <view wx:elif="{{pageState === 'success' && detail}}" class="detail">
+    <swiper wx:if="{{detail.imageUrls.length}}" class="gallery" indicator-dots autoplay circular>
+      <swiper-item wx:for="{{detail.imageUrls}}" wx:key="*this">
+        <image class="gallery-image" src="{{item}}" mode="aspectFill" />
+      </swiper-item>
+    </swiper>
+    <view wx:else class="gallery placeholder-gallery">德汇创新中心</view>
+
+    <view class="card">
+      <view class="title-row">
+        <view>
+          <view class="title">{{detail.title}}</view>
+          <view class="subtitle">{{detail.subtitle}}</view>
+        </view>
+        <view class="status">{{detail.statusText}}</view>
+      </view>
+
+      <view class="info-grid">
+        <view class="info-item">
+          <text class="info-value">{{detail.floorText}}</text>
+          <text class="info-label">楼层</text>
+        </view>
+        <view class="info-item">
+          <text class="info-value">{{detail.roomNumber}}</text>
+          <text class="info-label">房号</text>
+        </view>
+        <view class="info-item">
+          <text class="info-value">{{detail.areaText}}</text>
+          <text class="info-label">面积</text>
+        </view>
+        <view class="info-item">
+          <text class="info-value">{{detail.roomTypeText}}</text>
+          <text class="info-label">类型</text>
+        </view>
+      </view>
+
+      <view wx:if="{{detail.tags.length}}" class="tag-row">
+        <text wx:for="{{detail.tags}}" wx:key="*this" class="tag">{{item}}</text>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">房源介绍</view>
+      <view class="paragraph">{{detail.description || '暂无详细介绍，可预约后由招商顾问补充说明。'}}</view>
+    </view>
+
+    <view wx:if="{{detail.highlights.length}}" class="card">
+      <view class="section-title">房源亮点</view>
+      <view class="highlight" wx:for="{{detail.highlights}}" wx:key="*this">{{item}}</view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">费用说明</view>
+      <view class="fee-line">租金：{{detail.rentDesc || '面议'}}</view>
+      <view class="fee-line">物业费：{{detail.propertyFeeDesc || '以合同约定为准'}}</view>
+    </view>
+
+    <view class="bottom-actions">
+      <button class="ghost-button" bindtap="callConsultant">电话咨询</button>
+      <button wx:if="{{canBookViewing}}" class="primary-button" bindtap="openLeadPopup">预约看房</button>
+    </view>
+  </view>
+
+  <view wx:if="{{canBookViewing && leadPopupVisible}}" class="popup-mask" bindtap="closeLeadPopup">
+    <view class="popup-panel" catchtap="noop">
+      <view class="popup-head">
+        <view>
+          <view class="popup-title">预约看房</view>
+          <view class="popup-desc">招商顾问会根据房源情况与您联系</view>
+        </view>
+        <view class="popup-close" bindtap="closeLeadPopup">×</view>
+      </view>
+      <scroll-view scroll-y class="popup-scroll">
+        <input class="input" placeholder="联系人" value="{{leadForm.name}}" maxlength="20" data-field="name" bindinput="onLeadInput" />
+        <input class="input verified-phone" placeholder="手机号验证后自动填写" value="{{leadForm.phone}}" disabled />
+        <button
+          wx:if="{{!leadForm.phone}}"
+          class="phone-authorize-button"
+          open-type="getPhoneNumber"
+          bindgetphonenumber="authorizePhone"
+        >验证手机号</button>
+        <input class="input" placeholder="公司名称" value="{{leadForm.companyName}}" maxlength="50" data-field="companyName" bindinput="onLeadInput" />
+        <input class="input" placeholder="意向房源" value="{{leadForm.intendedRoom}}" disabled />
+        <input class="input" placeholder="意向面积" type="digit" value="{{leadForm.desiredArea}}" maxlength="10" data-field="desiredArea" bindinput="onLeadInput" />
+        <input class="input" placeholder="用途" value="{{leadForm.intendedUse}}" maxlength="50" data-field="intendedUse" bindinput="onLeadInput" />
+        <view class="picker-grid">
+          <calendar-date-field value="{{leadForm.preferredVisitDate}}" min-date="{{today}}" placeholder="选择看房日期" bind:change="onDateChange" />
+          <calendar-time-field value="{{leadForm.preferredVisitClock}}" placeholder="选择看房时间" title="选择看房时间" bind:change="onTimeChange" />
+        </view>
+        <textarea class="textarea" placeholder="补充需求" value="{{leadForm.remark}}" maxlength="200" data-field="remark" bindinput="onLeadInput" />
+      </scroll-view>
+      <button class="submit-button" loading="{{submitting}}" bindtap="submitLead">提交预约</button>
+    </view>
+  </view>
+</view>

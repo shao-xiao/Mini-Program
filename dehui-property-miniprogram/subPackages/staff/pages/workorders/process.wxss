@@ -1,0 +1,5 @@
+page {
+  --dhic-page-action-primary: var(--dhic-orange-strong);
+  --dhic-page-action-soft: var(--dhic-orange-soft);
+  --dhic-page-action-rgb: var(--dhic-orange-rgb);
+}

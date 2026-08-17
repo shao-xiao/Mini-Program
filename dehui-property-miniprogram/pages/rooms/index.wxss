@@ -1,0 +1,57 @@
+page {
+  --dhic-page-action-primary: var(--dhic-tech-700);
+  --dhic-page-action-soft: var(--dhic-tech-soft);
+  --dhic-page-action-rgb: var(--dhic-tech-rgb);
+}
+
+.page {
+  padding: 24rpx;
+}
+
+.card {
+  margin-bottom: 18rpx;
+  padding: 26rpx;
+  border: 1rpx solid var(--dhic-border-light);
+  border-radius: var(--dhic-radius-card);
+  background: var(--dhic-surface);
+  box-shadow: var(--dhic-shadow-card);
+  box-sizing: border-box;
+}
+
+.title {
+  color: var(--dhic-text-primary);
+  font-size: var(--dhic-font-title);
+  font-weight: var(--dhic-weight-heading);
+}
+
+.meta {
+  margin-top: 12rpx;
+  color: var(--dhic-text-secondary);
+  font-size: var(--dhic-font-body-lg);
+}
+
+.state,
+.more {
+  padding: 80rpx 20rpx;
+  color: var(--dhic-text-tertiary);
+  text-align: center;
+}
+
+.error {
+  color: var(--dhic-danger);
+}
+
+.state button {
+  width: 220rpx;
+  margin-top: 24rpx;
+  border: 0;
+  border-radius: var(--dhic-radius-card);
+  background: var(--dhic-action-primary);
+  color: var(--dhic-text-inverse);
+  font-weight: var(--dhic-weight-heading);
+  box-shadow: var(--dhic-shadow-action);
+}
+
+.state button::after {
+  border: 0;
+}

@@ -1,67 +1,141 @@
 <template>
-  <div class="page-container">
+  <div class="page-container" :class="{ 'page-container--embedded': props.embedded }">
     <div class="content-layout">
-      <el-card class="list-card" shadow="never">
-        <template #header>
-          <div class="page-header">
-            <div>
-              <div class="page-title">招商内容</div>
-              <div class="page-subtitle">按小程序招商中心展示区块维护内容、发布状态和排序</div>
-            </div>
-            <el-button type="primary" @click="openDialog">新增内容</el-button>
-          </div>
+      <DataWorkspace
+        class="content-workspace"
+        :workspace-config="investmentContentWorkspaceConfig"
+        :views="workspaceViews"
+        :active-view-id="activeViewId"
+        :view-dirty="isViewDirty"
+        :filter-logic="tablePrefs.filterLogic"
+        :filter-logic-visible="tablePrefs.filters.length > 1"
+        :filter-items="activeFilterItems"
+        :query-notices="queryNotices"
+        @change-view="switchContentView"
+        @create-view="createTableView"
+        @duplicate-view="duplicateTableView"
+        @rename-view="renameTableView"
+        @delete-view="deleteTableView"
+        @save-view="saveContentView"
+        @remove-filter="removeViewFilter"
+      >
+        <template #header-actions>
+          <el-button
+            v-if="hasPermission('investment-content:create')"
+            type="primary"
+            :icon="Plus"
+            @click="openDialog"
+          >新增内容</el-button>
         </template>
 
-        <el-table v-loading="loading" :data="list" border stripe class="content-table">
-          <el-table-column label="序号" width="80" align="center">
-            <template #default="{ $index }">{{ sequence($index) }}</template>
-          </el-table-column>
-          <el-table-column label="展示区块" width="130">
-            <template #default="{ row }">{{ sectionName(row.sectionKey) }}</template>
-          </el-table-column>
-          <el-table-column prop="title" label="标题" min-width="160" show-overflow-tooltip />
-          <el-table-column prop="subtitle" label="副标题" min-width="170" show-overflow-tooltip />
-          <el-table-column prop="sortOrder" label="排序" width="80" align="center" />
-          <el-table-column label="状态" width="100" align="center">
-            <template #default="{ row }">
-              <el-tag :type="statusTag(row.publishStatus || row.status)">
-                {{ statusText(row.publishStatus || row.status) }}
-              </el-tag>
+        <template #toolbar>
+          <DhicDataToolbar
+            :workspace-config="investmentContentWorkspaceConfig"
+            allow-column-layout
+            field-config-saveable
+            :view-name="activeViewName"
+            :field-config-dirty="isViewDirty"
+            :columns="orderedColumns"
+            :visible-columns="tablePrefs.visibleColumns"
+            :column-order="tablePrefs.columnOrder"
+            :fixed-columns="tablePrefs.fixedColumns"
+            :filter-options="filterOptions"
+            :filters="tablePrefs.filters"
+            :filter-logic="tablePrefs.filterLogic"
+            :filter-logics="filterLogicOptions"
+            :sort-options="sortOptions"
+            :sorts="tablePrefs.sorts"
+            :sort-key="tablePrefs.sortKey"
+            :sort-order="tablePrefs.sortOrder"
+            :sort-count="sortCount"
+            :group-options="groupOptions"
+            :groups="tablePrefs.groups"
+            :group-key="tablePrefs.groupKey"
+            :group-count="groupCount"
+            :row-density="tablePrefs.rowDensity"
+            :active-filter-count="activeFilterCount"
+            :filter-items="activeFilterItems"
+            @update:visible-columns="updateVisibleColumns"
+            @update:column-order="updateColumnOrder"
+            @update:fixed-columns="updateFixedColumns"
+            @update:filters="updateFilters"
+            @update:filter-logic="updateFilterLogic"
+            @update:sort-key="updateSortKey"
+            @update:sort-order="updateSortOrder"
+            @update:sorts="updateSorts"
+            @update:group-key="updateGroupKey"
+            @update:groups="updateGroups"
+            @update:row-density="updateRowDensity"
+            @reset-view="resetTableView"
+            @save-field-config="saveContentView"
+          >
+            <template #right>
+              <el-button :icon="Refresh" @click="loadWorkspaceData">刷新</el-button>
+              <span class="view-hint">当前页 {{ resultScope.loadedRecords }} 条 / 共 {{ resultScope.serverTotal }} 条</span>
             </template>
-          </el-table-column>
-          <el-table-column label="更新时间" width="160">
-            <template #default="{ row }">{{ formatDateTime(row.updatedAt) }}</template>
-          </el-table-column>
-          <el-table-column label="操作" width="300" fixed="right">
-            <template #default="{ row }">
-              <el-button size="small" @click="edit(row)">编辑</el-button>
-              <el-button size="small" @click="preview(row)">预览</el-button>
-              <el-button
-                v-if="(row.publishStatus || row.status) !== 'PUBLISHED'"
-                size="small"
-                type="success"
-                @click="publish(row)"
-              >
-                发布
-              </el-button>
-              <el-button v-else size="small" type="warning" @click="disable(row)">停用</el-button>
-              <el-button size="small" type="danger" @click="remove(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+          </DhicDataToolbar>
+        </template>
 
-        <div class="pagination-wrapper">
-          <el-pagination
-            v-model:current-page="pagination.currentPage"
-            v-model:page-size="pagination.pageSize"
-            :total="pagination.total"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next, jumper"
-            @current-change="load"
-            @size-change="handleSizeChange"
-          />
-        </div>
-      </el-card>
+        <template #grid>
+          <WorkspaceDataGrid
+            :loading="loading"
+            :error-text="loadError"
+            retryable
+            :rows="tableRows"
+            :columns="visibleOrderedColumns"
+            row-key="id"
+            :current-page="pagination.currentPage"
+            :page-size="pagination.pageSize"
+            :density="tablePrefs.rowDensity"
+            :empty-text="tableEmptyText"
+            :sort-state="activeTableSort"
+            :data-mode="investmentContentWorkspaceConfig.query.dataMode"
+            :column-width="columnWidth"
+            :column-fixed="columnFixed"
+            :is-column-sortable="isColumnSortable"
+            :show-overflow-tooltip="column => ['title', 'subtitle'].includes(column.key)"
+            :operation-column="{ width: 286, fixed: 'right', align: 'left' }"
+            @column-resize="handleHeaderDragEnd"
+            @sort-change="handleTableSortChange"
+            @retry="loadWorkspaceData"
+            aria-label="招商内容数据表格"
+          >
+            <template #operations="{ row }">
+              <div class="content-actions">
+                <el-button v-if="hasPermission('investment-content:update')" link type="primary" @click="edit(row)">编辑</el-button>
+                <el-button link @click="preview(row)">预览</el-button>
+                <el-button
+                  v-if="hasPermission('investment-content:publish') && (row.publishStatus || row.status) !== 'PUBLISHED'"
+                  link
+                  type="success"
+                  @click="publish(row)"
+                >发布</el-button>
+                <el-button
+                  v-else-if="hasPermission('investment-content:publish')"
+                  link
+                  type="warning"
+                  @click="disable(row)"
+                >停用</el-button>
+                <el-button v-if="hasPermission('investment-content:delete')" link type="danger" @click="remove(row)">删除</el-button>
+              </div>
+            </template>
+          </WorkspaceDataGrid>
+        </template>
+
+        <template #footer>
+          <div class="pagination-wrapper">
+            <el-pagination
+              v-model:current-page="pagination.currentPage"
+              v-model:page-size="pagination.pageSize"
+              :total="pagination.total"
+              :page-sizes="[10, 20, 50, 100]"
+              layout="total, sizes, prev, pager, next, jumper"
+              @current-change="loadContent"
+              @size-change="handleSizeChange"
+            />
+          </div>
+        </template>
+      </DataWorkspace>
 
       <el-card class="preview-card" shadow="never">
         <template #header>
@@ -94,7 +168,6 @@
             <preview-section title="园区介绍" :items="previewGroups.introduction" single />
             <preview-section title="园区地址" :items="previewGroups.location" single />
             <preview-section title="联系方式" :items="previewGroups.contact" single />
-            <preview-section title="招商公告" :items="previewGroups.notice" />
           </div>
         </div>
       </el-card>
@@ -120,8 +193,19 @@
           <el-input v-model="form.content" type="textarea" :rows="5" />
         </el-form-item>
 
-        <el-form-item label="图片地址">
-          <el-input v-model="form.imageUrl" placeholder="可选，后续可接文件上传" />
+        <el-form-item label="展示图片">
+          <div class="image-field">
+            <el-input v-model="form.imageUrl" placeholder="上传图片后自动回填，也可粘贴已有图片地址" />
+            <el-upload
+              v-if="hasPermission('investment-content:update') || hasPermission('investment-content:create')"
+              :show-file-list="false"
+              accept="image/jpeg,image/png,image/gif,image/webp,image/bmp"
+              :http-request="uploadShowcaseImage"
+            >
+              <el-button>上传图片</el-button>
+            </el-upload>
+            <img v-if="form.imageUrl" class="form-image-preview" :src="form.imageUrl" alt="招商展示图片预览" />
+          </div>
         </el-form-item>
 
         <div class="form-grid">
@@ -137,6 +221,29 @@
           </el-form-item>
         </div>
 
+        <div class="form-grid">
+          <el-form-item label="生效时间">
+            <el-date-picker
+              v-model="form.effectiveAt"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="失效时间">
+            <el-date-picker
+              v-model="form.expiresAt"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              style="width: 100%"
+            />
+          </el-form-item>
+        </div>
+
+        <el-form-item label="公开展示">
+          <el-switch v-model="form.publicVisible" />
+        </el-form-item>
+
         <el-form-item label="后台备注">
           <el-input v-model="form.remark" type="textarea" :rows="3" />
         </el-form-item>
@@ -144,7 +251,12 @@
 
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+        <el-button
+          v-if="form.id ? hasPermission('investment-content:update') : hasPermission('investment-content:create')"
+          type="primary"
+          :loading="saving"
+          @click="save"
+        >保存</el-button>
       </template>
     </el-dialog>
 
@@ -161,20 +273,28 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, reactive, ref } from 'vue'
+import { computed, defineComponent, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { Plus, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { uploadCustomFieldAttachment } from '../../api/customFields'
+import DataWorkspace from '../../components/DataWorkspace.vue'
+import DhicDataToolbar from '../../components/DhicDataToolbar.vue'
+import WorkspaceDataGrid from '../../components/workspace/WorkspaceDataGrid.vue'
+import { useDhicTableView } from '../../composables/useDhicTableView'
 import request from '../../utils/request'
-import { createPagination, pageParams, readPage } from '../../utils/pagination'
+import { createPagination, pageParams, readPage, resetToFirstPage } from '../../utils/pagination'
+import { hasPermission } from '../../utils/permission'
+import { createLatestRequestGuard } from '../../utils/requestLifecycle'
+import {
+  investmentContentStatusOptions,
+  investmentContentWorkspaceConfig,
+  investmentSectionOptions as sectionOptions
+} from '../../workspaceConfigs/investmentWorkspaceConfig'
+import { workspaceTableOptions } from '../../workspaceConfigs/workspaceConfig'
 
-const sectionOptions = [
-  { label: '顶部主视觉', value: 'hero' },
-  { label: '园区亮点', value: 'highlight' },
-  { label: '招商政策', value: 'policy' },
-  { label: '园区介绍', value: 'introduction' },
-  { label: '园区地址', value: 'location' },
-  { label: '联系方式', value: 'contact' },
-  { label: '招商公告', value: 'notice' }
-]
+const props = defineProps({
+  embedded: { type: Boolean, default: false }
+})
 
 const PreviewSection = defineComponent({
   name: 'PreviewSection',
@@ -201,6 +321,7 @@ const PreviewSection = defineComponent({
 
 const list = ref([])
 const loading = ref(false)
+const loadError = ref('')
 const saving = ref(false)
 const visible = ref(false)
 const previewVisible = ref(false)
@@ -208,6 +329,76 @@ const previewRow = ref(null)
 const pagination = reactive(createPagination(20))
 const formRef = ref(null)
 const previewGroups = reactive(createEmptyGroups())
+const contentPermissions = investmentContentWorkspaceConfig.permissions
+
+const {
+  workspaceViews,
+  activeViewId,
+  activeViewName,
+  isViewDirty,
+  tablePrefs,
+  orderedColumns,
+  visibleOrderedColumns,
+  tableRows,
+  tableEmptyText,
+  sortOptions,
+  groupOptions,
+  filterOptions,
+  filterLogicOptions,
+  serverQueryParams,
+  queryNotices,
+  queryRequestGuard: listRequestGuard,
+  debouncedQueryTask: debouncedContentQuery,
+  disposeQueryLifecycle,
+  resultScope,
+  activeFilterItems,
+  activeFilterCount,
+  groupCount,
+  sortCount,
+  activeTableSort,
+  updateVisibleColumns,
+  updateColumnOrder,
+  updateFixedColumns,
+  columnWidth,
+  columnFixed,
+  handleHeaderDragEnd,
+  handleTableSortChange,
+  isColumnSortable,
+  updateFilterLogic,
+  updateFilters,
+  updateSortKey,
+  updateSortOrder,
+  updateSorts,
+  updateGroupKey,
+  updateGroups,
+  updateRowDensity,
+  resetTableView,
+  switchTableView,
+  createTableView,
+  renameTableView,
+  duplicateTableView,
+  deleteTableView,
+  saveCurrentView,
+  discardCurrentViewChanges,
+  removeViewFilter
+} = useDhicTableView(workspaceTableOptions(investmentContentWorkspaceConfig, {
+  records: () => list.value,
+  serverTotal: () => pagination.total,
+  queryLifecycle: {
+    task: () => {
+      resetToFirstPage(pagination)
+      loadWorkspaceData()
+    }
+  },
+  groupLabel: value => (
+    sectionOptions.find(option => option.value === value)?.label
+    || investmentContentStatusOptions.find(option => option.value === value)?.label
+    || value
+    || '未填写'
+  )
+}))
+
+watch(() => JSON.stringify(serverQueryParams.value), () => debouncedContentQuery.schedule())
 
 const defaultForm = () => ({
   id: null,
@@ -216,6 +407,9 @@ const defaultForm = () => ({
   subtitle: '',
   content: '',
   imageUrl: '',
+  publicVisible: true,
+  effectiveAt: '',
+  expiresAt: '',
   status: 'DRAFT',
   sortOrder: 10,
   remark: ''
@@ -230,28 +424,24 @@ const rules = {
   status: [{ required: true, message: '请选择状态', trigger: 'change' }]
 }
 
+async function uploadShowcaseImage(options) {
+  try {
+    const result = await uploadCustomFieldAttachment(options.file, {
+      fieldType: 'IMAGE',
+      workspaceKey: 'investment-contents'
+    })
+    form.imageUrl = result?.url || ''
+    options.onSuccess?.(result)
+    ElMessage.success('展示图片上传成功')
+  } catch (error) {
+    options.onError?.(error)
+    ElMessage.error(requestErrorMessage(error, '展示图片上传失败'))
+  }
+}
+
 const sectionName = (key) => sectionOptions.find(item => item.value === key)?.label || key || '-'
 
-const statusText = (status) => ({
-  DRAFT: '草稿',
-  PUBLISHED: '已发布',
-  DISABLED: '停用'
-}[status] || status || '-')
-
-const statusTag = (status) => ({
-  DRAFT: 'info',
-  PUBLISHED: 'success',
-  DISABLED: 'warning'
-}[status] || 'info')
-
 const firstItem = (key) => previewGroups[key]?.[0] || null
-
-const sequence = (index) => (pagination.currentPage - 1) * pagination.pageSize + index + 1
-
-const formatDateTime = (value) => {
-  if (!value) return '-'
-  return String(value).replace('T', ' ').slice(0, 16)
-}
 
 function createEmptyGroups() {
   return sectionOptions.reduce((result, item) => {
@@ -296,18 +486,44 @@ const resetForm = () => {
   formRef.value?.clearValidate()
 }
 
-const load = async () => {
+function requestErrorMessage(error, fallback) {
+  return error?.response?.data?.message || error?.message || error?.msg || fallback
+}
+
+const loadContent = async () => {
+  if (!hasPermission(contentPermissions.view)) {
+    list.value = []
+    pagination.total = 0
+    return
+  }
+  const requestId = listRequestGuard.start()
   loading.value = true
+  loadError.value = ''
   try {
-    const data = await request.get('/investment/contents', { params: pageParams(pagination) })
+    const data = await request.get('/investment/contents', {
+      params: { ...serverQueryParams.value, ...pageParams(pagination) },
+      silent: true
+    })
+    if (!listRequestGuard.isCurrent(requestId)) return
     const page = readPage(data)
-    list.value = page.records
+    list.value = page.records.map(row => ({
+      ...row,
+      publishStatus: row.publishStatus || row.status
+    }))
     pagination.total = page.total
     await loadPreview()
+  } catch (error) {
+    if (!listRequestGuard.isCurrent(requestId)) return
+    list.value = []
+    pagination.total = 0
+    applyGroups(createEmptyGroups())
+    loadError.value = requestErrorMessage(error, '招商内容加载失败')
   } finally {
-    loading.value = false
+    if (listRequestGuard.isCurrent(requestId)) loading.value = false
   }
 }
+
+const loadWorkspaceData = () => loadContent()
 
 const loadPreview = async () => {
   try {
@@ -319,8 +535,30 @@ const loadPreview = async () => {
 }
 
 const handleSizeChange = () => {
-  pagination.currentPage = 1
-  load()
+  resetToFirstPage(pagination)
+  loadContent()
+}
+
+async function switchContentView(viewId) {
+  if (isViewDirty.value) {
+    try {
+      await ElMessageBox.confirm('当前视图有未保存的调整，是否保存后切换？', '切换视图', {
+        distinguishCancelAndClose: true,
+        confirmButtonText: '保存并切换',
+        cancelButtonText: '放弃调整'
+      })
+      saveCurrentView()
+    } catch (action) {
+      if (action === 'cancel') discardCurrentViewChanges()
+      else return
+    }
+  }
+  switchTableView(viewId)
+}
+
+function saveContentView() {
+  saveCurrentView()
+  ElMessage.success(`视图“${activeViewName.value}”已保存`)
 }
 
 const openDialog = () => {
@@ -336,6 +574,9 @@ const edit = (row) => {
     subtitle: row.subtitle || '',
     content: row.content || '',
     imageUrl: row.imageUrl || '',
+    publicVisible: row.publicVisible !== false && Number(row.publicVisible) !== 0,
+    effectiveAt: row.effectiveAt || '',
+    expiresAt: row.expiresAt || '',
     status: row.publishStatus || row.status || 'DRAFT',
     sortOrder: Number(row.sortOrder || 10),
     remark: row.remark || ''
@@ -354,6 +595,9 @@ const save = async () => {
       subtitle: form.subtitle,
       content: form.content,
       imageUrl: form.imageUrl,
+      publicVisible: form.publicVisible,
+      effectiveAt: form.effectiveAt || null,
+      expiresAt: form.expiresAt || null,
       sortOrder: form.sortOrder,
       publishStatus: form.status,
       remark: form.remark
@@ -368,7 +612,7 @@ const save = async () => {
     }
     visible.value = false
     resetForm()
-    await load()
+    await loadWorkspaceData()
   } finally {
     saving.value = false
   }
@@ -378,21 +622,21 @@ const publish = async (row) => {
   await ElMessageBox.confirm(`确定发布「${row.title}」吗？`, '发布确认', { type: 'warning' })
   await request.post(`/investment/contents/${row.id}/publish`)
   ElMessage.success('发布成功')
-  await load()
+  await loadWorkspaceData()
 }
 
 const disable = async (row) => {
   await ElMessageBox.confirm(`确定停用「${row.title}」吗？停用后小程序端不再展示。`, '停用确认', { type: 'warning' })
   await request.post(`/investment/contents/${row.id}/disable`)
   ElMessage.success('已停用')
-  await load()
+  await loadWorkspaceData()
 }
 
 const remove = async (row) => {
   await ElMessageBox.confirm(`确定删除「${row.title}」吗？`, '删除确认', { type: 'warning' })
   await request.delete(`/investment/contents/${row.id}`)
   ElMessage.success('已删除')
-  await load()
+  await loadWorkspaceData()
 }
 
 const preview = (row) => {
@@ -404,12 +648,32 @@ const preview = (row) => {
   previewVisible.value = true
 }
 
-onMounted(load)
+onMounted(loadWorkspaceData)
+onBeforeUnmount(() => disposeQueryLifecycle())
 </script>
 
 <style scoped>
+.image-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  width: 100%;
+}
+
+.form-image-preview {
+  grid-column: 1 / -1;
+  width: 180px;
+  height: 108px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
 .page-container {
   padding: 20px;
+}
+
+.page-container--embedded {
+  padding: 14px 0 0;
 }
 
 .content-layout {
@@ -417,6 +681,23 @@ onMounted(load)
   grid-template-columns: minmax(0, 1fr) 360px;
   gap: 18px;
   align-items: start;
+}
+
+.content-workspace {
+  min-width: 0;
+}
+
+.view-hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.content-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .page-header,

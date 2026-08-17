@@ -1,0 +1,24 @@
+<view class="service-agreement-page">
+  <view class="service-card">
+    <view class="service-title">德汇创新中心用户服务协议</view>
+    <view class="service-paragraph">
+      本服务由德汇创新中心物业管理系统提供。小程序第一期用于园区公告与招商房源公开展示，以及租户账单、电子合同、报修、会议预约和访客预约等自助服务。
+    </view>
+    <view class="service-section-title">一、账号使用</view>
+    <view class="service-paragraph">
+      进入小程序后，系统会通过微信静默会话识别当前用户。用户主动使用租户服务时，可授权微信手机号；系统仅在该手机号匹配有效租户联系人后开通租户服务。匹配失败时，请联系物业核对或开通联系人信息。
+    </view>
+    <view class="service-section-title">二、信息提交</view>
+    <view class="service-paragraph">
+      用户在提交看房预约、租户报修、会议预约和访客预约时，应确保填写的信息真实、准确，并仅用于对应园区或物业服务办理。租户归属和数据范围以后端当前登录身份为准，客户端不会要求用户填写租户 ID。
+    </view>
+    <view class="service-section-title">三、服务记录</view>
+    <view class="service-paragraph">
+      系统会根据业务需要展示与当前微信身份相关的看房预约，以及与当前租户身份相关的账单、合同、会议、访客预约和报修记录。用户不得冒用他人手机号或转借已开通的租户服务身份。
+    </view>
+    <view class="service-section-title">四、协议更新</view>
+    <view class="service-paragraph">
+      如服务范围、协议或隐私规则调整，小程序会更新协议版本，并在需要时要求用户重新确认。用户可以在“我的”页面随时查看当前用户服务协议和微信《用户隐私保护指引》。
+    </view>
+  </view>
+</view>

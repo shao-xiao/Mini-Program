@@ -1,0 +1,46 @@
+# Asset spaces and equipment
+building
+building_floor
+building_room
+equipment
+
+# Energy
+energy_bill_operation_log
+energy_meter
+energy_meter_binding
+energy_price_setting
+energy_reading
+energy_reading_audit
+
+# Parking
+parking_assignment
+parking_bill
+parking_space
+parking_space_type_option
+
+# Meetings
+meeting_bill
+meeting_booking
+meeting_rate_rule
+meeting_room
+
+# Unified asset charge basis and finance history
+asset_charge_basis
+bill
+bill_audit_log
+bill_invoice
+bill_invoice_attachment
+bill_line_item
+bill_payment_record
+billing_plan
+billing_plan_item
+fee_rule
+fee_rule_version
+
+# Shared records used by asset images, attachments and unified fields
+custom_field_definition
+custom_field_definition_history
+custom_field_option
+custom_field_value
+file_upload
+module_field_setting

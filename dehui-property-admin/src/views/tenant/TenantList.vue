@@ -1,51 +1,126 @@
 <template>
   <div class="page-container">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <div>
-            <span>租户管理</span>
-            <span class="header-tip">维护租户主档、联系人账号和小程序绑定入口</span>
-          </div>
-          <el-button type="primary" @click="openCreateDialog">新增租户</el-button>
-        </div>
+    <DataWorkspace
+      :workspace-config="tenantWorkspaceConfig"
+      :views="workspaceViews"
+      :active-view-id="activeViewId"
+      :view-dirty="isViewDirty"
+      :filter-logic="tablePrefs.filterLogic"
+      :filter-logic-visible="tablePrefs.filters.length > 1"
+      :filter-items="activeFilterItems"
+      :query-notices="queryNotices"
+      :metric-data="tenantMetricData"
+      @change-view="switchTenantView"
+      @create-view="createTableView"
+      @duplicate-view="duplicateTableView"
+      @rename-view="renameTableView"
+      @delete-view="deleteTableView"
+      @save-view="saveTenantView"
+      @remove-filter="removeViewFilter"
+    >
+      <template #header-actions>
+        <el-button
+          v-if="hasPermission(tenantPermissions.create)"
+          type="primary"
+          :icon="Plus"
+          @click="openCreateDialog"
+        >
+          {{ tenantWorkspaceConfig.primaryAction.label }}
+        </el-button>
       </template>
 
-      <el-table :data="tenants" border style="width: 100%">
-        <el-table-column prop="tenantCode" label="租户编号" width="140" />
-        <el-table-column prop="tenantName" label="租户名称" min-width="180" />
-        <el-table-column prop="contactPerson" label="联系人" min-width="120" />
-        <el-table-column label="联系电话" min-width="155">
-          <template #default="{ row }">
-            <span :class="{ 'invalid-contact': row.contactPhone && !isValidContactPhone(row.contactPhone) }">
-              {{ contactText(row.contactPhone, 'phone') }}
+      <template #toolbar>
+        <DhicDataToolbar
+          :workspace-config="tenantWorkspaceConfig"
+          allow-column-layout
+          field-config-saveable
+          :view-name="activeViewName"
+          :field-config-dirty="isViewDirty"
+          :columns="orderedColumns"
+          :visible-columns="tablePrefs.visibleColumns"
+          :column-order="tablePrefs.columnOrder"
+          :fixed-columns="tablePrefs.fixedColumns"
+          :filter-options="filterOptions"
+          :filters="tablePrefs.filters"
+          :filter-logic="tablePrefs.filterLogic"
+          :filter-logics="filterLogicOptions"
+          :sort-options="sortOptions"
+          :sorts="tablePrefs.sorts"
+          :sort-key="tablePrefs.sortKey"
+          :sort-order="tablePrefs.sortOrder"
+          :sort-count="sortCount"
+          :group-options="groupOptions"
+          :groups="tablePrefs.groups"
+          :group-key="tablePrefs.groupKey"
+          :group-count="groupCount"
+          :row-density="tablePrefs.rowDensity"
+          :active-filter-count="activeFilterCount"
+          :filter-items="activeFilterItems"
+          @update:visible-columns="updateVisibleColumns"
+          @update:column-order="updateColumnOrder"
+          @update:fixed-columns="updateFixedColumns"
+          @update:filters="updateFilters"
+          @update:filter-logic="updateFilterLogic"
+          @update:sort-key="updateSortKey"
+          @update:sort-order="updateSortOrder"
+          @update:sorts="updateSorts"
+          @update:group-key="updateGroupKey"
+          @update:groups="updateGroups"
+          @update:row-density="updateRowDensity"
+          @reset-view="resetTableView"
+          @save-field-config="saveTenantView"
+        >
+          <template #right>
+            <span class="view-hint">
+              全部已加载 {{ resultScope.loadedRecords }} 户，当前视图 {{ resultScope.visibleRecords }} 户
             </span>
           </template>
-        </el-table-column>
-        <el-table-column label="邮箱" min-width="190">
-          <template #default="{ row }">
-            <span :class="{ 'invalid-contact': row.contactEmail && !isValidEmail(row.contactEmail) }">
-              {{ contactText(row.contactEmail, 'email') }}
+        </DhicDataToolbar>
+      </template>
+
+      <template #grid>
+        <WorkspaceDataGrid
+          :loading="loading"
+          :error-text="listErrorText"
+          retryable
+          :rows="tableRows"
+          :columns="visibleOrderedColumns"
+          row-key="id"
+          :index-width="72"
+          :density="tablePrefs.rowDensity"
+          :empty-text="tableEmptyText"
+          :sort-state="activeTableSort"
+          :data-mode="tenantWorkspaceConfig.query.dataMode"
+          :column-width="columnWidth"
+          :column-fixed="columnFixed"
+          :is-column-sortable="isColumnSortable"
+          :show-overflow-tooltip="column => ['email', 'creditCode'].includes(column.key)"
+          :row-class-name="tenantRowClassName"
+          :operation-column="{ width: 292, fixed: 'right', align: 'left' }"
+          @column-resize="handleHeaderDragEnd"
+          @sort-change="handleTableSortChange"
+          @retry="loadTenants"
+          aria-label="租户管理数据表格"
+        >
+          <template #cell-phone="{ row }">
+            <span :class="{ 'invalid-contact': row.phone && !isValidContactPhone(row.phone) }">
+              {{ contactText(row.phone, 'phone') }}
             </span>
           </template>
-        </el-table-column>
-        <el-table-column prop="businessLicense" label="营业执照 / 统一信用代码" min-width="190" />
-        <el-table-column label="状态" width="105" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'info'" effect="plain">
-              {{ row.status === 'ACTIVE' ? '正常' : '停用' }}
-            </el-tag>
+          <template #cell-email="{ row }">
+            <span :class="{ 'invalid-contact': row.email && !isValidEmail(row.email) }">
+              {{ contactText(row.email, 'email') }}
+            </span>
           </template>
-        </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
-            <el-button size="small" type="primary" @click="openContactDialog(row)">联系人</el-button>
+          <template #operations="{ row }">
+            <el-button v-if="canEditTenant" size="small" @click="openEditDialog(row)">编辑</el-button>
+            <el-button v-if="hasPermission(tenantPermissions.update)" size="small" type="primary" @click="openContactDialog(row)">联系人</el-button>
             <el-button size="small" @click="openOverview(row)">详情</el-button>
+            <el-button v-if="hasPermission(tenantPermissions.delete)" size="small" type="danger" @click="deleteTenant(row)">删除</el-button>
           </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+        </WorkspaceDataGrid>
+      </template>
+    </DataWorkspace>
 
     <el-dialog v-model="dialogVisible" :title="form.id ? '编辑租户' : '新增租户'" width="560px">
       <el-form ref="tenantFormRef" :model="form" :rules="tenantRules" label-width="120px">
@@ -79,22 +154,22 @@
 
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveTenant">保存</el-button>
+        <el-button v-if="form.id ? canEditTenant : hasPermission('tenant:create')" type="primary" @click="saveTenant">保存</el-button>
       </template>
     </el-dialog>
 
     <el-dialog
       v-model="contactDialogVisible"
-      :title="currentTenant ? `联系人账号 - ${currentTenant.tenantName}` : '联系人账号'"
+      :title="currentTenant ? `租户联系人 - ${currentTenant.tenantName}` : '租户联系人'"
       width="820px"
     >
       <div class="contact-toolbar">
-        <el-button type="primary" @click="openContactForm">新增联系人</el-button>
+        <el-button v-if="hasPermission('tenant:create')" type="primary" @click="openContactForm">新增联系人</el-button>
       </div>
 
       <el-table :data="contacts" border style="width: 100%">
         <el-table-column prop="name" label="姓名" min-width="120" />
-        <el-table-column label="手机号 / 账号" min-width="150">
+        <el-table-column label="手机号" min-width="150">
           <template #default="{ row }">
             <span :class="{ 'invalid-contact': row.phone && !isValidContactPhone(row.phone) }">
               {{ contactText(row.phone, 'phone') }}
@@ -108,7 +183,9 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="role" label="角色" min-width="120" />
+        <el-table-column label="联系人类型" min-width="120">
+          <template #default="{ row }">{{ row.role === 'RESPONSIBLE' || row.isPrimary ? '租户负责人' : '租户员工' }}</template>
+        </el-table-column>
         <el-table-column label="主联系人" width="100" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.isPrimary" type="success">是</el-tag>
@@ -122,13 +199,13 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="230">
+        <el-table-column label="操作" width="290">
           <template #default="{ row }">
-            <el-button size="small" @click="editContact(row)">编辑</el-button>
-            <el-button size="small" @click="resetPassword(row)">重置密码</el-button>
-            <el-button size="small" type="danger" :disabled="row.status !== 'ACTIVE'" @click="deactivateContact(row)">
+            <el-button v-if="hasPermission('tenant:create')" size="small" @click="editContact(row)">编辑</el-button>
+            <el-button v-if="hasPermission('tenant:create')" size="small" type="danger" :disabled="row.status !== 'ACTIVE'" @click="deactivateContact(row)">
               停用
             </el-button>
+            <el-button v-if="hasPermission('tenant:delete')" size="small" type="danger" @click="deleteContact(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -145,8 +222,11 @@
         <el-form-item label="邮箱" prop="email">
           <el-input v-model="contactForm.email" placeholder="例如 name@example.com" />
         </el-form-item>
-        <el-form-item label="角色" prop="role">
-          <el-input v-model="contactForm.role" placeholder="如：财务 / 行政 / 负责人" />
+        <el-form-item label="联系人类型" prop="role">
+          <el-select v-model="contactForm.role" style="width: 100%">
+            <el-option label="租户负责人" value="RESPONSIBLE" />
+            <el-option label="租户员工" value="EMPLOYEE" />
+          </el-select>
         </el-form-item>
         <el-form-item label="主联系人" prop="isPrimary">
           <el-switch v-model="contactForm.isPrimary" />
@@ -161,7 +241,7 @@
 
       <template #footer>
         <el-button @click="contactFormVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveContact">保存</el-button>
+        <el-button v-if="hasPermission('tenant:create')" type="primary" @click="saveContact">保存</el-button>
       </template>
     </el-dialog>
 
@@ -221,13 +301,13 @@
             </el-descriptions>
           </el-tab-pane>
 
-          <el-tab-pane label="联系人账号" name="contacts">
+          <el-tab-pane label="租户联系人" name="contacts">
             <div class="drawer-toolbar">
-              <el-button type="primary" @click="openContactDialog(overview.tenant)">维护联系人</el-button>
+              <el-button v-if="hasPermission('tenant:update')" type="primary" @click="openContactDialog(overview.tenant)">维护联系人</el-button>
             </div>
             <el-table :data="overview.contacts || []" border>
               <el-table-column prop="name" label="姓名" />
-              <el-table-column label="手机号 / 账号">
+              <el-table-column label="手机号">
                 <template #default="{ row }">
                   <span :class="{ 'invalid-contact': row.phone && !isValidContactPhone(row.phone) }">
                     {{ contactText(row.phone, 'phone') }}
@@ -241,8 +321,8 @@
                   </span>
                 </template>
               </el-table-column>
-              <el-table-column label="角色">
-                <template #default="{ row }">{{ row.roleText || row.role || '-' }}</template>
+              <el-table-column label="联系人类型">
+                <template #default="{ row }">{{ row.role === 'RESPONSIBLE' || row.isPrimary ? '租户负责人' : '租户员工' }}</template>
               </el-table-column>
               <el-table-column label="主联系人" width="90">
                 <template #default="{ row }"><el-tag v-if="row.isPrimary" type="success">是</el-tag><span v-else>-</span></template>
@@ -299,10 +379,17 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
+import DataWorkspace from '../../components/DataWorkspace.vue'
+import DhicDataToolbar from '../../components/DhicDataToolbar.vue'
+import WorkspaceDataGrid from '../../components/workspace/WorkspaceDataGrid.vue'
+import { useDhicTableView } from '../../composables/useDhicTableView'
+import { useWorkspaceListRequestState } from '../../composables/workspace/useWorkspaceRequestState'
 import request from '../../utils/request'
 import { readPage } from '../../utils/pagination'
+import { hasPermission } from '../../utils/permission'
 import {
   isValidContactPhone,
   isValidEmail,
@@ -310,6 +397,13 @@ import {
   optionalEmailRule,
   validateContactPhone
 } from '../../utils/contactValidation'
+import {
+  buildTenantMetricSnapshot,
+  normalizeTenantWorkspaceRecord,
+  tenantStatusOptions,
+  tenantWorkspaceConfig
+} from '../../workspaceConfigs/tenantWorkspaceConfig'
+import { workspaceTableOptions } from '../../workspaceConfigs/workspaceConfig'
 
 const tenants = ref([])
 const dialogVisible = ref(false)
@@ -323,6 +417,73 @@ const currentTenant = ref(null)
 const overview = ref(null)
 const tenantFormRef = ref()
 const contactFormRef = ref()
+const tenantPermissions = tenantWorkspaceConfig.permissions
+const listState = useWorkspaceListRequestState({
+  hasResults: () => tenants.value.length > 0,
+  clearResults: () => {
+    tenants.value = []
+  },
+  staleMessage: '租户列表刷新失败，当前显示上次成功数据'
+})
+const loading = computed(() => listState.status.value === 'loading')
+const listErrorText = listState.errorText
+
+const {
+  workspaceViews,
+  activeViewId,
+  activeViewName,
+  isViewDirty,
+  tablePrefs,
+  orderedColumns,
+  visibleOrderedColumns,
+  visibleRecords,
+  tableRows,
+  tableEmptyText,
+  sortOptions,
+  groupOptions,
+  filterOptions,
+  filterLogicOptions,
+  queryNotices,
+  queryRequestGuard: listRequestGuard,
+  disposeQueryLifecycle,
+  resultScope,
+  activeFilterItems,
+  activeFilterCount,
+  groupCount,
+  sortCount,
+  activeTableSort,
+  updateVisibleColumns,
+  updateColumnOrder,
+  updateFixedColumns,
+  columnWidth,
+  columnFixed,
+  handleHeaderDragEnd,
+  handleTableSortChange,
+  isColumnSortable,
+  updateFilterLogic,
+  updateFilters,
+  updateSortKey,
+  updateSortOrder,
+  updateSorts,
+  updateGroupKey,
+  updateGroups,
+  updateRowDensity,
+  resetTableView,
+  switchTableView,
+  createTableView,
+  renameTableView,
+  duplicateTableView,
+  deleteTableView,
+  saveCurrentView,
+  discardCurrentViewChanges,
+  removeViewFilter
+} = useDhicTableView(workspaceTableOptions(tenantWorkspaceConfig, {
+  records: () => tenants.value,
+  serverTotal: () => tenants.value.length,
+  groupLabel: value => tenantStatusOptions.find(option => option.value === value)?.label || value || '未填写'
+}))
+
+const tenantMetricData = computed(() => buildTenantMetricSnapshot(tenants.value, visibleRecords.value))
 
 const form = reactive({
   id: null,
@@ -339,7 +500,7 @@ const contactForm = reactive({
   name: '',
   phone: '',
   email: '',
-  role: '',
+  role: 'EMPLOYEE',
   isPrimary: false,
   status: 'ACTIVE'
 })
@@ -367,6 +528,10 @@ const contactRules = {
   email: [optionalEmailRule]
 }
 
+const canEditTenant = computed(() => (
+  hasPermission(tenantPermissions.update) && hasPermission(tenantPermissions.create)
+))
+
 function resetForm() {
   Object.assign(form, {
     id: null,
@@ -386,16 +551,48 @@ function resetContactForm() {
     name: '',
     phone: '',
     email: '',
-    role: '',
+    role: 'EMPLOYEE',
     isPrimary: false,
     status: 'ACTIVE'
   })
   contactFormRef.value?.clearValidate()
 }
 
+async function switchTenantView(viewId) {
+  if (viewId === activeViewId.value) return
+  if (isViewDirty.value) {
+    try {
+      await ElMessageBox.confirm('当前视图有未保存的调整，是否保存后切换？', '切换视图', {
+        distinguishCancelAndClose: true,
+        confirmButtonText: '保存并切换',
+        cancelButtonText: '放弃调整'
+      })
+      saveCurrentView()
+    } catch (action) {
+      if (action === 'cancel') discardCurrentViewChanges()
+      else return
+    }
+  }
+  switchTableView(viewId)
+}
+
+function saveTenantView() {
+  saveCurrentView()
+  ElMessage.success(`视图“${activeViewName.value}”已保存`)
+}
+
 async function loadTenants() {
-  const data = await request.get('/tenant/list')
-  tenants.value = readPage(data).records
+  const requestId = listRequestGuard.start()
+  const requestContext = listState.begin({ resource: '/tenant/list' })
+  try {
+    const data = await request.get('/tenant/list', { silent: true })
+    if (!listRequestGuard.isCurrent(requestId) || !listState.isCurrent(requestContext)) return
+    tenants.value = readPage(data).records.map(normalizeTenantWorkspaceRecord)
+    listState.succeed(requestContext)
+  } catch (error) {
+    if (!listRequestGuard.isCurrent(requestId) || !listState.isCurrent(requestContext)) return
+    listState.fail(requestContext, error?.response?.data?.message || '租户列表加载失败，请稍后重试')
+  }
 }
 
 async function loadContacts() {
@@ -420,7 +617,15 @@ function openCreateDialog() {
 
 function openEditDialog(row) {
   resetForm()
-  Object.assign(form, row)
+  Object.assign(form, {
+    id: row.id,
+    tenantName: row.tenantName || row.name || '',
+    contactPerson: row.contactPerson ?? row.contactName ?? '',
+    contactPhone: row.contactPhone ?? row.phone ?? '',
+    contactEmail: row.contactEmail ?? row.email ?? '',
+    businessLicense: row.businessLicense ?? row.creditCode ?? '',
+    status: row.status || 'ACTIVE'
+  })
   dialogVisible.value = true
 }
 
@@ -449,7 +654,7 @@ function editContact(row) {
     name: row.name || '',
     phone: row.phone || '',
     email: row.email || '',
-    role: row.role || '',
+    role: row.role || (row.isPrimary ? 'RESPONSIBLE' : 'EMPLOYEE'),
     isPrimary: Boolean(row.isPrimary),
     status: row.status || 'ACTIVE'
   })
@@ -475,6 +680,17 @@ async function saveTenant() {
   await loadTenants()
   if (overviewVisible.value && form.id) {
     await loadOverview(form.id)
+  }
+}
+
+async function deleteTenant(row) {
+  await ElMessageBox.confirm(`确定删除租户“${row.tenantName || row.name}”吗？`, '删除确认', { type: 'warning' })
+  await request.delete(`/tenants/${row.id}`)
+  ElMessage.success('租户已删除')
+  await loadTenants()
+  if (overviewVisible.value && overview.value?.tenant?.id === row.id) {
+    overviewVisible.value = false
+    overview.value = null
   }
 }
 
@@ -507,11 +723,7 @@ async function saveContact() {
   contactFormVisible.value = false
   await loadContacts()
 
-  if (data?.initialPassword) {
-    showPassword(data.initialPassword)
-  } else {
-    ElMessage.success('联系人已保存')
-  }
+  ElMessage.success(data?.loginHint || '联系人已保存；该手机号可直接通过微信手机号快捷登录。')
   if (overviewVisible.value && currentTenant.value) {
     await loadOverview(currentTenant.value.id)
   }
@@ -527,13 +739,13 @@ async function deactivateContact(row) {
   }
 }
 
-async function resetPassword(row) {
-  await ElMessageBox.confirm(`确定重置联系人「${row.name}」的初始密码吗？`, '重置确认', { type: 'warning' })
-  const data = await request.post(`/tenant/contacts/${row.id}/reset-password`)
+async function deleteContact(row) {
+  if (!currentTenant.value) return
+  const contactName = row.name || row.phone || row.email || row.id
+  await ElMessageBox.confirm(`确定删除联系人「${contactName}」吗？删除后该账号将不能继续用于小程序登录和绑定。`, '删除确认', { type: 'warning' })
+  await request.delete(`/tenant/${currentTenant.value.id}/contacts/${row.id}`)
+  ElMessage.success('联系人已删除')
   await loadContacts()
-  if (data?.initialPassword) {
-    showPassword(data.initialPassword)
-  }
   if (overviewVisible.value && currentTenant.value) {
     await loadOverview(currentTenant.value.id)
   }
@@ -552,15 +764,16 @@ function money(value) {
   })
 }
 
-function showPassword(password) {
-  ElMessageBox.alert(`初始密码：${password}\n请告知租户联系人，该密码只在本次生成时显示。`, '租户联系人初始密码', {
-    confirmButtonText: '我已记录'
-  })
+function tenantRowClassName({ row }) {
+  if (row.__group) return 'view-group-row'
+  if (['INACTIVE', 'DISABLED'].includes(row.status)) return 'row-muted'
+  return ''
 }
 
 onMounted(() => {
   loadTenants()
 })
+onBeforeUnmount(disposeQueryLifecycle)
 </script>
 
 <style scoped>
@@ -568,16 +781,10 @@ onMounted(() => {
   padding: 20px;
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-tip {
-  margin-left: 12px;
-  color: #909399;
-  font-size: 13px;
+.view-hint {
+  color: var(--dhic-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .invalid-contact {

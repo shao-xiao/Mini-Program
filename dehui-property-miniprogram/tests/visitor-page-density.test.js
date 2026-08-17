@@ -35,7 +35,7 @@ test('tenant history is a compact summary panel and hides empty pagination noise
   assert.match(style, /\.tenant-history-item\s*\{[\s\S]*?box-shadow:\s*none/)
 })
 
-test('tenant page removes the redundant title card and retains red primary actions', () => {
+test('tenant page removes the redundant title card and keeps page-specific primary actions', () => {
   const script = read('pages/visitors/index.js')
   const page = read('pages/visitors/index.wxml')
   const style = read('pages/visitors/index.wxss')
@@ -45,6 +45,7 @@ test('tenant page removes the redundant title card and retains red primary actio
   assert.match(script, /profile\.tenantInfo\?\.name/)
   assert.match(page, />提交访客预约<\/button>/)
   assert.match(page, />门禁二维码<\/button>/)
-  assert.match(style, /\.tenant-submit-button/)
-  assert.match(style, /\.qr-button\s*\{[\s\S]*?background:\s*#ed2f2a/)
+  assert.match(style, /--dhic-page-action-primary:\s*var\(--dhic-success\)/)
+  assert.match(style, /\.tenant-submit-button,[\s\S]*?background:\s*var\(--dhic-action-primary\)/)
+  assert.match(style, /\.qr-button\s*\{[\s\S]*?background:\s*var\(--dhic-action-primary\)/)
 })

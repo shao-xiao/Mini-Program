@@ -145,3 +145,8 @@ Expected: PASS.
 - [ ] **Step 3: Review git diff**
 
 Run: `git status --short` and inspect the changed files.
+
+## 2026-07-24 记录更新
+
+- 已修复登录提交适配：dehui-property-admin/src/views/Login.vue 改为提交 JSON Body（username/password），并指定 Content-Type: application/json，避免后端 HttpMessageNotReadableException。
+- 已新增演示数据脚本：dehui-property-management/scripts/seed_demo_building_tenants_energy.sql（1 个楼宇、3 层、3 间房、3 家租户、6 个表具、18 条近三月读数）用于楼宇/租户水电联动演示。

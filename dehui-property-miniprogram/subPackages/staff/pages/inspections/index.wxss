@@ -1,0 +1,15 @@
+page {
+  --dhic-page-action-primary: var(--dhic-tech-600);
+  --dhic-page-action-soft: var(--dhic-tech-soft);
+  --dhic-page-action-rgb: var(--dhic-tech-600-rgb);
+}
+
+.inspection-result--normal {
+  background: var(--dhic-success-soft);
+  color: var(--dhic-success);
+}
+
+.inspection-result--abnormal {
+  background: var(--dhic-danger-soft);
+  color: var(--dhic-danger);
+}

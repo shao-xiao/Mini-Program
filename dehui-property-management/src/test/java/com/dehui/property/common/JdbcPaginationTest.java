@@ -72,4 +72,35 @@ class JdbcPaginationTest {
                 eq(0)
         );
     }
+
+    @Test
+    void recordOnlyOrderingArgumentsNeverLeakIntoTheCountQuery() {
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(Object[].class))).thenReturn(3L);
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+
+        JdbcPagination.query(
+                jdbcTemplate,
+                "SELECT id FROM demo WHERE status = ? ORDER BY (SELECT value_number FROM custom_field_value WHERE field_id = ?) DESC",
+                "SELECT COUNT(*) FROM demo WHERE status = ?",
+                List.of("ACTIVE"),
+                List.of(9L),
+                1,
+                20
+        );
+
+        verify(jdbcTemplate).queryForObject(
+                eq("SELECT COUNT(*) FROM demo WHERE status = ?"),
+                eq(Long.class),
+                eq("ACTIVE")
+        );
+        verify(jdbcTemplate).query(
+                eq("SELECT id FROM demo WHERE status = ? ORDER BY (SELECT value_number FROM custom_field_value WHERE field_id = ?) DESC LIMIT ? OFFSET ?"),
+                any(RowMapper.class),
+                eq("ACTIVE"),
+                eq(9L),
+                eq(20),
+                eq(0)
+        );
+    }
 }

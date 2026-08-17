@@ -5,11 +5,21 @@ import com.dehui.property.common.BusinessException;
 import com.dehui.property.common.JdbcPagination;
 import com.dehui.property.common.JdbcMaps;
 import com.dehui.property.common.PageResponse;
+import com.dehui.property.common.WorkspaceOrderBy;
+import com.dehui.property.modules.customfield.application.CustomFieldProjectionService;
+import com.dehui.property.modules.customfield.application.CustomFieldQueryCompiler.CompiledQuery;
+import com.dehui.property.modules.customfield.application.CustomFieldQueryCompiler.NativeOrderPolicy;
+import com.dehui.property.modules.customfield.application.CustomFieldQueryService;
+import com.dehui.property.modules.lease.application.LeaseApplicationService;
+import com.dehui.property.modules.lease.dto.LeaseResponse;
+import com.dehui.property.security.AuthInterceptor;
+import com.dehui.property.security.AuthPrincipal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,11 +28,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequiredArgsConstructor
 public class BuildingController {
 
     public static final String BUILDING_LIST_SQL = """
@@ -57,7 +67,43 @@ public class BuildingController {
             WHERE id = ? AND deleted = 0
             """;
 
+    private static final Map<String, String> ROOM_ORDERABLE_FIELDS = Map.ofEntries(
+            Map.entry("roomCode", "r.code"),
+            Map.entry("buildingName", "b.name"),
+            Map.entry("floorName", "f.name"),
+            Map.entry("roomNumber", "r.room_no"),
+            Map.entry("roomName", "r.room_no"),
+            Map.entry("area", "r.area"),
+            Map.entry("propertyFeeArea", "r.property_fee_area"),
+            Map.entry("roomType", "r.usage_type"),
+            Map.entry("status", "r.rent_status")
+    );
+
     private final JdbcTemplate jdbcTemplate;
+    private final LeaseApplicationService leaseService;
+    private final CustomFieldQueryService customFieldQueryService;
+    private final CustomFieldProjectionService customFieldProjectionService;
+
+    public BuildingController(JdbcTemplate jdbcTemplate) {
+        this(jdbcTemplate, null, null, null);
+    }
+
+    public BuildingController(JdbcTemplate jdbcTemplate, LeaseApplicationService leaseService) {
+        this(jdbcTemplate, leaseService, null, null);
+    }
+
+    @Autowired
+    public BuildingController(
+            JdbcTemplate jdbcTemplate,
+            LeaseApplicationService leaseService,
+            CustomFieldQueryService customFieldQueryService,
+            CustomFieldProjectionService customFieldProjectionService
+    ) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.leaseService = leaseService;
+        this.customFieldQueryService = customFieldQueryService;
+        this.customFieldProjectionService = customFieldProjectionService;
+    }
 
     @GetMapping("/buildings")
     public ApiResponse<List<Map<String, Object>>> buildings() {
@@ -122,6 +168,7 @@ public class BuildingController {
                        building_id AS buildingId,
                        floor_no AS floorNumber,
                        name AS floorName,
+                       total_area AS totalArea,
                        status,
                        remark AS description
                 FROM building_floor
@@ -136,6 +183,11 @@ public class BuildingController {
         ));
     }
 
+    @GetMapping("/buildings/{buildingId}/floors")
+    public ApiResponse<List<Map<String, Object>>> buildingFloors(@PathVariable Long buildingId) {
+        return floors(buildingId);
+    }
+
     @PostMapping("/floors")
     public ApiResponse<Void> createFloor(@RequestBody Map<String, Object> body) {
         Long buildingId = JdbcMaps.requiredLong(body, "Building is required", "buildingId", "building_id");
@@ -147,13 +199,14 @@ public class BuildingController {
         try {
             jdbcTemplate.update(
                     """
-                    INSERT INTO building_floor (code, building_id, floor_no, name, status, created_by, updated_by, remark)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO building_floor (code, building_id, floor_no, name, total_area, status, created_by, updated_by, remark)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     JdbcMaps.code("FLR"),
                     buildingId,
                     floorNo,
                     name,
+                    JdbcMaps.decimal(body, java.math.BigDecimal.ZERO, "totalArea", "total_area"),
                     JdbcMaps.strOr(body, "ACTIVE", "status"),
                     0L,
                     0L,
@@ -175,12 +228,13 @@ public class BuildingController {
         int updated = jdbcTemplate.update(
                 """
                 UPDATE building_floor
-                SET building_id = ?, floor_no = ?, name = ?, status = ?, updated_by = ?, remark = ?
+                SET building_id = ?, floor_no = ?, name = ?, total_area = ?, status = ?, updated_by = ?, remark = ?
                 WHERE id = ? AND deleted = 0
                 """,
                 buildingId,
                 floorNo,
                 JdbcMaps.strOr(body, floorNo + "F", "floorName", "name"),
+                JdbcMaps.decimal(body, java.math.BigDecimal.ZERO, "totalArea", "total_area"),
                 JdbcMaps.strOr(body, "ACTIVE", "status"),
                 0L,
                 JdbcMaps.str(body, "description", "remark"),
@@ -226,6 +280,9 @@ public class BuildingController {
             @RequestParam(name = "building_id", required = false) Long buildingId,
             @RequestParam(name = "floor_id", required = false) Long floorId,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String customFilters,
+            @RequestParam(required = false) String sorts,
+            @RequestParam(required = false) String groupBy,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer pageSize) {
         StringBuilder sql = new StringBuilder("""
@@ -238,12 +295,64 @@ public class BuildingController {
                        r.room_no AS roomNumber,
                        r.room_no AS roomName,
                        r.area,
+                       r.property_fee_area AS propertyFeeArea,
                        r.usage_type AS roomType,
                        r.rent_status AS status,
+                       COALESCE(contract_stage.contract_stage, 'NONE') AS contractStage,
                        r.remark AS description
                 FROM building_room r
                 LEFT JOIN building b ON b.id = r.building_id
                 LEFT JOIN building_floor f ON f.id = r.floor_id
+                LEFT JOIN (
+                    SELECT contract_link.room_id,
+                           CASE
+                               WHEN MAX(CASE
+                                   WHEN contract_link.status = 'ACTIVE'
+                                    AND CURRENT_DATE BETWEEN COALESCE(contract_link.effective_date, contract_link.start_date)
+                                                             AND contract_link.end_date
+                                   THEN 1 ELSE 0
+                               END) = 1 THEN 'ACTIVE_CURRENT'
+                               WHEN MAX(CASE
+                                   WHEN contract_link.status = 'ACTIVE'
+                                    AND CURRENT_DATE < COALESCE(contract_link.effective_date, contract_link.start_date)
+                                   THEN 1 ELSE 0
+                               END) = 1 THEN 'ACTIVE_FUTURE'
+                               WHEN MAX(CASE WHEN contract_link.status = 'SUSPENDED' THEN 1 ELSE 0 END) = 1
+                                   THEN 'SUSPENDED'
+                               WHEN MAX(CASE
+                                   WHEN contract_link.status IN ('PENDING_APPROVAL', 'PENDING') THEN 1 ELSE 0
+                               END) = 1 THEN 'PENDING_APPROVAL'
+                               WHEN MAX(CASE WHEN contract_link.status = 'DRAFT' THEN 1 ELSE 0 END) = 1
+                                   THEN 'DRAFT'
+                               ELSE 'NONE'
+                           END AS contract_stage
+                    FROM (
+                        SELECT cr.room_id,
+                               c.status,
+                               c.start_date,
+                               c.end_date,
+                               c.effective_date
+                        FROM contract_room cr
+                        JOIN contract c ON c.id = cr.contract_id AND c.deleted = 0
+                        WHERE cr.deleted = 0
+
+                        UNION ALL
+
+                        SELECT c.room_id,
+                               c.status,
+                               c.start_date,
+                               c.end_date,
+                               c.effective_date
+                        FROM contract c
+                        LEFT JOIN contract_room cr
+                          ON cr.contract_id = c.id
+                         AND cr.deleted = 0
+                        WHERE c.deleted = 0
+                          AND c.room_id IS NOT NULL
+                          AND cr.id IS NULL
+                    ) contract_link
+                    GROUP BY contract_link.room_id
+                ) contract_stage ON contract_stage.room_id = r.id
                 WHERE r.deleted = 0
                 """);
         StringBuilder countSql = new StringBuilder("""
@@ -267,8 +376,88 @@ public class BuildingController {
             countSql.append(" AND r.rent_status = ?");
             args.add(status);
         }
-        sql.append(" ORDER BY r.room_no ASC, r.id ASC");
-        return ApiResponse.success(JdbcPagination.query(jdbcTemplate, sql.toString(), countSql.toString(), args, page, pageSize));
+        CompiledQuery customQuery = compileRoomCustomQuery(customFilters, groupBy, sorts);
+        if (customQuery != null && customQuery.hasPredicates()) {
+            sql.append(" AND ").append(customQuery.predicateSql());
+            countSql.append(" AND ").append(customQuery.predicateSql());
+            args.addAll(customQuery.predicateArguments());
+        }
+        if (customQuery != null && customQuery.hasOrderings()) {
+            sql.append(" ORDER BY ").append(String.join(", ", customQuery.orderExpressions()));
+        } else if ((sorts == null || sorts.isBlank()) && (groupBy == null || groupBy.isBlank())) {
+            sql.append(" ORDER BY r.room_no ASC, r.id ASC");
+        } else {
+            sql.append(" ORDER BY ").append(WorkspaceOrderBy.build(
+                    ROOM_ORDERABLE_FIELDS,
+                    groupBy,
+                    sorts,
+                    null,
+                    null,
+                    "r.room_no",
+                    "r.id"
+            ));
+        }
+        PageResponse<Map<String, Object>> result = JdbcPagination.query(
+                jdbcTemplate,
+                sql.toString(),
+                countSql.toString(),
+                args,
+                customQuery == null ? List.of() : customQuery.orderArguments(),
+                page,
+                pageSize
+        );
+        if (customFieldProjectionService != null) {
+            result = customFieldProjectionService.attach("rooms", result);
+        }
+        return ApiResponse.success(result);
+    }
+
+    public ApiResponse<PageResponse<Map<String, Object>>> rooms(
+            Long buildingId,
+            Long floorId,
+            String status,
+            String sorts,
+            String groupBy,
+            Integer page,
+            Integer pageSize) {
+        return rooms(buildingId, floorId, status, null, sorts, groupBy, page, pageSize);
+    }
+
+    public ApiResponse<PageResponse<Map<String, Object>>> rooms(
+            Long buildingId,
+            Long floorId,
+            String status,
+            Integer page,
+            Integer pageSize) {
+        return rooms(buildingId, floorId, status, null, null, null, page, pageSize);
+    }
+
+    private CompiledQuery compileRoomCustomQuery(String customFilters, String groupBy, String sorts) {
+        if (customFieldQueryService == null) return null;
+        boolean hasOrdering = (sorts != null && !sorts.isBlank()) || (groupBy != null && !groupBy.isBlank());
+        NativeOrderPolicy orderPolicy = new NativeOrderPolicy(
+                ROOM_ORDERABLE_FIELDS,
+                null,
+                null,
+                "r.room_no",
+                "ASC",
+                "r.id",
+                hasOrdering ? "DESC" : "ASC"
+        );
+        return customFieldQueryService.compile(
+                "rooms",
+                customFilters,
+                groupBy,
+                sorts,
+                orderPolicy
+        );
+    }
+
+    @GetMapping("/buildings/{buildingId}/floors/{floorId}/rooms")
+    public ApiResponse<List<Map<String, Object>>> buildingFloorRooms(
+            @PathVariable Long buildingId,
+            @PathVariable Long floorId) {
+        return ApiResponse.success(queryRoomList(buildingId, floorId));
     }
 
     @PostMapping("/rooms")
@@ -291,6 +480,22 @@ public class BuildingController {
     }
 
     @PostMapping("/rooms/{id}/lease")
+    public ApiResponse<LeaseResponse> leaseRoomV2(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body,
+            @RequestAttribute(AuthInterceptor.PRINCIPAL_ATTRIBUTE) AuthPrincipal principal
+    ) {
+        return ApiResponse.success(leaseService.legacyCheckInByRoom(
+                id,
+                JdbcMaps.longVal(body, "contractId", "contract_id"),
+                JdbcMaps.str(body, "leaseNo", "lease_no"),
+                optionalDate(body, "plannedStartDate", "startDate"),
+                optionalDate(body, "plannedEndDate", "endDate"),
+                JdbcMaps.str(body, "reason", "remark"),
+                principal.userId()
+        ));
+    }
+
     public ApiResponse<Void> leaseRoom(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         int updated = jdbcTemplate.update(
                 "UPDATE building_room SET rent_status = 'RENTED', updated_by = ?, remark = COALESCE(?, remark) WHERE id = ? AND deleted = 0",
@@ -303,10 +508,25 @@ public class BuildingController {
     }
 
     @PostMapping("/rooms/{id}/checkout")
+    public ApiResponse<LeaseResponse> checkoutRoomV2(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body,
+            @RequestAttribute(AuthInterceptor.PRINCIPAL_ATTRIBUTE) AuthPrincipal principal
+    ) {
+        return ApiResponse.success(leaseService.legacyCheckOutByRoom(
+                id, JdbcMaps.str(body, "reason", "remark"), principal.userId()
+        ));
+    }
+
     public ApiResponse<Void> checkoutRoom(@PathVariable Long id) {
         int updated = jdbcTemplate.update("UPDATE building_room SET rent_status = 'VACANT', updated_by = ? WHERE id = ? AND deleted = 0", 0L, id);
         ensureUpdated(updated, "Room not found");
         return ApiResponse.success();
+    }
+
+    private LocalDate optionalDate(Map<String, Object> body, String... keys) {
+        String value = JdbcMaps.str(body, keys);
+        return value == null ? null : LocalDate.parse(value.substring(0, Math.min(value.length(), 10)));
     }
 
     @GetMapping("/mobile/building/summary")
@@ -318,23 +538,28 @@ public class BuildingController {
         Long buildingId = JdbcMaps.requiredLong(body, "Building is required", "buildingId", "building_id");
         Long floorId = JdbcMaps.requiredLong(body, "Floor is required", "floorId", "floor_id");
         String roomNo = JdbcMaps.requiredStr(body, "Room number is required", "roomNumber", "roomNo", "room_no");
-        String rentStatus = JdbcMaps.strOr(body, "VACANT", "status", "rentStatus");
-        if ("AVAILABLE".equals(rentStatus)) {
-            rentStatus = "VACANT";
+        requireFloorInBuilding(buildingId, floorId);
+        java.math.BigDecimal area = JdbcMaps.decimal(body, java.math.BigDecimal.ZERO, "area");
+        java.math.BigDecimal propertyFeeArea = JdbcMaps.decimal(body, area, "propertyFeeArea", "property_fee_area");
+        if (area.signum() < 0 || propertyFeeArea.signum() < 0) {
+            throw new BusinessException(400, "Room area cannot be negative");
         }
         if (id == null) {
             jdbcTemplate.update(
                     """
-                    INSERT INTO building_room (code, building_id, floor_id, room_no, area, usage_type, rent_status, status, created_by, updated_by, remark)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO building_room (
+                        code, building_id, floor_id, room_no, area, property_fee_area,
+                        usage_type, rent_status, status, created_by, updated_by, remark
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'VACANT', ?, ?, ?, ?)
                     """,
                     JdbcMaps.code("ROM"),
                     buildingId,
                     floorId,
                     roomNo,
-                    JdbcMaps.decimal(body, java.math.BigDecimal.ZERO, "area"),
+                    area,
+                    propertyFeeArea,
                     JdbcMaps.strOr(body, "OFFICE", "roomType", "usageType"),
-                    rentStatus,
                     "ACTIVE",
                     0L,
                     0L,
@@ -345,20 +570,75 @@ public class BuildingController {
         int updated = jdbcTemplate.update(
                 """
                 UPDATE building_room
-                SET building_id = ?, floor_id = ?, room_no = ?, area = ?, usage_type = ?, rent_status = ?, updated_by = ?, remark = ?
+                SET building_id = ?,
+                    floor_id = ?,
+                    room_no = ?,
+                    area = ?,
+                    property_fee_area = ?,
+                    usage_type = ?,
+                    updated_by = ?,
+                    remark = ?
                 WHERE id = ? AND deleted = 0
                 """,
                 buildingId,
                 floorId,
                 roomNo,
-                JdbcMaps.decimal(body, java.math.BigDecimal.ZERO, "area"),
+                area,
+                propertyFeeArea,
                 JdbcMaps.strOr(body, "OFFICE", "roomType", "usageType"),
-                rentStatus,
                 0L,
                 JdbcMaps.str(body, "description", "remark", "roomName"),
                 id
         );
         ensureUpdated(updated, "Room not found");
+    }
+
+    private List<Map<String, Object>> queryRoomList(Long buildingId, Long floorId) {
+        return jdbcTemplate.queryForList(
+                """
+                SELECT r.id,
+                       r.code AS roomCode,
+                       r.building_id AS buildingId,
+                       b.name AS buildingName,
+                       r.floor_id AS floorId,
+                       f.name AS floorName,
+                       r.room_no AS roomNumber,
+                       r.room_no AS roomName,
+                       r.area,
+                       r.property_fee_area AS propertyFeeArea,
+                       r.usage_type AS roomType,
+                       r.rent_status AS status,
+                       r.remark AS description
+                FROM building_room r
+                LEFT JOIN building b ON b.id = r.building_id
+                LEFT JOIN building_floor f ON f.id = r.floor_id
+                WHERE r.deleted = 0
+                  AND r.building_id = ?
+                  AND r.floor_id = ?
+                ORDER BY r.room_no ASC, r.id ASC
+                """,
+                buildingId,
+                floorId
+        );
+    }
+
+    private void requireFloorInBuilding(Long buildingId, Long floorId) {
+        Long count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM building_floor
+                WHERE id = ?
+                  AND building_id = ?
+                  AND deleted = 0
+                  AND status IN ('ACTIVE', 'ENABLED')
+                """,
+                Long.class,
+                floorId,
+                buildingId
+        );
+        if (count == null || count == 0) {
+            throw new BusinessException(400, "Floor does not belong to the selected building or is disabled");
+        }
     }
 
     private void insertFloorIfAbsent(Long buildingId, int floorNo, String name) {

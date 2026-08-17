@@ -1,0 +1,97 @@
+<view class="page parking-page">
+  <view class="section">
+    <data-source-panel
+      title="{{scope === 'company' ? '企业车位资产' : '个人车位绑定'}}"
+      description="{{scope === 'company' ? '汇总当前企业有效车位、固定分配与空余活动车位' : '展示当前联系人名下有效车位与车辆绑定信息'}}"
+      source="{{scope === 'company' ? '资产中心 · 企业车位分配' : '资产中心 · 联系人绑定'}}"
+      scope="{{scope === 'company' ? '当前企业' : '当前账号'}}"
+      status="服务端同步"
+      tone="secure"
+    />
+  </view>
+
+  <view
+    wx:if="{{scope === 'company' && state !== 'unauthorized' && state !== 'error'}}"
+    class="card section parking-summary-card"
+  >
+    <view class="parking-summary-heading">
+      <view>
+        <view class="parking-summary-kicker">PARKING ASSET</view>
+        <view class="parking-summary-title">车位资产概览</view>
+      </view>
+      <view class="parking-summary-source">来源 · 后端企业范围汇总</view>
+    </view>
+    <view class="parking-summary">
+      <view class="parking-metric">
+        <view class="parking-metric-value">{{summary.totalCount}}</view>
+        <view class="parking-metric-label">公司车位总数</view>
+      </view>
+      <view class="parking-metric">
+        <view class="parking-metric-value">{{summary.fixedCount}}</view>
+        <view class="parking-metric-label">固定车位数量</view>
+      </view>
+      <view class="parking-metric">
+        <view class="parking-metric-value parking-metric-value--available">{{summary.unboundCount}}</view>
+        <view class="parking-metric-label">空余活动车位</view>
+      </view>
+    </view>
+    <view class="summary-hint">
+      空余活动车位为尚未绑定具体使用人的公司车位
+    </view>
+  </view>
+
+  <view wx:if="{{state === 'loading'}}" class="card muted">正在加载停车数据...</view>
+  <view wx:elif="{{state === 'unauthorized' || state === 'error'}}" class="card section">
+    <view class="empty-title">{{state === 'unauthorized' ? '当前身份不可查看' : '加载失败'}}</view>
+    <view class="empty-desc">{{message}}</view>
+    <button class="button-primary retry-button" bindtap="load">重新加载</button>
+  </view>
+  <view wx:elif="{{rows.length === 0}}" class="card muted">暂无有效车位绑定</view>
+  <view wx:else class="section">
+    <view class="parking-list-heading">
+      <view>
+        <view class="parking-list-kicker">ASSIGNMENT RECORD</view>
+        <view class="parking-list-title">{{scope === 'company' ? '企业分配记录' : '我的绑定记录'}}</view>
+      </view>
+      <view class="parking-list-count">{{total}} 条</view>
+    </view>
+    <view wx:for="{{rows}}" wx:key="assignmentId" class="parking-card" data-id="{{item.id || item.assignmentId}}" bindtap="openDetail">
+      <view class="parking-source-row">
+        <view class="parking-source-dot"></view>
+        <text>来源 · 车位分配记录</text>
+        <text class="parking-record-id">ID {{item.assignmentId || item.id}}</text>
+      </view>
+      <view class="parking-head">
+        <view class="space-no">{{item.spaceNo}}</view>
+        <view class="plate {{item.plateNumber ? 'plate-bound' : 'plate-unbound'}}">{{item.plateNumber || '未绑定车牌'}}</view>
+      </view>
+      <view class="parking-info-grid">
+        <view class="parking-info-item">
+          <text class="parking-info-label">区域 / 楼层</text>
+          <text class="parking-info-value">{{item.area || '-'}} · {{item.floor || '-'}}</text>
+        </view>
+        <view class="parking-info-item">
+          <text class="parking-info-label">车位类型</text>
+          <text class="parking-info-value">{{item.spaceType || '-'}}</text>
+        </view>
+        <view class="parking-info-item">
+          <text class="parking-info-label">使用人</text>
+          <text class="parking-info-value">{{item.contactName || '暂未绑定'}}</text>
+        </view>
+        <view class="parking-info-item">
+          <text class="parking-info-label">车辆类型</text>
+          <text class="parking-info-value">{{item.vehicleType || '-'}}</text>
+        </view>
+      </view>
+      <view class="parking-period">
+        <text class="parking-period-label">有效期</text>
+        <text class="parking-period-value">{{item.periodText}}</text>
+      </view>
+      <view class="parking-price">
+        <text>月度计费快照</text>
+        <text class="parking-price-value">¥{{item.priceText}} / 月</text>
+      </view>
+    </view>
+    <view class="more">{{loadingMore ? '加载中…' : (noMore && total > 0 ? '没有更多数据' : '上拉加载更多')}}</view>
+  </view>
+</view>

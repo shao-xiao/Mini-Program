@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "新增巡检",
+  "usingComponents": {
+    "dynamic-form": "/components/dynamic-form/index"
+  }
+}

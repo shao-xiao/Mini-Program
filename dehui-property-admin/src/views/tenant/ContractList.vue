@@ -1,83 +1,132 @@
 <template>
   <div class="page-container">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>合同管理</span>
-          <div class="header-actions">
-            <el-button @click="generateBills">生成到期账单</el-button>
-            <el-button type="primary" @click="openCreateDialog">新增合同</el-button>
-          </div>
+    <DataWorkspace
+      :workspace-config="contractWorkspaceConfig"
+      :views="workspaceViews"
+      :active-view-id="activeViewId"
+      :view-dirty="isViewDirty"
+      :filter-logic="tablePrefs.filterLogic"
+      :filter-logic-visible="tablePrefs.filters.length > 1"
+      :filter-items="activeFilterItems"
+      :query-notices="queryNotices"
+      :metric-data="contractMetricData"
+      @change-view="switchContractView"
+      @create-view="createTableView"
+      @duplicate-view="duplicateTableView"
+      @rename-view="renameTableView"
+      @delete-view="deleteTableView"
+      @save-view="saveContractView"
+      @remove-filter="removeViewFilter"
+    >
+      <template #header-actions>
+        <div class="header-actions">
+          <el-button
+            v-if="hasPermission(contractPermissions.create)"
+            type="primary"
+            :icon="Plus"
+            @click="openCreateDialog"
+          >
+            {{ contractWorkspaceConfig.primaryAction.label }}
+          </el-button>
         </div>
       </template>
 
-      <el-table :data="contracts" border stripe class="contract-table" row-key="id" style="width: 100%">
-        <el-table-column label="合同信息" min-width="185">
-          <template #default="{ row }">
-            <div class="primary-text">{{ row.contractNumber || row.code || '-' }}</div>
-            <div class="secondary-text">{{ row.contractName || '未填写合同名称' }}</div>
+      <template #toolbar>
+        <DhicDataToolbar
+          :workspace-config="contractWorkspaceConfig"
+          allow-column-layout
+          field-config-saveable
+          :view-name="activeViewName"
+          :field-config-dirty="isViewDirty"
+          :columns="orderedColumns"
+          :visible-columns="tablePrefs.visibleColumns"
+          :column-order="tablePrefs.columnOrder"
+          :fixed-columns="tablePrefs.fixedColumns"
+          :filter-options="filterOptions"
+          :filters="tablePrefs.filters"
+          :filter-logic="tablePrefs.filterLogic"
+          :filter-logics="filterLogicOptions"
+          :sort-options="sortOptions"
+          :sorts="tablePrefs.sorts"
+          :sort-key="tablePrefs.sortKey"
+          :sort-order="tablePrefs.sortOrder"
+          :sort-count="sortCount"
+          :group-options="groupOptions"
+          :groups="tablePrefs.groups"
+          :group-key="tablePrefs.groupKey"
+          :group-count="groupCount"
+          :row-density="tablePrefs.rowDensity"
+          :active-filter-count="activeFilterCount"
+          :filter-items="activeFilterItems"
+          @update:visible-columns="updateVisibleColumns"
+          @update:column-order="updateColumnOrder"
+          @update:fixed-columns="updateFixedColumns"
+          @update:filters="updateFilters"
+          @update:filter-logic="updateFilterLogic"
+          @update:sort-key="updateSortKey"
+          @update:sort-order="updateSortOrder"
+          @update:sorts="updateSorts"
+          @update:group-key="updateGroupKey"
+          @update:groups="updateGroups"
+          @update:row-density="updateRowDensity"
+          @reset-view="resetTableView"
+          @save-field-config="saveContractView"
+        >
+          <template #right>
+            <span class="view-hint">
+              全部已加载 {{ resultScope.loadedRecords }} 份，当前视图 {{ resultScope.visibleRecords }} 份
+            </span>
           </template>
-        </el-table-column>
+        </DhicDataToolbar>
+      </template>
 
-        <el-table-column label="租户 / 房间" min-width="185">
-          <template #default="{ row }">
-            <div class="primary-text">{{ row.tenantName || tenantDisplayName(row.tenantId) }}</div>
-            <div class="secondary-text">{{ row.roomName || roomDisplayName(row.roomId) }}</div>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="联系方式" min-width="190">
-          <template #default="{ row }">
-            <div class="primary-text">{{ row.contactPerson || '-' }}</div>
-            <div class="secondary-text" :class="{ 'invalid-contact': row.contactPhone && !isValidContactPhone(row.contactPhone) }">
-              {{ contactText(row.contactPhone, 'phone') }}
-            </div>
-            <div class="secondary-text" :class="{ 'invalid-contact': row.contactEmail && !isValidEmail(row.contactEmail) }">
-              {{ contactText(row.contactEmail, 'email') }}
-            </div>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="合同周期" width="145">
-          <template #default="{ row }">
-            <div class="primary-text">{{ row.startDate || '-' }}</div>
-            <div class="secondary-text">至 {{ row.endDate || '长期' }}</div>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="费用" min-width="150">
-          <template #default="{ row }">
-            <div class="money-line">
-              <span>月租</span>
-              <strong>{{ formatMoney(row.rentAmount) }}</strong>
-            </div>
-            <div class="money-line muted-line">
-              <span>押金</span>
-              <strong>{{ formatMoney(row.depositAmount) }}</strong>
-            </div>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="状态" width="105" align="center">
-          <template #default="{ row }">
-            <el-tag :type="contractStatusTag(row.status)" effect="plain">{{ contractStatusText(row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="操作" width="290" align="center" fixed="right">
-          <template #default="{ row }">
+      <template #grid>
+        <WorkspaceDataGrid
+          :loading="loading"
+          :error-text="listErrorText"
+          retryable
+          :rows="tableRows"
+          :columns="visibleOrderedColumns"
+          row-key="id"
+          :index-width="72"
+          :density="tablePrefs.rowDensity"
+          :empty-text="tableEmptyText"
+          :sort-state="activeTableSort"
+          :data-mode="contractWorkspaceConfig.query.dataMode"
+          :column-width="columnWidth"
+          :column-fixed="columnFixed"
+          :is-column-sortable="isColumnSortable"
+          :show-overflow-tooltip="column => ['tenantName', 'roomSummary'].includes(column.key)"
+          :operation-column="{ width: 390, fixed: 'right', align: 'center' }"
+          @column-resize="handleHeaderDragEnd"
+          @sort-change="handleTableSortChange"
+          @retry="loadContracts"
+          aria-label="合同管理数据表格"
+        >
+          <template #operations="{ row }">
             <div class="action-buttons">
-              <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
-              <el-button size="small" :disabled="!['DRAFT', 'PENDING'].includes(row.status)" @click="activate(row)">生效</el-button>
-              <el-button size="small" :disabled="row.status !== 'ACTIVE'" @click="checkIn(row)">入驻</el-button>
-              <el-button size="small" :disabled="!['TERMINATED', 'CANCELLED'].includes(row.status)" @click="reactivate(row)">恢复</el-button>
-              <el-button size="small" type="danger" :disabled="row.status !== 'ACTIVE'" @click="terminate(row)">终止</el-button>
-              <el-button size="small" :disabled="!['DRAFT', 'PENDING'].includes(row.status)" @click="cancelContract(row)">作废</el-button>
+              <el-button v-if="hasPermission('contract:update')" size="small" @click="openEditDialog(row)">编辑</el-button>
+              <el-button v-if="hasPermission('contract:update')" size="small" type="primary" plain @click="selectContractFile(row)">上传电子合同</el-button>
+              <el-button size="small" :disabled="!hasContractFile(row)" @click="previewElectronicContract(row)">查看电子合同</el-button>
+              <el-button v-if="hasPermission('contract:update')" size="small" :disabled="row.status !== 'DRAFT'" @click="submitContract(row)">提交审批</el-button>
+              <el-button v-if="hasPermission('contract:approve')" size="small" type="primary" plain :disabled="!['PENDING', 'PENDING_APPROVAL'].includes(row.status)" @click="approveContract(row)">审批通过</el-button>
+              <el-button v-if="hasPermission('contract:activate')" size="small" :disabled="row.status !== 'SUSPENDED'" @click="activate(row)">恢复生效</el-button>
+              <el-button v-if="hasPermission('lease:checkin')" size="small" :disabled="row.status !== 'ACTIVE'" @click="checkIn(row)">入驻</el-button>
+              <el-button v-if="hasPermission('contract:terminate')" size="small" type="danger" :disabled="!['ACTIVE', 'SUSPENDED'].includes(row.status)" @click="terminate(row)">终止</el-button>
+              <el-button v-if="hasPermission('contract:cancel')" size="small" :disabled="!['DRAFT', 'PENDING', 'PENDING_APPROVAL'].includes(row.status)" @click="cancelContract(row)">作废</el-button>
             </div>
           </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+        </WorkspaceDataGrid>
+      </template>
+    </DataWorkspace>
+
+    <input
+      ref="contractFileInputRef"
+      type="file"
+      accept="application/pdf"
+      class="hidden-file-input"
+      @change="handleContractFileChange"
+    />
 
     <el-dialog v-model="dialogVisible" :title="form.id ? '编辑合同' : '新增合同'" width="760px" class="contract-dialog">
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
@@ -87,44 +136,89 @@
             <el-input v-model="form.contractNumber" placeholder="不填则由后端自动生成" />
           </el-form-item>
 
-          <el-form-item label="合同名称" prop="contractName">
-            <el-input v-model="form.contractName" />
-          </el-form-item>
         </div>
 
         <div class="form-section-title">租户信息</div>
         <div class="form-grid">
-          <el-form-item label="租户名称" prop="tenantName">
-            <el-input v-model="form.tenantName" placeholder="可直接录入新租户名称" />
+          <el-form-item label="租户" prop="tenantId">
+            <el-select
+              v-model="form.tenantId"
+              filterable
+              style="width:100%"
+              placeholder="请选择已建档租户"
+              @change="handleTenantChange"
+            >
+              <el-option
+                v-for="tenant in tenants"
+                :key="tenant.id"
+                :label="tenant.tenantName || tenant.name || `租户 #${tenant.id}`"
+                :value="tenant.id"
+              />
+            </el-select>
+            <div class="form-tip">新租户请先在“租户管理”完成建档，合同只保存租户关联。</div>
           </el-form-item>
 
           <el-form-item label="联系人" prop="contactPerson">
-            <el-input v-model="form.contactPerson" />
+            <el-input v-model="form.contactPerson" disabled />
           </el-form-item>
 
           <el-form-item label="联系电话" prop="contactPhone">
-            <el-input v-model="form.contactPhone" placeholder="例如 13800000000 或 021-88888888" />
+            <el-input v-model="form.contactPhone" disabled />
           </el-form-item>
 
           <el-form-item label="邮箱" prop="contactEmail">
-            <el-input v-model="form.contactEmail" placeholder="例如 name@example.com" />
+            <el-input v-model="form.contactEmail" disabled />
           </el-form-item>
         </div>
 
         <div class="form-section-title">房间与周期</div>
-        <div class="form-grid">
-          <el-form-item label="楼层" prop="floorId">
-            <el-select v-model="form.floorId" filterable placeholder="请选择楼层" style="width:100%" @change="handleFloorChange">
-              <el-option v-for="floor in floors" :key="floor.id" :label="floorLabel(floor)" :value="floor.id" />
+        <div class="form-grid location-grid">
+          <el-form-item label="楼宇" prop="buildingIds">
+            <el-select
+              v-model="form.buildingIds"
+              multiple
+              filterable
+              collapse-tags
+              collapse-tags-tooltip
+              placeholder="请选择楼宇"
+              style="width:100%"
+              @change="handleBuildingIdsChange"
+            >
+              <el-option v-for="building in buildings" :key="building.id" :label="buildingLabel(building)" :value="building.id" />
             </el-select>
           </el-form-item>
 
-          <el-form-item label="房间" prop="roomId">
-            <el-select v-model="form.roomId" filterable placeholder="请选择房间" style="width:100%">
+          <el-form-item label="楼层" prop="floorIds">
+            <el-select
+              v-model="form.floorIds"
+              multiple
+              filterable
+              collapse-tags
+              collapse-tags-tooltip
+              placeholder="请选择楼层"
+              style="width:100%"
+              @change="handleFloorIdsChange"
+            >
+              <el-option v-for="floor in availableFloors" :key="floor.id" :label="floorLabel(floor)" :value="floor.id" />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="房间" prop="roomIds">
+            <el-select
+              v-model="form.roomIds"
+              multiple
+              filterable
+              collapse-tags
+              collapse-tags-tooltip
+              placeholder="请选择房间"
+              style="width:100%"
+            >
               <el-option v-for="room in availableRooms" :key="room.id" :label="roomLabel(room)" :value="room.id" />
             </el-select>
           </el-form-item>
+        </div>
 
+        <div class="form-grid period-grid">
           <el-form-item label="开始日期" prop="startDate">
             <el-date-picker v-model="form.startDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
           </el-form-item>
@@ -134,149 +228,234 @@
           </el-form-item>
         </div>
 
-        <div class="form-section-title">费用与收款</div>
-        <div class="form-grid">
+        <div class="form-section-title">合同金额</div>
+        <div class="form-grid fee-grid">
           <el-form-item label="月租金额" prop="rentAmount">
             <el-input-number v-model="form.rentAmount" :min="0" :precision="2" style="width:100%" />
-          </el-form-item>
-
-          <el-form-item label="月物业费" prop="propertyFeeAmount">
-            <el-input-number v-model="form.propertyFeeAmount" :min="0" :precision="2" style="width:100%" />
           </el-form-item>
 
           <el-form-item label="押金" prop="depositAmount">
             <el-input-number v-model="form.depositAmount" :min="0" :precision="2" style="width:100%" />
           </el-form-item>
 
-          <el-form-item label="付款方式" prop="paymentCycle">
-            <el-select v-model="form.paymentCycle" style="width:100%">
-              <el-option label="全款" value="FULL" />
-              <el-option label="月付" value="MONTHLY" />
-              <el-option label="季付" value="QUARTERLY" />
-              <el-option label="半年付" value="SEMI_ANNUAL" />
-              <el-option label="年付" value="YEARLY" />
-            </el-select>
-          </el-form-item>
-
-          <el-form-item label="提前出账天数" prop="billingLeadDays">
-            <el-input-number v-model="form.billingLeadDays" :min="0" :max="60" style="width:100%" />
-            <div class="form-tip">例如填 7，表示每个账期开始前 7 天自动生成下一期账单。</div>
-          </el-form-item>
-
-          <el-form-item label="合同状态" prop="status">
-            <el-select v-model="form.status" style="width:100%">
-              <el-option label="草稿" value="DRAFT" />
-              <el-option label="待生效" value="PENDING" />
-              <el-option label="履约中" value="ACTIVE" />
-              <el-option label="已终止" value="TERMINATED" />
-              <el-option label="已作废" value="CANCELLED" />
-            </el-select>
-          </el-form-item>
         </div>
 
-        <el-form-item label="备注" prop="remark">
+        <el-form-item label="备注" prop="remark" class="remark-item">
           <el-input v-model="form.remark" type="textarea" :rows="3" />
         </el-form-item>
       </el-form>
 
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveContract">保存</el-button>
+        <el-button v-if="form.id ? hasPermission('contract:update') : hasPermission('contract:create')" type="primary" @click="saveContract">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
+import DataWorkspace from '../../components/DataWorkspace.vue'
+import DhicDataToolbar from '../../components/DhicDataToolbar.vue'
+import WorkspaceDataGrid from '../../components/workspace/WorkspaceDataGrid.vue'
+import { useDhicTableView } from '../../composables/useDhicTableView'
+import { useWorkspaceListRequestState } from '../../composables/workspace/useWorkspaceRequestState'
 import request from '../../utils/request'
+import { downloadBlob } from '../../utils/downloadBlob'
+import { hasPermission } from '../../utils/permission'
 import { readPage } from '../../utils/pagination'
 import {
-  isValidContactPhone,
-  isValidEmail,
-  optionalContactPhoneRule,
-  optionalEmailRule
-} from '../../utils/contactValidation'
-
-const BUILDING_ID = 1
+  buildContractMetricSnapshot,
+  contractStatusOptions,
+  contractWorkspaceConfig,
+  normalizeContractWorkspaceRecord
+} from '../../workspaceConfigs/contractWorkspaceConfig'
+import { workspaceTableOptions } from '../../workspaceConfigs/workspaceConfig'
 
 const contracts = ref([])
 const dialogVisible = ref(false)
 const formRef = ref()
+const buildings = ref([])
 const tenants = ref([])
 const rooms = ref([])
 const floors = ref([])
+const contractFileInputRef = ref(null)
+const currentContractFile = ref(null)
+const contractPermissions = contractWorkspaceConfig.permissions
+const listState = useWorkspaceListRequestState({
+  hasResults: () => contracts.value.length > 0,
+  clearResults: () => {
+    contracts.value = []
+  },
+  staleMessage: '合同列表刷新失败，当前显示上次成功数据'
+})
+const loading = computed(() => listState.status.value === 'loading')
+const listErrorText = listState.errorText
+
+const {
+  workspaceViews,
+  activeViewId,
+  activeViewName,
+  isViewDirty,
+  tablePrefs,
+  orderedColumns,
+  visibleOrderedColumns,
+  visibleRecords,
+  tableRows,
+  tableEmptyText,
+  sortOptions,
+  groupOptions,
+  filterOptions,
+  filterLogicOptions,
+  queryNotices,
+  queryRequestGuard: listRequestGuard,
+  disposeQueryLifecycle,
+  resultScope,
+  activeFilterItems,
+  activeFilterCount,
+  groupCount,
+  sortCount,
+  activeTableSort,
+  updateVisibleColumns,
+  updateColumnOrder,
+  updateFixedColumns,
+  columnWidth,
+  columnFixed,
+  handleHeaderDragEnd,
+  handleTableSortChange,
+  isColumnSortable,
+  updateFilterLogic,
+  updateFilters,
+  updateSortKey,
+  updateSortOrder,
+  updateSorts,
+  updateGroupKey,
+  updateGroups,
+  updateRowDensity,
+  resetTableView,
+  switchTableView,
+  createTableView,
+  renameTableView,
+  duplicateTableView,
+  deleteTableView,
+  saveCurrentView,
+  discardCurrentViewChanges,
+  removeViewFilter
+} = useDhicTableView(workspaceTableOptions(contractWorkspaceConfig, {
+  records: () => contracts.value,
+  serverTotal: () => contracts.value.length,
+  groupLabel: value => contractStatusOptions.find(option => option.value === value)?.label || value || '未填写'
+}))
+
+const contractMetricData = computed(() => buildContractMetricSnapshot(contracts.value, visibleRecords.value))
 
 const form = reactive({
   id: null,
+  version: null,
   contractNumber: '',
-  contractName: '',
   tenantId: '',
   tenantName: '',
   contactPerson: '',
   contactPhone: '',
   contactEmail: '',
-  floorId: '',
-  roomId: '',
+  buildingIds: [],
+  floorIds: [],
+  roomIds: [],
   leaseId: '',
   startDate: '',
   endDate: '',
   rentAmount: 0,
-  propertyFeeAmount: 0,
   depositAmount: 0,
-  paymentCycle: 'MONTHLY',
-  billingLeadDays: 7,
-  billingRule: '',
   remark: '',
   status: 'DRAFT'
 })
 
 const rules = {
-  tenantName: [{ required: true, message: '请输入租户名称', trigger: 'blur' }],
-  roomId: [{ required: true, message: '请选择房间', trigger: 'change' }],
-  contactPhone: [optionalContactPhoneRule],
-  contactEmail: [optionalEmailRule]
+  tenantId: [{ required: true, message: '请选择租户', trigger: 'change' }],
+  buildingIds: [{ type: 'array', required: true, message: '请选择楼宇', trigger: 'change' }],
+  roomIds: [{ type: 'array', required: true, message: '请选择房间', trigger: 'change' }]
 }
 
+const availableFloors = computed(() => {
+  const selectedBuildingIds = form.buildingIds.map(Number)
+  return floors.value.filter(item => {
+    return selectedBuildingIds.length ? selectedBuildingIds.includes(Number(item.buildingId)) : true
+  })
+})
+
 const availableRooms = computed(() => {
+  const selectedBuildingIds = form.buildingIds.map(Number)
+  const selectedFloorIds = form.floorIds.map(Number)
+  const selectedRoomIds = form.roomIds.map(Number)
   return rooms.value.filter(item => {
-    const sameFloor = form.floorId ? Number(item.floorId) === Number(form.floorId) : true
-    const selectableStatus = ['AVAILABLE', 'VACANT'].includes(item.status) || Number(item.id) === Number(form.roomId)
-    return sameFloor && selectableStatus
+    const sameBuilding = selectedBuildingIds.length ? selectedBuildingIds.includes(Number(item.buildingId)) : true
+    const sameFloor = selectedFloorIds.length ? selectedFloorIds.includes(Number(item.floorId)) : true
+    const selectableStatus = ['AVAILABLE', 'VACANT'].includes(item.status) || selectedRoomIds.includes(Number(item.id))
+    return sameBuilding && sameFloor && selectableStatus
   })
 })
 
 function resetForm() {
   Object.assign(form, {
     id: null,
+    version: null,
     contractNumber: '',
-    contractName: '',
     tenantId: '',
     tenantName: '',
     contactPerson: '',
     contactPhone: '',
     contactEmail: '',
-    floorId: '',
-    roomId: '',
+    buildingIds: [],
+    floorIds: [],
+    roomIds: [],
     leaseId: '',
     startDate: '',
     endDate: '',
     rentAmount: 0,
-    propertyFeeAmount: 0,
     depositAmount: 0,
-    paymentCycle: 'MONTHLY',
-    billingLeadDays: 7,
-    billingRule: '',
     remark: '',
     status: 'DRAFT'
   })
   formRef.value?.clearValidate()
 }
 
+async function switchContractView(viewId) {
+  if (viewId === activeViewId.value) return
+  if (isViewDirty.value) {
+    try {
+      await ElMessageBox.confirm('当前视图有未保存的调整，是否保存后切换？', '切换视图', {
+        distinguishCancelAndClose: true,
+        confirmButtonText: '保存并切换',
+        cancelButtonText: '放弃调整'
+      })
+      saveCurrentView()
+    } catch (action) {
+      if (action === 'cancel') discardCurrentViewChanges()
+      else return
+    }
+  }
+  switchTableView(viewId)
+}
+
+function saveContractView() {
+  saveCurrentView()
+  ElMessage.success(`视图“${activeViewName.value}”已保存`)
+}
+
 async function loadContracts() {
-  const data = await request.get('/contracts')
-  contracts.value = readPage(data).records
+  const requestId = listRequestGuard.start()
+  const requestContext = listState.begin({ resource: '/contracts' })
+  try {
+    const data = await request.get('/contracts', { silent: true })
+    if (!listRequestGuard.isCurrent(requestId) || !listState.isCurrent(requestContext)) return
+    contracts.value = readPage(data).records.map(normalizeContractWorkspaceRecord)
+    listState.succeed(requestContext)
+  } catch (error) {
+    if (!listRequestGuard.isCurrent(requestId) || !listState.isCurrent(requestContext)) return
+    listState.fail(requestContext, error?.response?.data?.message || '合同列表加载失败，请稍后重试')
+  }
 }
 
 async function loadTenants() {
@@ -285,15 +464,34 @@ async function loadTenants() {
 }
 
 async function loadRooms() {
-  const floorsData = await request.get(`/buildings/${BUILDING_ID}/floors`)
-  floors.value = readPage(floorsData).records
+  const buildingsData = await request.get('/buildings')
+  buildings.value = readPage(buildingsData).records
 
-  const result = []
-  for (const floor of floors.value) {
-    const data = await request.get(`/buildings/${BUILDING_ID}/floors/${floor.id}/rooms`)
-    result.push(...readPage(data).records)
+  const loadedFloors = []
+  const loadedRooms = []
+  for (const building of buildings.value) {
+    const floorsData = await request.get(`/buildings/${building.id}/floors`)
+    const buildingFloors = readPage(floorsData).records.map(floor => ({
+      ...floor,
+      buildingId: floor.buildingId || building.id,
+      buildingName: building.buildingName
+    }))
+    loadedFloors.push(...buildingFloors)
+
+    for (const floor of buildingFloors) {
+      const data = await request.get(`/buildings/${building.id}/floors/${floor.id}/rooms`)
+      loadedRooms.push(...readPage(data).records.map(room => ({
+        ...room,
+        buildingId: room.buildingId || building.id,
+        buildingName: building.buildingName,
+        floorId: room.floorId || floor.id,
+        floorName: floor.floorName,
+        floorNumber: floor.floorNumber
+      })))
+    }
   }
-  rooms.value = result
+  floors.value = loadedFloors
+  rooms.value = loadedRooms
 }
 
 function openCreateDialog() {
@@ -303,38 +501,75 @@ function openCreateDialog() {
 
 function openEditDialog(row) {
   resetForm()
-  const room = rooms.value.find(item => Number(item.id) === Number(row.roomId))
+  const rowRoomIds = Array.isArray(row.roomIds) && row.roomIds.length ? row.roomIds : (row.roomId ? [row.roomId] : [])
+  const selectedRooms = rooms.value.filter(item => rowRoomIds.map(Number).includes(Number(item.id)))
+  const rowBuildingIds = [...new Set(selectedRooms.map(item => item.buildingId).filter(Boolean))]
+  const rowFloorIds = Array.isArray(row.floorIds) && row.floorIds.length
+    ? row.floorIds
+    : [...new Set(selectedRooms.map(item => item.floorId).filter(Boolean))]
   Object.assign(form, {
     id: row.id,
-    contractNumber: row.contractNumber || row.code || '',
-    contractName: row.contractName || '',
+    version: row.version ?? null,
+    contractNumber: row.contractNumber || row.contractNo || row.code || '',
     tenantId: row.tenantId || '',
     tenantName: row.tenantName || tenantDisplayName(row.tenantId),
     contactPerson: row.contactPerson || '',
     contactPhone: row.contactPhone || '',
     contactEmail: row.contactEmail || '',
-    floorId: room?.floorId || '',
-    roomId: row.roomId || '',
+    buildingIds: rowBuildingIds.map(Number),
+    floorIds: rowFloorIds.map(Number),
+    roomIds: rowRoomIds.map(Number),
     startDate: row.startDate || '',
     endDate: row.endDate || '',
     rentAmount: Number(row.rentAmount || 0),
-    propertyFeeAmount: Number(row.propertyFeeAmount || 0),
     depositAmount: Number(row.depositAmount || 0),
-    paymentCycle: row.paymentCycle || 'MONTHLY',
-    billingLeadDays: Number(row.billingLeadDays ?? 7),
     remark: row.remark || '',
     status: row.status || 'DRAFT'
   })
   dialogVisible.value = true
 }
 
-function handleFloorChange() {
-  form.roomId = ''
+function handleBuildingIdsChange() {
+  const selectedBuildingIds = form.buildingIds.map(Number)
+  if (!selectedBuildingIds.length) {
+    form.floorIds = []
+    form.roomIds = []
+    return
+  }
+  form.floorIds = form.floorIds.filter(floorId => {
+    const floor = floors.value.find(item => Number(item.id) === Number(floorId))
+    return floor && selectedBuildingIds.includes(Number(floor.buildingId))
+  })
+  form.roomIds = form.roomIds.filter(roomId => {
+    const room = rooms.value.find(item => Number(item.id) === Number(roomId))
+    return room && selectedBuildingIds.includes(Number(room.buildingId))
+  })
+}
+
+function handleFloorIdsChange() {
+  const selectedFloorIds = form.floorIds.map(Number)
+  if (!selectedFloorIds.length) return
+  form.roomIds = form.roomIds.filter(roomId => {
+    const room = rooms.value.find(item => Number(item.id) === Number(roomId))
+    return room && selectedFloorIds.includes(Number(room.floorId))
+  })
 }
 
 function tenantDisplayName(tenantId) {
   const tenant = tenants.value.find(item => Number(item.id) === Number(tenantId))
   return tenant ? tenant.tenantName : `租户ID:${tenantId || '-'}`
+}
+
+function handleTenantChange(tenantId) {
+  const tenant = tenants.value.find(item => Number(item.id) === Number(tenantId))
+  form.tenantName = tenant?.tenantName || tenant?.name || ''
+  form.contactPerson = tenant?.contactPerson || ''
+  form.contactPhone = tenant?.contactPhone || ''
+  form.contactEmail = tenant?.contactEmail || ''
+}
+
+function buildingLabel(building) {
+  return building.buildingName || building.name || building.buildingCode || `楼宇ID:${building.id}`
 }
 
 function floorLabel(floor) {
@@ -343,7 +578,8 @@ function floorLabel(floor) {
 
 function roomLabel(room) {
   const areaText = room.area ? `｜${room.area}㎡` : ''
-  return `${room.roomNumber || room.roomName || '未命名房间'}${areaText}`
+  const roomText = room.roomNumber || room.roomName || '未命名房间'
+  return `${roomText}${areaText}`
 }
 
 function roomDisplayName(roomId) {
@@ -354,79 +590,29 @@ function roomDisplayName(roomId) {
   return `${room.roomNumber || room.roomName || '未命名房间'}${areaText}`
 }
 
-function formatMoney(value) {
-  const number = Number(value || 0)
-  if (!number) return '-'
-  return number.toLocaleString('zh-CN', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2
-  })
-}
-
-function contractStatusText(status) {
-  const map = {
-    DRAFT: '草稿',
-    PENDING: '待生效',
-    ACTIVE: '履约中',
-    EXPIRED: '已到期',
-    TERMINATED: '已终止',
-    CANCELLED: '已作废'
-  }
-  return map[status] || status || '-'
-}
-
-function contractStatusTag(status) {
-  const map = {
-    DRAFT: 'info',
-    PENDING: 'warning',
-    ACTIVE: 'success',
-    EXPIRED: 'info',
-    TERMINATED: 'danger',
-    CANCELLED: 'info'
-  }
-  return map[status] || ''
-}
-
-function contactText(value, type) {
-  if (!value) return '-'
-  const valid = type === 'phone' ? isValidContactPhone(value) : isValidEmail(value)
-  return valid ? value : `${value}（格式异常）`
-}
-
 function payload() {
-  return {
-    contractNumber: form.contractNumber,
-    contractName: form.contractName,
-    tenantId: form.tenantId || undefined,
-    tenantName: form.tenantName,
-    contactPerson: form.contactPerson,
-    contactPhone: form.contactPhone,
-    contactEmail: form.contactEmail,
-    roomId: Number(form.roomId),
+  const requestBody = {
+    contractNo: form.contractNumber.trim() || undefined,
+    tenantId: Number(form.tenantId),
+    roomIds: form.roomIds.map(Number),
     startDate: form.startDate,
     endDate: form.endDate,
+    effectiveDate: form.startDate,
+    currency: 'CNY',
     rentAmount: form.rentAmount,
-    propertyFeeAmount: form.propertyFeeAmount,
     depositAmount: form.depositAmount,
-    paymentCycle: form.paymentCycle,
-    billingLeadDays: form.billingLeadDays,
-    remark: form.remark || form.contractName,
-    status: form.status
+    remark: form.remark || undefined
   }
+  if (form.id) {
+    requestBody.version = Number(form.version)
+    requestBody.changeReason = '后台合同编辑'
+  }
+  return requestBody
 }
 
 async function saveContract() {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
-  if (!isValidContactPhone(form.contactPhone)) {
-    ElMessage.warning('请输入正确的联系电话，例如 13800000000 或 021-88888888')
-    return
-  }
-  if (!isValidEmail(form.contactEmail)) {
-    ElMessage.warning('请输入正确的邮箱地址，例如 name@example.com')
-    return
-  }
-
   if (form.id) {
     await request.put(`/contracts/${form.id}`, payload())
     ElMessage.success('保存成功')
@@ -440,9 +626,30 @@ async function saveContract() {
   await Promise.all([loadContracts(), loadTenants(), loadRooms()])
 }
 
+async function submitContract(row) {
+  await request.post(`/contracts/${row.id}/submit`, {
+    version: row.version,
+    reason: '后台合同列表提交审批'
+  })
+  ElMessage.success('合同已提交审批')
+  await loadContracts()
+}
+
+async function approveContract(row) {
+  await request.post(`/contracts/${row.id}/approve`, {
+    version: row.version,
+    reason: '后台合同列表审批通过'
+  })
+  ElMessage.success('合同审批通过')
+  await loadContracts()
+}
+
 async function activate(row) {
-  await request.post(`/contracts/${row.id}/activate`)
-  ElMessage.success('已生效')
+  await request.post(`/contracts/${row.id}/activate`, {
+    version: row.version,
+    reason: '后台合同列表恢复生效'
+  })
+  ElMessage.success('合同已恢复生效')
   await loadContracts()
 }
 
@@ -453,31 +660,86 @@ async function checkIn(row) {
 }
 
 async function terminate(row) {
-  await request.post(`/contracts/${row.id}/terminate`, { reason: '后台终止合同' })
+  await request.post(`/contracts/${row.id}/terminate`, {
+    version: row.version,
+    reason: '后台终止合同'
+  })
   ElMessage.success('已终止')
   await Promise.all([loadContracts(), loadRooms()])
 }
 
-async function reactivate(row) {
-  await request.post(`/contracts/${row.id}/reactivate`, { reason: '后台恢复履约' })
-  ElMessage.success('已恢复履约')
-  await Promise.all([loadContracts(), loadRooms()])
-}
-
 async function cancelContract(row) {
-  await request.post(`/contracts/${row.id}/cancel`, { reason: '后台作废合同' })
+  await request.post(`/contracts/${row.id}/cancel`, {
+    version: row.version,
+    reason: '后台作废合同'
+  })
   ElMessage.success('已作废')
   await Promise.all([loadContracts(), loadRooms()])
 }
 
-async function generateBills() {
-  const result = await request.post('/contracts/generate-bills')
-  ElMessage.success(`已生成 ${result?.generatedCount || result?.generated || 0} 张，跳过 ${result?.skipped || 0} 张`)
+function hasContractFile(row) {
+  return row.hasContractFile === true || row.hasContractFile === 1 || Boolean(row.contractFileName)
+}
+
+function selectContractFile(row) {
+  currentContractFile.value = row
+  if (contractFileInputRef.value) {
+    contractFileInputRef.value.value = ''
+    contractFileInputRef.value.click()
+  }
+}
+
+async function handleContractFileChange(event) {
+  const file = event.target.files?.[0]
+  const row = currentContractFile.value
+  if (!file || !row) return
+
+  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+    ElMessage.error('只能上传 PDF 电子合同')
+    return
+  }
+
+  const formData = new FormData()
+  formData.append('file', file)
+  try {
+    await request.post(`/contracts/${row.id}/file`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    ElMessage.success('电子合同已上传')
+    await loadContracts()
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.message || error?.message || '电子合同上传失败')
+  } finally {
+    currentContractFile.value = null
+    if (contractFileInputRef.value) contractFileInputRef.value.value = ''
+  }
+}
+
+async function previewElectronicContract(row) {
+  if (!hasContractFile(row)) {
+    ElMessage.warning('请先上传电子合同')
+    return
+  }
+
+  const previewWindow = window.open('', '_blank')
+  try {
+    const blob = await request.get(`/contracts/${row.id}/file/download`, {
+      responseType: 'blob'
+    })
+    downloadBlob(blob, row.contractFileName || `${row.contractNumber || row.contractNo || row.code || '电子合同'}.pdf`, {
+      previewWindow,
+      download: false
+    })
+  } catch (error) {
+    if (previewWindow) previewWindow.close()
+    ElMessage.error(error?.response?.data?.message || error?.message || '电子合同打开失败')
+  }
 }
 
 onMounted(async () => {
   await Promise.all([loadContracts(), loadTenants(), loadRooms()])
 })
+onBeforeUnmount(disposeQueryLifecycle)
 </script>
 
 <style scoped>
@@ -485,80 +747,19 @@ onMounted(async () => {
   padding: 20px;
 }
 
-.page-container :deep(.el-card__body) {
-  padding: 22px 24px 28px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 36px;
-  font-weight: 600;
-}
-
 .header-actions {
   display: flex;
   gap: 10px;
 }
 
-.contract-table {
-  font-size: 14px;
-}
-
-.contract-table :deep(.el-table__header th) {
-  height: 52px;
-  background: #f7f8fa;
-  color: #303133;
-  font-weight: 600;
-}
-
-.contract-table :deep(.el-table__row td) {
-  padding: 14px 0;
-  vertical-align: middle;
-}
-
-.primary-text {
-  color: #1f2937;
-  font-weight: 600;
-  line-height: 22px;
-  word-break: break-word;
-}
-
-.secondary-text {
-  margin-top: 4px;
-  color: #6b7280;
-  font-size: 13px;
-  line-height: 20px;
-  word-break: break-word;
-}
-
-.invalid-contact {
-  color: #d93025;
-  font-weight: 600;
-}
-
-.money-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  line-height: 22px;
+.view-hint {
+  color: var(--dhic-text-muted);
+  font-size: 12px;
   white-space: nowrap;
 }
 
-.money-line span {
-  color: #909399;
-}
-
-.money-line strong {
-  min-width: 66px;
-  color: #1f2937;
-  font-weight: 600;
-  text-align: right;
-}
-
-.muted-line strong {
-  color: #4b5563;
+.hidden-file-input {
+  display: none;
 }
 
 .action-buttons {
@@ -573,13 +774,14 @@ onMounted(async () => {
 }
 
 .contract-dialog :deep(.el-dialog__body) {
-  padding: 8px 28px 4px;
-  max-height: 68vh;
+  padding: 12px 28px 6px;
+  max-height: min(72vh, 760px);
   overflow-y: auto;
 }
 
 .contract-dialog :deep(.el-dialog__footer) {
   padding: 14px 28px 22px;
+  border-top: 1px solid #eef0f4;
 }
 
 .form-section-title {
@@ -599,12 +801,24 @@ onMounted(async () => {
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 18px;
-  row-gap: 2px;
+  gap: 14px 18px;
+  align-items: start;
+}
+
+.location-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.period-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fee-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .form-grid :deep(.el-form-item) {
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .form-grid :deep(.el-form-item__label) {
@@ -621,8 +835,22 @@ onMounted(async () => {
   line-height: 1.5;
 }
 
+.remark-item {
+  margin-top: 14px;
+}
+
 @media (max-width: 900px) {
-  .form-grid {
+  .location-grid,
+  .fee-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .form-grid,
+  .location-grid,
+  .period-grid,
+  .fee-grid {
     grid-template-columns: 1fr;
   }
 }

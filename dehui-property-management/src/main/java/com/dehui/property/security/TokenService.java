@@ -3,10 +3,14 @@ package com.dehui.property.security;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -54,6 +58,52 @@ public class TokenService {
         String token = normalize(rawToken);
         if (token != null && !token.isBlank()) {
             redisTemplate.delete(RedisKeys.authToken(token));
+        }
+    }
+
+    /**
+     * Revokes every active token that currently resolves to the supplied user.
+     *
+     * <p>Phone-authorized WeChat identity replacement is rare, but it must
+     * invalidate tokens issued before the replacement. SCAN is deliberately
+     * used instead of Redis KEYS so the operation does not block Redis.</p>
+     */
+    public int revokeUserSessions(Long userId) {
+        if (userId == null) {
+            return 0;
+        }
+        List<String> matchedKeys = new ArrayList<>();
+        ScanOptions options = ScanOptions.scanOptions()
+                .match(RedisKeys.authToken("*"))
+                .count(100)
+                .build();
+        try (Cursor<String> cursor = redisTemplate.scan(options)) {
+            while (cursor.hasNext()) {
+                String key = cursor.next();
+                String payload = redisTemplate.opsForValue().get(key);
+                if (belongsToUser(payload, userId)) {
+                    matchedKeys.add(key);
+                }
+            }
+        }
+        if (matchedKeys.isEmpty()) {
+            return 0;
+        }
+        Long deleted = redisTemplate.delete(matchedKeys);
+        return deleted == null ? 0 : deleted.intValue();
+    }
+
+    private boolean belongsToUser(String payload, Long userId) {
+        if (payload == null || payload.isBlank()) {
+            return false;
+        }
+        try {
+            AuthPrincipal principal = objectMapper.readValue(payload, AuthPrincipal.class);
+            return userId.equals(principal.userId())
+                    && principal.roles() != null
+                    && principal.roles().contains("MOBILE_USER");
+        } catch (JsonProcessingException exception) {
+            return false;
         }
     }
 

@@ -24,7 +24,7 @@ function confirmAction(content, confirmText = '确认') {
       title: '操作确认',
       content,
       confirmText,
-      confirmColor: '#e4312b',
+      confirmColor: '#D71920',
       success: result => resolve(Boolean(result.confirm)),
       fail: () => resolve(false)
     })

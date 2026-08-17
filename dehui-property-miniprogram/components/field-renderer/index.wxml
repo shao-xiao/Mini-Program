@@ -1,0 +1,10 @@
+<view wx:if="{{files.length}}" class="files">
+  <view wx:for="{{files}}" wx:key="fileId" class="file-item">
+    <image wx:if="{{field.dataType === 'IMAGE' && item.previewUrl}}" src="{{item.previewUrl}}" mode="aspectFill" data-index="{{index}}" bindtap="preview" />
+    <view wx:elif="{{field.dataType === 'IMAGE'}}" class="image-state {{item.previewError ? 'error' : ''}}">
+      {{item.previewLoading ? '加载中' : '图片不可用'}}
+    </view>
+    <text wx:else>{{item.name || ('文件 #' + item.fileId)}}</text>
+  </view>
+</view>
+<text wx:else>{{text}}</text>

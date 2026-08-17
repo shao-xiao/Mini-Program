@@ -1,27 +1,62 @@
 <view class="page home-page">
   <view class="card intro-card">
     <view class="brand-row">
-      <view class="brand-logo-wrap">
-        <image class="brand-logo" src="/assets/dehui-logo.png" mode="aspectFit" />
+      <view class="brand-logo-column">
+        <view class="brand-logo-wrap">
+          <image
+            class="brand-logo"
+            src="/assets/dehui-logo.png"
+            mode="aspectFit"
+            aria-label="德汇创新中心品牌标识"
+          />
+        </view>
       </view>
       <view class="intro-text">
-        <view class="title">{{overview.title}}</view>
-        <view class="subtitle">{{overview.subtitle}}</view>
+        <view class="title">德汇创新中心</view>
+        <view class="subtitle">旨在为高新技术、科技研发及创新型总部企业提供聚合发展与赋能升级的理想平台。</view>
+        <view class="intro-meta">
+          <view class="intro-address">上海市浦东新区川桥路1089号</view>
+          <view class="intro-contact">
+            <text class="intro-contact-label">合作请致电：</text>
+            <text class="intro-contact-number">021-65686336</text>
+          </view>
+        </view>
       </view>
     </view>
   </view>
 
   <view class="card banner-card">
     <view class="section-title">园区公告</view>
+
+    <view wx:if="{{announcementState === 'loading'}}" class="state-card" aria-busy="true">
+      <view class="state-title">正在加载园区公告</view>
+      <view class="state-description">请稍候，园区最新信息马上呈现。</view>
+    </view>
+
+    <view wx:elif="{{announcementState === 'error' || announcementState === 'unauthorized'}}" class="state-card">
+      <view class="state-title">{{announcementState === 'unauthorized' ? '当前账号无法查看公告' : '公告暂时无法加载'}}</view>
+      <view class="state-description">{{announcementMessage}}</view>
+      <button class="state-action" bindtap="retryHome">重新加载</button>
+    </view>
+
+    <view wx:elif="{{announcementState === 'empty'}}" class="state-card">
+      <view class="state-title">暂无重点公告</view>
+      <view class="state-description">当前没有设置为首页轮播的已发布公告。</view>
+    </view>
+
     <swiper
+      wx:else
       class="home-swiper"
-      autoplay="{{true}}"
-      circular="{{true}}"
+      style="height: {{announcementSwiperHeight}}px;"
+      current="{{currentBannerIndex}}"
+      autoplay="{{banners.length > 1}}"
+      circular="{{banners.length > 1}}"
       indicator-dots="{{banners.length > 1}}"
-      indicator-color="rgba(255,255,255,0.5)"
+      indicator-color="rgba(255,255,255,0.48)"
       indicator-active-color="#FFFFFF"
       interval="3500"
       duration="500"
+      bindchange="onBannerChange"
     >
       <swiper-item
         wx:for="{{banners}}"
@@ -31,27 +66,55 @@
         bindtap="openBanner"
       >
         <view class="banner-item">
-          <view class="banner-content">
+          <view class="banner-head">
             <view class="banner-title">{{item.title}}</view>
-            <view class="banner-subtitle">{{item.subtitle}}</view>
-            <view class="banner-time" wx:if="{{item.time}}">{{item.time}}</view>
+            <view class="banner-type">{{item.typeText}}</view>
           </view>
-          <view class="banner-link">查看详情</view>
+          <view class="banner-subtitle" wx:if="{{item.subtitle}}">{{item.subtitle}}</view>
+          <view class="banner-footer">
+            <view class="banner-time" wx:if="{{item.time}}">{{item.time}}</view>
+            <view class="banner-link">查看详情</view>
+          </view>
         </view>
       </swiper-item>
     </swiper>
   </view>
 
-  <view class="module-grid">
+  <view wx:if="{{identityState === 'loading'}}" class="card state-card service-state" aria-busy="true">
+    <view class="state-title">正在确认服务能力</view>
+    <view class="state-description">请稍候，正在同步当前身份。</view>
+  </view>
+
+  <view wx:elif="{{identityState === 'error' || identityState === 'login-required' || identityState === 'unauthorized'}}" class="card state-card service-state">
+    <view class="state-title">当前身份暂时无法确认</view>
+    <view class="state-description">{{identityMessage}}</view>
+    <button class="state-action" bindtap="refreshPage">重新确认</button>
+  </view>
+
+  <view wx:if="{{identityState === 'success' && isInternal}}" class="card state-card service-state">
+    <view class="state-title">物业移动工作台</view>
+    <view class="state-description" wx:if="{{hasStaffWorkbench}}">当前员工身份已由后台移动权限确认；工作台仅展示已有真实接口和页面的功能。</view>
+    <view class="state-description" wx:else>当前员工暂无已授权移动功能；后台授予模块权限后将自动显示对应入口。</view>
+  </view>
+
+  <view class="module-grid" wx:if="{{modules.length}}">
     <view
       wx:for="{{modules}}"
-      wx:key="title"
+      wx:key="key"
       class="module-item"
-      data-index="{{index}}"
+      data-key="{{item.key}}"
       bindtap="openModule"
+      hover-class="module-item-active"
+      role="button"
+      aria-label="{{item.title}}，{{item.description}}"
     >
       <view class="module-title">{{item.title}}</view>
-      <view class="module-desc">{{item.desc}}</view>
+      <view class="module-desc">{{item.description}}</view>
     </view>
+  </view>
+
+  <view wx:else class="card state-card service-state">
+    <view class="state-title">暂无可用服务</view>
+    <view class="state-description">请稍后重试或前往“我的”检查登录状态。</view>
   </view>
 </view>

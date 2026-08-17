@@ -1,0 +1,153 @@
+<view class="page energy-page">
+  <view class="energy-toolbar">
+    <picker class="month-control" mode="date" fields="month" value="{{periodMonth}}" bindchange="changeMonth">
+      <view class="month-control-inner">
+        <view>
+          <view class="control-label">后台统计账期</view>
+          <view class="control-value">{{periodMonth}}</view>
+        </view>
+        <view class="control-arrow">›</view>
+      </view>
+    </picker>
+    <button wx:if="{{canCreate}}" class="create-button" bindtap="create">
+      <text class="create-plus">＋</text>
+      <text>新增抄表</text>
+    </button>
+  </view>
+
+  <view wx:if="{{error}}" class="feedback-panel feedback-panel--error">
+    <view class="feedback-title">能耗数据加载失败</view>
+    <view class="feedback-desc">{{error}}</view>
+    <button class="retry-button" bindtap="retry">重新加载</button>
+  </view>
+
+  <block wx:else>
+    <view class="energy-section">
+      <view class="section-heading">
+        <view>
+          <view class="section-title">能源概览</view>
+          <view class="section-subtitle">{{periodMonth}} 按能源类型汇总</view>
+        </view>
+        <view class="section-count">{{summary.byType.length}} 类</view>
+      </view>
+      <view wx:if="{{summary.byType.length}}" class="type-grid">
+        <view wx:for="{{summary.byType}}" wx:key="meterType" class="type-card type-card--{{item.meterTypeTone}}">
+          <view class="type-card-head">
+            <view class="type-identity">
+              <view class="type-icon">{{item.meterTypeShortLabel}}</view>
+              <view class="type-name">{{item.meterTypeLabel}}</view>
+            </view>
+            <view wx:if="{{item.abnormalCount}}" class="abnormal-count">{{item.abnormalCount}} 条异常</view>
+            <view wx:else class="normal-count">无异常</view>
+          </view>
+          <view class="type-usage-line">
+            <view class="type-usage">{{item.usageText}}</view>
+            <view wx:if="{{item.meterTypeUnitLabel}}" class="type-unit">{{item.meterTypeUnitLabel}}</view>
+          </view>
+          <view class="type-usage-label">本期用量</view>
+          <view class="type-fee">
+            <text>费用依据</text>
+            <text class="type-fee-value">¥{{item.settlementText}}</text>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="empty-panel">当前账期暂无能源汇总</view>
+    </view>
+
+    <view class="energy-section">
+      <view class="section-heading">
+        <view>
+          <view class="section-title">企业费用依据</view>
+          <view class="section-subtitle">按本期费用依据由高到低</view>
+        </view>
+        <view class="section-count">{{summary.byTenant.length}} 家</view>
+      </view>
+      <view wx:if="{{summary.byTenant.length}}" class="tenant-panel">
+        <view wx:for="{{summary.byTenant}}" wx:key="id" class="tenant-row">
+          <view class="tenant-rank tenant-rank--{{item.rankTone}}">{{item.rankText}}</view>
+          <view class="tenant-main">
+            <view class="tenant-title-line">
+              <view class="tenant-name">{{item.tenantName}}</view>
+            </view>
+            <view class="tenant-progress">
+              <view class="tenant-progress-value" style="width: {{item.settlementRatio}}%;"></view>
+            </view>
+          </view>
+          <view class="tenant-result">
+            <view class="tenant-fee">¥{{item.settlementText}}</view>
+            <view wx:if="{{item.abnormalCount}}" class="tenant-status tenant-status--warning">异常 {{item.abnormalCount}}</view>
+            <view wx:else class="tenant-status">无异常</view>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="empty-panel">当前账期暂无企业汇总</view>
+    </view>
+
+    <view class="energy-section">
+      <view class="section-heading">
+        <view>
+          <view class="section-title">抄表记录</view>
+          <view class="section-subtitle">原始读数与后端费用依据</view>
+        </view>
+        <view class="section-count">{{total}} 条</view>
+      </view>
+      <view wx:for="{{records}}" wx:key="id" class="reading-card {{item.isAbnormal ? 'reading-card--abnormal' : ''}}">
+        <view class="reading-head">
+          <view class="reading-type reading-type--{{item.meterTypeTone}}">
+            <view class="reading-type-dot"></view>
+            <text>{{item.meterTypeLabel}}</text>
+          </view>
+          <view class="reading-statuses">
+            <view wx:if="{{item.isAbnormal}}" class="status-tag status-tag--danger">读数异常</view>
+            <view class="status-tag status-tag--{{item.billStatusTone}}">{{item.billStatusLabel}}</view>
+          </view>
+        </view>
+        <view class="reading-title">{{item.meterName || item.meterNo}}</view>
+        <view class="reading-tenant">{{item.tenantName || '未绑定企业'}}</view>
+        <view class="reading-period">{{item.periodMonth}} · {{item.readingDate || '未记录日期'}}</view>
+        <view class="reading-flow">
+          <view class="reading-point">
+            <view class="reading-point-label">上期读数</view>
+            <view class="reading-point-value">{{item.previousReadingText}}</view>
+          </view>
+          <view class="reading-flow-arrow">
+            <view class="flow-line"></view>
+            <view class="flow-arrow">›</view>
+          </view>
+          <view class="reading-point reading-point--current">
+            <view class="reading-point-label">本期读数</view>
+            <view class="reading-point-value">{{item.currentReadingText}}</view>
+          </view>
+        </view>
+        <view class="reading-facts">
+          <view class="reading-fact">
+            <view class="fact-label">本期用量</view>
+            <view class="fact-value">{{item.usageText}}</view>
+          </view>
+          <view class="reading-fact">
+            <view class="fact-label">单价快照</view>
+            <view class="fact-value">¥{{item.unitPriceText}}</view>
+          </view>
+          <view class="reading-fact reading-fact--fee">
+            <view class="fact-label">费用依据</view>
+            <view class="fact-value">¥{{item.settlementText}}</view>
+          </view>
+        </view>
+        <view wx:if="{{item.isAbnormal && item.abnormalReason}}" class="abnormal-reason">
+          异常说明：{{item.abnormalReason}}
+        </view>
+      </view>
+
+      <view wx:if="{{loading}}" class="loading-panel">
+        <view class="loading-dot"></view>
+        <text>正在加载能耗数据…</text>
+      </view>
+      <view wx:if="{{!loading && !records.length}}" class="empty-panel">本月暂无抄表记录</view>
+      <view wx:if="{{!hasMore && records.length}}" class="list-end">
+        <view class="list-end-line"></view>
+        <text>已加载全部记录</text>
+        <view class="list-end-line"></view>
+      </view>
+    </view>
+  </block>
+</view>

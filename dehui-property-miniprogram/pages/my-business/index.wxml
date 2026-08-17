@@ -1,0 +1,15 @@
+<view class="page">
+  <view class="company" wx:if="{{companyName}}">{{companyName}}</view>
+  <view class="state" wx:if="{{loading}}">正在加载业务摘要…</view>
+  <view class="state error" wx:elif="{{pageState === 'error' || pageState === 'unauthorized'}}">
+    <text>{{errorMessage}}</text>
+    <button wx:if="{{pageState === 'error'}}" bindtap="retryLoad">重试</button>
+  </view>
+  <view class="state" wx:elif="{{pageState === 'empty'}}">暂无可展示的业务摘要</view>
+  <view class="grid" wx:else>
+    <view class="item" wx:for="{{items}}" wx:key="key">
+      <text class="label">{{item.label}}</text>
+      <text class="value">{{item.value}}</text>
+    </view>
+  </view>
+</view>

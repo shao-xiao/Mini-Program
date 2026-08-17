@@ -1,225 +1,248 @@
-const api = require('../../utils/request')
-const { clearSession, getIdentity, setSession } = require('../../utils/auth')
+const { getUserType } = require('../../utils/capabilities')
 const {
-  defaultBaseURL,
-  lanBaseURL,
-  getBaseURL,
-  setBaseURL,
-  resetBaseURL
-} = require('../../config/env')
+  ensureWechatSession,
+  refreshCurrentProfile,
+  authorizeWechatPhone,
+  selectIdentity,
+  unbindCurrentIdentity,
+  logout: logoutSession
+} = require('../../utils/auth')
+const { isConsentCurrent, acceptCurrentConsent, readConsent } = require('../../utils/consent')
+
+const PUBLIC_PROFILE = {
+  userType: 'PUBLIC',
+  capabilities: [],
+  availableIdentities: [],
+  profile: { name: '', maskedPhone: '', avatarUrl: '' }
+}
+
+function normalizeProfile(payload) {
+  if (!payload || typeof payload !== 'object') return { ...PUBLIC_PROFILE }
+  const display = payload.profile && typeof payload.profile === 'object' ? payload.profile : {}
+  return {
+    ...payload,
+    ...display,
+    profile: display,
+    userType: getUserType(payload),
+    capabilities: Array.isArray(payload.capabilities) ? payload.capabilities : [],
+    availableIdentities: Array.isArray(payload.availableIdentities)
+      ? payload.availableIdentities
+      : []
+  }
+}
+
+function accountPresentation(profile) {
+  const userType = getUserType(profile)
+  const tenantInfo = profile.tenantInfo || {}
+  const staffInfo = profile.staffInfo || {}
+  const bindingState = profile.bindingState || 'UNVERIFIED'
+  const availableIdentities = Array.isArray(profile.availableIdentities)
+    ? profile.availableIdentities
+    : []
+  const showIdentitySelector = availableIdentities.length > 1 ||
+    (bindingState === 'PENDING_SELECTION' && availableIdentities.length > 0)
+  const identityText = userType === 'TENANT'
+    ? '租户'
+    : (userType === 'STAFF' ? '物业员工' : '公开访问')
+  const statusText = profile.bindingState === 'PENDING_SELECTION'
+    ? '请选择业务身份'
+    : (profile.bindingState === 'UNMATCHED'
+        ? '手机号已验证，未匹配业务档案'
+        : (profile.bindingState === 'BOUND' ? '身份已绑定' : '尚未验证手机号'))
+  return {
+    userType,
+    isTenant: userType === 'TENANT',
+    isInternal: userType === 'STAFF',
+    identityText,
+    statusText,
+    tenantName: tenantInfo.name || '',
+    contactRoleLabel: tenantInfo.contactRoleLabel || '',
+    contactName: profile.name || staffInfo.name || '',
+    phone: profile.maskedPhone || '',
+    availableIdentities,
+    showIdentitySelector,
+    bindingState,
+    sessionState: profile.sessionState || 'ANONYMOUS'
+  }
+}
 
 Page({
   data: {
-    identityText: '访客',
-    profile: {},
-    loading: false,
-    internalForm: {
-      username: 'admin',
-      password: ''
-    },
-    tenantAccountForm: {
-      phone: '',
-      password: ''
-    },
-    apiBaseURL: '',
-    apiForm: {
-      baseURL: ''
-    },
-    defaultBaseURL,
-    lanBaseURL,
-    apiStatus: '未检查',
-    apiStatusClass: 'muted',
-    apiMessage: '',
-    checkingApi: false
+    pageState: 'loading',
+    errorMessage: '',
+    profile: PUBLIC_PROFILE,
+    userType: 'PUBLIC',
+    isTenant: false,
+    isInternal: false,
+    identityText: '公开访问',
+    statusText: '正在确认身份',
+    tenantName: '',
+    contactRoleLabel: '',
+    contactName: '',
+    phone: '',
+    bindingState: 'UNVERIFIED',
+    sessionState: 'ANONYMOUS',
+    availableIdentities: [],
+    showIdentitySelector: false,
+    agreementsAccepted: false,
+    consentRecord: null,
+    phoneLoginLoading: false,
+    identityLoading: false,
+    unbindLoading: false,
+    logoutLoading: false
+  },
+
+  onLoad() {
+    this._active = true
+    this._refreshSequence = 0
   },
 
   onShow() {
+    this._active = true
+    this.safeSetData({
+      agreementsAccepted: isConsentCurrent(),
+      consentRecord: readConsent()
+    })
     this.refreshIdentity()
-    this.refreshApiConfig()
-    this.loadProfile()
-    this.checkBackend()
   },
 
-  refreshIdentity() {
-    const identityMap = {
-      INTERNAL: '内部员工',
-      TENANT: '租户用户',
-      PUBLIC: '访客'
-    }
-    const identity = getIdentity()
-    this.setData({
-      identityText: identityMap[identity] || '访客'
+  onUnload() {
+    this._active = false
+    this._refreshSequence += 1
+  },
+
+  safeSetData(payload) {
+    if (this._active) this.setData(payload)
+  },
+
+  applyProfile(payload) {
+    const profile = normalizeProfile(payload)
+    this.safeSetData({
+      pageState: 'success',
+      errorMessage: '',
+      profile,
+      ...accountPresentation(profile)
     })
+    return profile
   },
 
-  async loadProfile() {
-    const token = wx.getStorageSync('token')
-    if (!token) return
-
+  async refreshIdentity() {
+    const requestId = ++this._refreshSequence
+    this.safeSetData({ pageState: 'loading', errorMessage: '' })
     try {
-      const profile = await api.get('/mobile/auth/me')
-      wx.setStorageSync('userInfo', profile)
-      wx.setStorageSync('identity', profile.userType || 'PUBLIC')
-      this.setData({ profile })
-      this.refreshIdentity()
+      await ensureWechatSession()
+      const payload = await refreshCurrentProfile()
+      if (!this._active || requestId !== this._refreshSequence) return
+      this.applyProfile(payload)
     } catch (error) {
-      clearSession()
-      this.setData({ profile: {} })
-      this.refreshIdentity()
+      if (!this._active || requestId !== this._refreshSequence) return
+      this.safeSetData({
+        pageState: 'error',
+        errorMessage: error && error.message ? error.message : '暂时无法确认账号状态',
+        profile: PUBLIC_PROFILE,
+        ...accountPresentation(PUBLIC_PROFILE)
+      })
     }
   },
 
-  onInternalInput(event) {
-    const field = event.currentTarget.dataset.field
-    this.setData({
-      [`internalForm.${field}`]: event.detail.value
-    })
+  onAgreementChange(event) {
+    const accepted = (event.detail.value || []).includes('accepted')
+    if (accepted) acceptCurrentConsent()
+    this.safeSetData({ agreementsAccepted: accepted, consentRecord: readConsent() })
   },
 
-  onTenantAccountInput(event) {
-    const field = event.currentTarget.dataset.field
-    this.setData({
-      [`tenantAccountForm.${field}`]: event.detail.value
-    })
+  ensureAgreementAccepted() {
+    if (this.data.agreementsAccepted && isConsentCurrent()) return true
+    wx.showToast({ title: '请先阅读并同意服务协议和隐私保护指引', icon: 'none' })
+    return false
   },
 
-  refreshApiConfig() {
-    const apiBaseURL = getBaseURL()
-    this.setData({
-      apiBaseURL,
-      'apiForm.baseURL': apiBaseURL
-    })
+  promptAgreementRequired() {
+    this.ensureAgreementAccepted()
   },
 
-  onApiInput(event) {
-    this.setData({
-      'apiForm.baseURL': event.detail.value
-    })
-  },
-
-  useDefaultApi() {
-    const apiBaseURL = resetBaseURL()
-    this.setData({
-      apiBaseURL,
-      'apiForm.baseURL': apiBaseURL
-    })
-    this.checkBackend()
-  },
-
-  useLanApi() {
-    const apiBaseURL = setBaseURL(lanBaseURL)
-    this.setData({
-      apiBaseURL,
-      'apiForm.baseURL': apiBaseURL
-    })
-    this.checkBackend()
-  },
-
-  saveApiBaseURL() {
-    if (!this.data.apiForm.baseURL.trim()) {
-      wx.showToast({ title: '请填写接口地址', icon: 'none' })
+  async loginWithPhoneNumber(event) {
+    if (!this.ensureAgreementAccepted()) return
+    const detail = (event && event.detail) || {}
+    if (!detail.code || (detail.errMsg && !detail.errMsg.includes('ok'))) {
+      wx.showToast({ title: '未完成手机号快捷登录', icon: 'none' })
       return
     }
-    const apiBaseURL = setBaseURL(this.data.apiForm.baseURL)
-    this.setData({
-      apiBaseURL,
-      'apiForm.baseURL': apiBaseURL
-    })
-    wx.showToast({ title: '接口地址已保存', icon: 'success' })
-    this.checkBackend()
-  },
-
-  async checkBackend() {
-    this.setData({
-      checkingApi: true,
-      apiStatus: '检查中',
-      apiStatusClass: 'muted',
-      apiMessage: ''
-    })
+    this.safeSetData({ phoneLoginLoading: true })
     try {
-      const health = await api.get('/ping')
-      this.setData({
-        apiStatus: '可用',
-        apiStatusClass: 'success',
-        apiMessage: health && health.time ? `服务时间：${health.time.replace('T', ' ').slice(0, 19)}` : '后端已响应'
-      })
+      await ensureWechatSession({ userInitiated: true })
+      const profile = await authorizeWechatPhone(detail.code, { silent: true })
+      this.applyProfile(profile)
+      if (profile.bindingState === 'UNMATCHED') {
+        wx.showModal({
+          title: '尚未匹配业务身份',
+          content: profile.bindingMessage || '手机号已验证，请联系管理员维护租户联系人或物业员工档案。',
+          showCancel: false
+        })
+      } else if (profile.bindingState === 'PENDING_SELECTION') {
+        wx.showToast({ title: '请选择要进入的身份', icon: 'none' })
+      } else {
+        wx.showToast({ title: '身份匹配成功', icon: 'success' })
+      }
     } catch (error) {
-      this.setData({
-        apiStatus: '不可用',
-        apiStatusClass: 'danger',
-        apiMessage: error && error.message ? error.message : '无法连接后端，请检查地址和服务状态'
-      })
+      wx.showToast({ title: error && error.message ? error.message : '手机号登录失败', icon: 'none' })
     } finally {
-      this.setData({ checkingApi: false })
+      this.safeSetData({ phoneLoginLoading: false })
     }
   },
 
-  async devLogin() {
-    this.setData({ loading: true })
+  async chooseIdentity(event) {
+    const candidateToken = event.currentTarget.dataset.token
+    if (!candidateToken) return
+    this.safeSetData({ identityLoading: true })
     try {
-      const loginResult = await wx.login()
-      const session = await api.post('/mobile/auth/wechat-login', {
-        code: loginResult.code
-      })
-      setSession(session)
-      this.setData({ profile: session.profile || {} })
-      this.refreshIdentity()
-      this.checkBackend()
-      wx.showToast({ title: '微信登录成功', icon: 'success' })
+      const profile = await selectIdentity(candidateToken, { silent: true })
+      this.applyProfile(profile)
+      wx.showToast({ title: '身份已切换', icon: 'success' })
+    } catch (error) {
+      wx.showToast({ title: error && error.message ? error.message : '身份切换失败', icon: 'none' })
+      await this.refreshIdentity()
     } finally {
-      this.setData({ loading: false })
+      this.safeSetData({ identityLoading: false })
     }
   },
 
-  async bindInternal() {
-    if (!wx.getStorageSync('token')) {
-      wx.showToast({ title: '请先微信登录', icon: 'none' })
-      return
-    }
-
-    this.setData({ loading: true })
+  async unbindCurrent() {
+    this.safeSetData({ unbindLoading: true })
     try {
-      const session = await api.post('/mobile/auth/bind-internal', this.data.internalForm)
-      setSession(session)
-      this.setData({ profile: session.profile || {} })
-      this.refreshIdentity()
-      this.checkBackend()
-      wx.showToast({ title: '绑定成功', icon: 'success' })
+      const profile = await unbindCurrentIdentity({ silent: true })
+      this.applyProfile(profile)
+      wx.showToast({ title: '当前业务绑定已解除', icon: 'success' })
+    } catch (error) {
+      wx.showToast({ title: error && error.message ? error.message : '解除绑定失败', icon: 'none' })
     } finally {
-      this.setData({ loading: false })
+      this.safeSetData({ unbindLoading: false })
     }
   },
 
-  async bindTenantAccount() {
-    if (!wx.getStorageSync('token')) {
-      wx.showToast({ title: '请先微信登录', icon: 'none' })
-      return
-    }
-    if (!this.data.tenantAccountForm.phone || !this.data.tenantAccountForm.password) {
-      wx.showToast({ title: '请输入手机号和初始密码', icon: 'none' })
-      return
-    }
+  async logout() {
+    this.safeSetData({ logoutLoading: true })
+    await logoutSession()
+    this.applyProfile(PUBLIC_PROFILE)
+    this.safeSetData({ logoutLoading: false })
+    wx.showToast({ title: '已退出登录', icon: 'success' })
+  },
 
-    this.setData({ loading: true })
-    try {
-      const session = await api.post('/mobile/auth/bind-tenant', {
-        phone: this.data.tenantAccountForm.phone,
-        password: this.data.tenantAccountForm.password
+  openServiceAgreement() {
+    wx.navigateTo({ url: '/pages/agreements/service/index' })
+  },
+
+  openPrivacyPolicy() {
+    if (wx.openPrivacyContract) {
+      wx.openPrivacyContract({
+        fail() {
+          wx.showModal({
+            title: '用户隐私保护指引',
+            content: '请在小程序资料页查看用户隐私保护指引。',
+            showCancel: false
+          })
+        }
       })
-      setSession(session)
-      this.setData({ profile: session.profile || {} })
-      this.refreshIdentity()
-      this.checkBackend()
-      wx.showToast({ title: '绑定成功', icon: 'success' })
-    } finally {
-      this.setData({ loading: false })
     }
-  },
-
-  logout() {
-    clearSession()
-    this.setData({ profile: {} })
-    this.refreshIdentity()
-    wx.showToast({ title: '已清除', icon: 'success' })
   }
 })

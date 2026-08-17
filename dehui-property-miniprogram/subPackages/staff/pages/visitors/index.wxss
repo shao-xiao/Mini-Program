@@ -1,3 +1,9 @@
+page {
+  --dhic-page-action-primary: var(--dhic-success);
+  --dhic-page-action-soft: var(--dhic-success-soft);
+  --dhic-page-action-rgb: var(--dhic-success-rgb);
+}
+
 .visitor-filter-scroll {
   margin-bottom: 18rpx;
   white-space: nowrap;
@@ -9,8 +15,8 @@
 }
 
 .visitor-record {
-  border: 1rpx solid #edf0f3;
-  box-shadow: 0 6rpx 18rpx rgba(30, 50, 70, 0.04);
+  border: 1rpx solid var(--dhic-border-light);
+  box-shadow: 0 6rpx 18rpx rgba(var(--dhic-accent-rgb), 0.04);
 }
 
 .visitor-record-title {
@@ -19,28 +25,28 @@
 }
 
 .staff-status.status-pending {
-  background: #fff1e8;
-  color: #c05621;
+  background: var(--dhic-orange-soft);
+  color: var(--dhic-orange);
 }
 
 .staff-status.status-ready {
-  background: #e8f3ff;
-  color: #1769aa;
+  background: var(--dhic-info-soft);
+  color: var(--dhic-info);
 }
 
 .staff-status.status-entered {
-  background: #e7f8ef;
-  color: #178a50;
+  background: var(--dhic-success-soft);
+  color: var(--dhic-success);
 }
 
 .staff-status.status-left,
 .staff-status.status-cancelled,
 .staff-status.status-expired {
-  background: #edf2f7;
-  color: #627d98;
+  background: var(--dhic-neutral-soft);
+  color: var(--dhic-text-secondary);
 }
 
 .staff-status.status-rejected {
-  background: #fff0f0;
-  color: #c53030;
+  background: var(--dhic-danger-soft);
+  color: var(--dhic-danger);
 }

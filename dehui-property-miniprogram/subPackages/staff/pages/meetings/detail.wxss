@@ -1,0 +1,18 @@
+page {
+  --dhic-page-action-primary: var(--dhic-purple);
+  --dhic-page-action-soft: var(--dhic-purple-soft);
+  --dhic-page-action-rgb: var(--dhic-purple-rgb);
+}
+
+.staff-button[data-status="COMPLETED"] {
+  background: var(--dhic-success);
+  color: var(--dhic-text-inverse);
+  box-shadow: 0 10rpx 24rpx rgba(var(--dhic-success-rgb), 0.18);
+}
+
+.staff-button[data-status="CANCELLED"] {
+  border: 1rpx solid var(--dhic-danger);
+  background: var(--dhic-danger-soft);
+  color: var(--dhic-danger);
+  box-shadow: none;
+}

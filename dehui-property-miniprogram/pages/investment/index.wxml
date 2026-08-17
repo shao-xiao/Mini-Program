@@ -1,137 +1,203 @@
 <view class="page">
-  <view class="section hero">
-    <block wx:if="{{hero}}">
-      <view class="hero-title">{{hero.title}}</view>
-      <view wx:if="{{hero.subtitle}}" class="hero-subtitle">{{hero.subtitle}}</view>
-      <view wx:if="{{hero.content}}" class="hero-address">{{hero.content}}</view>
-    </block>
-    <block wx:else>
-      <view class="hero-title">招商中心</view>
-      <view class="hero-subtitle">暂无已发布招商内容</view>
-    </block>
+  <view wx:if="{{accessState === 'loading'}}" class="empty">正在确认招商服务能力...</view>
+  <view wx:elif="{{accessState === 'login-required' || accessState === 'unauthorized' || accessState === 'error'}}" class="empty">
+    <view class="empty-title">招商服务暂时不可用</view>
+    <view class="empty-desc">{{accessMessage}}</view>
+    <button class="inline-button" bindtap="loadPage">重新加载</button>
   </view>
 
-  <view wx:if="{{loading}}" class="card muted">正在加载招商信息...</view>
+  <block wx:else>
+  <view wx:if="{{overviewError}}" class="inline-notice">园区介绍使用基础信息展示；实时内容暂未加载。</view>
 
-  <view wx:if="{{sections.highlight.length}}" class="section card">
-    <view class="section-title">园区亮点</view>
-    <view class="highlight-grid">
-      <view wx:for="{{sections.highlight}}" wx:key="title" class="highlight-item">
-        <view class="item-title">{{item.title}}</view>
-        <view wx:if="{{item.subtitle}}" class="item-subtitle">{{item.subtitle}}</view>
-        <view wx:if="{{item.content}}" class="item-content">{{item.content}}</view>
+  <view class="investment-news-card">
+    <view class="investment-news-head">
+      <view>
+        <view class="section-title">招商公告</view>
+        <view class="investment-news-desc">园区介绍、招商优势与政策动态</view>
+      </view>
+      <view class="investment-news-source">招商展示</view>
+    </view>
+
+    <view wx:if="{{!investmentBanners.length}}" class="investment-news-empty">
+      后台暂未发布招商展示内容
+    </view>
+
+    <swiper
+      wx:else
+      class="investment-swiper"
+      autoplay="{{investmentBanners.length > 1}}"
+      circular="{{investmentBanners.length > 1}}"
+      indicator-dots="{{investmentBanners.length > 1}}"
+      indicator-color="rgba(255,255,255,0.48)"
+      indicator-active-color="#FFFFFF"
+      interval="3800"
+      duration="500"
+    >
+      <swiper-item wx:for="{{investmentBanners}}" wx:key="key" class="investment-swiper-item">
+        <view class="investment-banner" bindtap="openInvestmentRooms">
+          <image wx:if="{{item.imageUrl}}" class="investment-banner-image" src="{{item.imageUrl}}" mode="aspectFill" />
+          <view class="investment-banner-mask"></view>
+          <view class="investment-banner-orb investment-banner-orb-large"></view>
+          <view class="investment-banner-orb investment-banner-orb-small"></view>
+          <view class="investment-banner-content">
+            <view class="investment-banner-eyebrow">{{item.eyebrow}}</view>
+            <view class="investment-banner-title">{{item.title}}</view>
+            <view wx:if="{{item.subtitle}}" class="investment-banner-subtitle">{{item.subtitle}}</view>
+            <view wx:if="{{item.summary}}" class="investment-banner-summary">{{item.summary}}</view>
+          </view>
+          <view class="investment-banner-link">查看房源</view>
+        </view>
+      </swiper-item>
+    </swiper>
+
+    <view class="investment-actions">
+      <button wx:if="{{canBookViewing}}" class="primary-button" bindtap="openInvestmentRooms">选择房源</button>
+      <button class="ghost-button" bindtap="callConsultant">电话咨询</button>
+    </view>
+  </view>
+
+  <view class="quick-grid">
+    <view class="quick-card" data-target="rooms" bindtap="switchSection">
+      <text class="quick-title">可租房源</text>
+      <text class="quick-desc">{{roomStats.count}} 间可选</text>
+    </view>
+    <view wx:if="{{canBookViewing}}" class="quick-card" data-target="records" bindtap="switchSection">
+      <text class="quick-title">我的预约</text>
+      <text class="quick-desc">{{myLeadRecords.length}} 条记录</text>
+    </view>
+  </view>
+
+  <view id="investment-room-section" wx:if="{{activeSection === 'rooms'}}" class="section-card">
+    <view class="section-title">招商房源</view>
+    <view class="section-desc">按楼层、类型和面积快速筛选，点击卡片可查看详情。</view>
+
+    <view class="stats-grid">
+      <view class="stat-card">
+        <text class="stat-value">{{roomStats.count}}</text>
+        <text class="stat-label">已发布房源</text>
+      </view>
+      <view class="stat-card">
+        <text class="stat-value">{{roomStats.area}}</text>
+        <text class="stat-label">可租面积</text>
+      </view>
+      <view class="stat-card">
+        <text class="stat-value">{{roomStats.office}}</text>
+        <text class="stat-label">办公房源</text>
+      </view>
+      <view class="stat-card">
+        <text class="stat-value">{{roomStats.recommended}}</text>
+        <text class="stat-label">推荐房源</text>
+      </view>
+    </view>
+
+    <view class="filter-panel">
+      <view class="filter-row">
+        <view class="filter-label">楼层</view>
+        <view class="filter-options">
+          <view class="filter-chip {{filters.floor === item.value ? 'active' : ''}}" wx:for="{{floorFilters}}" wx:key="value" data-field="floor" data-value="{{item.value}}" bindtap="changeFilter">{{item.label}}</view>
+        </view>
+      </view>
+      <view class="filter-row">
+        <view class="filter-label">类型</view>
+        <view class="filter-options">
+          <view class="filter-chip {{filters.type === item.value ? 'active' : ''}}" wx:for="{{typeFilters}}" wx:key="value" data-field="type" data-value="{{item.value}}" bindtap="changeFilter">{{item.label}}</view>
+        </view>
+      </view>
+      <view class="filter-row">
+        <view class="filter-label">面积</view>
+        <view class="filter-options">
+          <view class="filter-chip {{filters.area === item.value ? 'active' : ''}}" wx:for="{{areaFilters}}" wx:key="value" data-field="area" data-value="{{item.value}}" bindtap="changeFilter">{{item.label}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{loadingRooms}}" class="empty">正在加载房源...</view>
+    <view wx:elif="{{roomsError}}" class="empty">
+      <view class="empty-title">房源暂时无法加载</view>
+      <view class="empty-desc">{{roomsError}}</view>
+      <button class="inline-button" bindtap="retryRooms">重新加载</button>
+    </view>
+    <view wx:elif="{{!filteredRooms.length}}" class="empty">
+      <view class="empty-title">暂无可展示房源</view>
+      <view class="empty-desc">当前暂无后台已发布且可展示的真实房间房源。</view>
+    </view>
+    <view wx:else class="room-list">
+      <view class="room-card" wx:for="{{filteredRooms}}" wx:key="listingId">
+        <view class="cover-wrap" data-id="{{item.listingId}}" bindtap="viewDetail">
+          <image wx:if="{{item.coverImageUrl}}" class="cover" src="{{item.coverImageUrl}}" mode="aspectFill" />
+          <view wx:else class="cover placeholder-cover">
+            <text>德汇创新中心</text>
+          </view>
+          <view class="status-pill">{{item.statusText}}</view>
+        </view>
+        <view class="room-body">
+          <view class="room-title" data-id="{{item.listingId}}" bindtap="viewDetail">{{item.title}}</view>
+          <view class="room-subtitle">{{item.floorText}} · {{item.areaText}} · {{item.roomTypeText}}</view>
+          <view wx:if="{{item.subtitle}}" class="room-desc">{{item.subtitle}}</view>
+          <view class="tag-row">
+            <text wx:for="{{item.tags}}" wx:key="*this" class="tag">{{item}}</text>
+          </view>
+          <view class="card-actions">
+            <button class="secondary-button" data-url="/pages/investment/detail/index" data-id="{{item.listingId}}" bindtap="viewDetail">查看详情</button>
+            <button wx:if="{{canBookViewing}}" class="primary-button small" data-id="{{item.listingId}}" bindtap="openLeadPopup">预约看房</button>
+          </view>
+        </view>
       </view>
     </view>
   </view>
 
-  <view wx:if="{{sections.policy.length}}" class="section card">
-    <view class="section-title">招商政策</view>
-    <view wx:for="{{sections.policy}}" wx:key="title" class="policy-item">
-      <view class="item-title">{{item.title}}</view>
-      <view wx:if="{{item.subtitle}}" class="item-subtitle">{{item.subtitle}}</view>
-      <view wx:if="{{item.content}}" class="item-content">{{item.content}}</view>
+  <view wx:if="{{canBookViewing && activeSection === 'records'}}" class="section-card">
+    <view class="section-title">我的预约</view>
+    <view wx:if="{{loadingMyLeads}}" class="empty">正在加载预约记录...</view>
+    <view wx:elif="{{leadsError}}" class="empty">
+      <view class="empty-title">预约记录暂时无法加载</view>
+      <view class="empty-desc">{{leadsError}}</view>
+      <button class="inline-button" bindtap="retryMyLeads">重新加载</button>
+    </view>
+    <view wx:elif="{{!myLeadRecords.length}}" class="empty">暂无预约记录</view>
+    <view wx:else class="lead-list">
+      <view class="lead-card" wx:for="{{myLeadRecords}}" wx:key="id">
+        <view class="lead-head">
+          <text class="lead-title">{{item.intendedRoom || item.companyName || '预约看房'}}</text>
+          <text class="lead-status">{{item.statusText}}</text>
+        </view>
+        <view class="lead-line">看房时间：{{item.preferredVisitTimeText}}</view>
+        <view class="lead-line">联系人：{{item.name}} / {{item.phone}}</view>
+        <view class="lead-line">提交时间：{{item.createdAtText}}</view>
+      </view>
     </view>
   </view>
 
-  <view wx:if="{{sections.introduction.length}}" class="section card">
-    <view class="section-title">园区介绍</view>
-    <view wx:for="{{sections.introduction}}" wx:key="title" class="text-block">
-      <view class="item-title">{{item.title}}</view>
-      <view wx:if="{{item.subtitle}}" class="item-subtitle">{{item.subtitle}}</view>
-      <view wx:if="{{item.content}}" class="item-content">{{item.content}}</view>
+  <view wx:if="{{canBookViewing && leadPopupVisible}}" class="popup-mask" bindtap="closeLeadPopup">
+    <view class="popup-panel" catchtap="noop">
+      <view class="popup-head">
+        <view>
+          <view class="popup-title">预约看房</view>
+          <view class="popup-desc">招商顾问会根据房源情况与您联系</view>
+        </view>
+        <view class="popup-close" bindtap="closeLeadPopup">×</view>
+      </view>
+      <scroll-view scroll-y class="popup-scroll">
+        <input class="input" placeholder="联系人" value="{{leadForm.name}}" maxlength="20" data-field="name" bindinput="onLeadInput" />
+        <input wx:if="{{profile.maskedPhone}}" class="input" placeholder="已验证手机号" value="{{leadForm.phone}}" disabled />
+        <button
+          wx:else
+          class="phone-authorize-button"
+          open-type="getPhoneNumber"
+          bindgetphonenumber="authorizePhone"
+        >验证手机号后预约</button>
+        <input class="input" placeholder="公司名称" value="{{leadForm.companyName}}" maxlength="50" data-field="companyName" bindinput="onLeadInput" />
+        <input class="input" placeholder="意向房源" value="{{leadForm.intendedRoom}}" disabled />
+        <input class="input" placeholder="意向面积，如 100" type="digit" value="{{leadForm.desiredArea}}" maxlength="10" data-field="desiredArea" bindinput="onLeadInput" />
+        <input class="input" placeholder="用途，如 研发办公 / 企业总部" value="{{leadForm.intendedUse}}" maxlength="50" data-field="intendedUse" bindinput="onLeadInput" />
+        <view class="picker-grid">
+          <calendar-date-field value="{{leadForm.preferredVisitDate}}" min-date="{{today}}" placeholder="选择看房日期" bind:change="onDateChange" />
+          <calendar-time-field value="{{leadForm.preferredVisitClock}}" placeholder="选择看房时间" title="选择看房时间" bind:change="onTimeChange" />
+        </view>
+        <textarea class="textarea" placeholder="补充需求" value="{{leadForm.remark}}" maxlength="200" data-field="remark" bindinput="onLeadInput" />
+      </scroll-view>
+      <button class="submit-button" loading="{{submitting}}" bindtap="submitLead">提交预约</button>
     </view>
   </view>
-
-  <view wx:if="{{sections.location.length}}" class="section card">
-    <view class="section-title">园区地址</view>
-    <view wx:for="{{sections.location}}" wx:key="title" class="text-block">
-      <view class="item-title">{{item.title}}</view>
-      <view wx:if="{{item.subtitle}}" class="item-subtitle">{{item.subtitle}}</view>
-      <view wx:if="{{item.content}}" class="item-content">{{item.content}}</view>
-    </view>
-  </view>
-
-  <view wx:if="{{sections.contact.length}}" class="section card">
-    <view class="section-title">联系方式</view>
-    <view wx:for="{{sections.contact}}" wx:key="title" class="text-block">
-      <view class="item-title">{{item.title}}</view>
-      <view wx:if="{{item.subtitle}}" class="item-subtitle">{{item.subtitle}}</view>
-      <view wx:if="{{item.content}}" class="item-content">{{item.content}}</view>
-    </view>
-  </view>
-
-  <view wx:if="{{sections.notice.length}}" class="section card">
-    <view class="section-title">招商公告</view>
-    <view wx:for="{{sections.notice}}" wx:key="title" class="policy-item">
-      <view class="item-title">{{item.title}}</view>
-      <view wx:if="{{item.subtitle}}" class="item-subtitle">{{item.subtitle}}</view>
-      <view wx:if="{{item.content}}" class="item-content">{{item.content}}</view>
-    </view>
-  </view>
-
-  <view class="section card">
-    <view class="section-title">预约看房</view>
-    <view class="form-tip">请留下意向面积和使用需求，招商顾问会根据实际房源情况与您联系。</view>
-    <input
-      class="input"
-      placeholder-class="input-placeholder"
-      placeholder="联系人"
-      value="{{leadForm.name}}"
-      data-field="name"
-      bindinput="onLeadInput"
-    />
-    <input
-      class="input"
-      placeholder-class="input-placeholder"
-      placeholder="联系电话"
-      type="number"
-      value="{{leadForm.phone}}"
-      data-field="phone"
-      bindinput="onLeadInput"
-    />
-    <input
-      class="input"
-      placeholder-class="input-placeholder"
-      placeholder="公司名称"
-      value="{{leadForm.companyName}}"
-      data-field="companyName"
-      bindinput="onLeadInput"
-    />
-    <input
-      class="input"
-      placeholder-class="input-placeholder"
-      placeholder="意向面积，例如 100㎡"
-      type="digit"
-      value="{{leadForm.desiredArea}}"
-      data-field="desiredArea"
-      bindinput="onLeadInput"
-    />
-    <input
-      class="input"
-      placeholder-class="input-placeholder"
-      placeholder="用途，例如 研发办公 / 企业总部"
-      value="{{leadForm.intendedUse}}"
-      data-field="intendedUse"
-      bindinput="onLeadInput"
-    />
-    <input
-      class="input"
-      placeholder-class="input-placeholder"
-      placeholder="期望看房时间，例如 本周五下午"
-      value="{{leadForm.preferredVisitTime}}"
-      data-field="preferredVisitTime"
-      bindinput="onLeadInput"
-    />
-    <textarea
-      class="textarea"
-      placeholder-class="input-placeholder"
-      placeholder="补充需求，例如楼层偏好、入驻时间、预算范围"
-      value="{{leadForm.remark}}"
-      data-field="remark"
-      bindinput="onLeadInput"
-    />
-    <button class="button-primary submit-button" loading="{{submitting}}" bindtap="submitLead">
-      提交预约
-    </button>
-  </view>
+  </block>
 </view>

@@ -15,6 +15,7 @@ import request from '../utils/request'
 /**
  * @typedef {Object} ParkingAssignment
  * @property {number} id
+ * @property {number} assignmentId
  * @property {number} spaceId
  * @property {string} partyType
  * @property {string} partyNameSnapshot
@@ -27,6 +28,7 @@ import request from '../utils/request'
  * @typedef {Object} ParkingBill
  * @property {number} id
  * @property {string} billNo
+ * @property {string} billingMonth
  * @property {string} spaceNoSnapshot
  * @property {string} partyNameSnapshot
  * @property {string} plateNoSnapshot
@@ -54,6 +56,10 @@ export function bindParkingSpace(id, data) {
   return request.post(`/parking/spaces/${id}/bind`, data)
 }
 
+export function updateParkingAssignmentMonthlyFee(id, monthlyFee) {
+  return request.patch(`/parking/assignments/${id}/monthly-fee`, { monthlyFee })
+}
+
 export function releaseParkingSpace(id, data = {}) {
   return request.post(`/parking/spaces/${id}/release`, data)
 }
@@ -62,12 +68,28 @@ export function updateParkingSpaceStatus(id, status) {
   return request.patch(`/parking/spaces/${id}/status`, null, { params: { status } })
 }
 
+export function listParkingSpaceTypes() {
+  return request.get('/parking/spaces/type-options')
+}
+
+export function createParkingSpaceType(data) {
+  return request.post('/parking/spaces/type-options', data)
+}
+
 export function listParkingAssignments(params = {}) {
   return request.get('/parking/assignments', { params })
 }
 
 export function listParkingBills(params = {}) {
   return request.get('/parking/bills', { params })
+}
+
+export function listParkingBillAssignments() {
+  return request.get('/parking/bills/assignments')
+}
+
+export function createParkingBill(data) {
+  return request.post('/parking/bills', data)
 }
 
 export function syncParkingBills(data) {

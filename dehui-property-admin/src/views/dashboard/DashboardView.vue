@@ -633,23 +633,29 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .dashboard-page {
-  padding: 4px;
+  min-width: 0;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 16px;
   margin-bottom: 16px;
 }
 
 .page-header h2 {
   margin: 0;
+  color: var(--dhic-text-primary);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
 }
 
 .page-header p {
-  margin: 6px 0 0;
-  color: #777;
+  margin: 4px 0 0;
+  color: var(--dhic-text-secondary);
+  font-size: 13px;
 }
 
 .kpi-grid {
@@ -660,25 +666,28 @@ onBeforeUnmount(() => {
 }
 
 .kpi-card {
-  min-height: 126px;
+  min-height: 124px;
 }
 
 .card-title {
-  color: #666;
-  font-size: 14px;
+  color: var(--dhic-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .card-value {
-  margin-top: 10px;
-  font-size: 25px;
-  font-weight: bold;
+  margin-top: 9px;
+  color: var(--dhic-text-primary);
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   line-height: 1.15;
 }
 
 .card-desc {
   margin-top: 10px;
-  color: #909399;
-  font-size: 13px;
+  color: var(--dhic-text-secondary);
+  font-size: 12px;
 }
 
 .chart-grid {
@@ -693,7 +702,7 @@ onBeforeUnmount(() => {
 }
 
 .chart {
-  height: 300px;
+  height: 288px;
   width: 100%;
 }
 
@@ -702,19 +711,51 @@ onBeforeUnmount(() => {
 }
 
 .success {
-  color: #67c23a;
+  color: var(--dhic-success);
 }
 
 .danger {
-  color: #f56c6c;
+  color: var(--dhic-danger);
 }
 
 .warning {
-  color: #e6a23c;
+  color: var(--dhic-warning);
 }
 
 .ai-summary {
   margin: 0;
-  color: #303133;
+  color: var(--dhic-text-primary);
+  line-height: 1.7;
+}
+
+@media (max-width: 1500px) {
+  .kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1180px) {
+  .chart-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-card.wide {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 820px) {
+  .page-header {
+    flex-wrap: wrap;
+  }
+
+  .kpi-grid,
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-card.wide {
+    grid-column: auto;
+  }
 }
 </style>

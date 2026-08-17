@@ -2,29 +2,54 @@
   "pages": [
     "pages/index/index",
     "pages/mine/index",
-    "pages/mine/tenant-bind/index",
-    "pages/mine/staff-bind/index",
-    "pages/home/index",
     "pages/me/index",
+    "pages/agreements/service/index",
     "pages/announcements/index",
     "pages/announcements/detail",
     "pages/bills/index",
+    "pages/contracts/index",
+    "pages/rooms/index",
+    "pages/my-business/index",
     "pages/business-detail/index",
+    "pages/energy/index",
+    "pages/parking/index",
     "pages/meeting/index",
     "pages/workorders/index",
     "pages/visitors/index",
     "pages/investment/index",
-    "pages/checkin/index"
+    "pages/investment/detail/index"
+  ],
+  "subPackages": [
+    {
+      "root": "subPackages/staff",
+      "pages": [
+        "pages/workbench/index",
+        "pages/inspections/index",
+        "pages/inspections/form",
+        "pages/inspections/detail",
+        "pages/workorders/index",
+        "pages/workorders/detail",
+        "pages/workorders/process",
+        "pages/energy/index",
+        "pages/energy/reading-form",
+        "pages/meetings/index",
+        "pages/meetings/detail",
+        "pages/visitors/index",
+        "pages/visitors/detail",
+        "pages/investment/index",
+        "pages/investment/detail"
+      ]
+    }
   ],
   "window": {
     "navigationBarTitleText": "德汇创新中心",
-    "navigationBarBackgroundColor": "#E4312B",
+    "navigationBarBackgroundColor": "#163B5C",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#F5F6F8"
+    "backgroundColor": "#F5F7FA"
   },
   "tabBar": {
-    "color": "#8A8F99",
-    "selectedColor": "#E4312B",
+    "color": "#64748B",
+    "selectedColor": "#1E496F",
     "backgroundColor": "#ffffff",
     "borderStyle": "black",
     "list": [
@@ -38,14 +63,6 @@
       }
     ]
   },
-  "permission": {
-    "scope.userLocation": {
-      "desc": "用于员工签到时记录当前位置"
-    }
-  },
-  "requiredPrivateInfos": [
-    "getLocation"
-  ],
   "style": "v2",
   "lazyCodeLoading": "requiredComponents"
 }

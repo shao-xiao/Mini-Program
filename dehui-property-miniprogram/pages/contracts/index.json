@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "电子合同",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "data-source-panel": "../../components/data-source-panel/index"
+  }
+}

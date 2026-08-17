@@ -1,14 +1,22 @@
-<view class="page {{isPublicMode ? 'public-visitor-page' : 'tenant-visitor-page'}}">
-  <block wx:if="{{isPublicMode}}">
-    <view class="section card public-visitor-intro">
-      <view class="public-visitor-heading">
-        <view class="title">访客预约</view>
-        <view class="public-visitor-badge">免登录</view>
-      </view>
-      <view class="empty-desc">无需登录即可预约；提交后，本机会持续显示物业审核状态和门禁二维码。</view>
-    </view>
+<view class="page visitor-data-page {{isPublicMode ? 'public-visitor-page' : 'tenant-visitor-page'}}">
+  <view class="section visitor-source-section">
+    <data-source-panel
+      title="访客通行服务"
+      description="{{isPublicMode ? '无需登录即可预约；访客登记、物业审核与门禁状态统一追踪' : '创建访客预约，并持续跟踪物业审核与门禁状态'}}"
+      source="{{isPublicMode ? '本机预约凭证 · 物业访客系统' : '物业访客管理'}}"
+      scope="{{isPublicMode ? '本机历史与公开预约' : (identityText || '当前租户') + ' · 当前身份范围'}}"
+      status="审核状态同步"
+      tone="service"
+    />
+  </view>
 
+  <block wx:if="{{isPublicMode}}">
     <view class="section card reservation-history-card">
+      <view class="history-source-row">
+        <view class="history-source-dot"></view>
+        <text>记录来源 · 本机预约凭证</text>
+        <text class="history-source-count">{{visitors.length}} 条</text>
+      </view>
       <view class="section-title history-title">个人预约历史记录</view>
       <view class="history-scope-tip">仅显示本机提交并保存的预约；更换设备后请凭预约编号联系物业。</view>
       <view wx:if="{{historyLoading}}" class="history-state">正在刷新预约记录…</view>
@@ -44,7 +52,29 @@
     </view>
 
     <view class="section card public-visitor-form">
-      <view class="section-title public-section-title">新增访客预约</view>
+      <view class="public-form-heading">
+        <view>
+          <view class="section-title public-section-title">新增访客预约</view>
+          <view class="form-source-text">字段来源 · 访客预约固定业务字段</view>
+        </view>
+        <view class="public-visitor-badge">免登录</view>
+      </view>
+      <view class="visitor-process">
+        <view class="visitor-process-item active">
+          <view class="visitor-process-index">01</view>
+          <view class="visitor-process-text">提交预约</view>
+        </view>
+        <view class="visitor-process-line"></view>
+        <view class="visitor-process-item">
+          <view class="visitor-process-index">02</view>
+          <view class="visitor-process-text">物业审核</view>
+        </view>
+        <view class="visitor-process-line"></view>
+        <view class="visitor-process-item">
+          <view class="visitor-process-index">03</view>
+          <view class="visitor-process-text">门禁核验</view>
+        </view>
+      </view>
       <view class="public-field-grid">
         <input
           class="input public-input"
@@ -156,6 +186,10 @@
       <view class="section card reservation-history-section tenant-history-panel">
         <view class="tenant-history-heading">
           <view>
+            <view class="tenant-section-source">
+              <view class="tenant-section-source-dot"></view>
+              <text>记录来源 · 物业访客系统</text>
+            </view>
             <view class="section-title history-title">个人预约历史记录</view>
             <view class="tenant-history-identity">{{identityText || '当前租户'}} · 审核及门禁状态</view>
           </view>
@@ -219,9 +253,25 @@
         <view class="tenant-form-heading">
           <view>
             <view class="section-title tenant-form-title">新增访客预约</view>
-            <view class="tenant-form-tip">提交后由物业审核，通过后可出示门禁二维码</view>
+            <view class="tenant-form-tip">字段来源 · 后台字段平台　提交后进入物业审核</view>
           </view>
           <view class="tenant-required-tip"><text>*</text> 必填</view>
+        </view>
+        <view class="visitor-process tenant-process">
+          <view class="visitor-process-item active">
+            <view class="visitor-process-index">01</view>
+            <view class="visitor-process-text">填写信息</view>
+          </view>
+          <view class="visitor-process-line"></view>
+          <view class="visitor-process-item">
+            <view class="visitor-process-index">02</view>
+            <view class="visitor-process-text">物业审核</view>
+          </view>
+          <view class="visitor-process-line"></view>
+          <view class="visitor-process-item">
+            <view class="visitor-process-index">03</view>
+            <view class="visitor-process-text">门禁通行</view>
+          </view>
         </view>
         <dynamic-form
           id="schemaForm"

@@ -1,0 +1,20 @@
+<view class="page">
+  <view class="staff-form">
+    <view class="staff-field"><view class="staff-label">处理记录</view><textarea class="staff-textarea" value="{{content}}" bindinput="input" /></view>
+    <dynamic-form id="schemaForm" module-key="workorders" schema="{{fieldSchema}}" values="{{customFields}}" bind:change="onSchemaChange" />
+    <block wx:if="{{false}}">
+    <view class="staff-field" wx:for="{{schemaFields}}" wx:key="fieldKey">
+      <view class="staff-label">{{item.label}}{{item.required ? ' *' : ''}}</view>
+      <view wx:if="{{item.dataType === 'IMAGE'}}" class="staff-actions">
+        <button class="staff-button secondary" data-key="{{item.fieldKey}}" bindtap="chooseCustomImages" disabled="{{submitting}}">选择并上传</button>
+        <button wx:for="{{customFiles[item.fieldKey]}}" wx:for-item="file" wx:for-index="fileIndex" wx:key="fileId" class="staff-button secondary" data-key="{{item.fieldKey}}" data-url="{{file.url}}" bindtap="previewCustomImage">预览 {{fileIndex + 1}}</button>
+        <button wx:for="{{customFiles[item.fieldKey]}}" wx:for-item="file" wx:for-index="fileIndex" wx:key="fileId" class="staff-button secondary" data-key="{{item.fieldKey}}" data-index="{{fileIndex}}" bindtap="removeCustomImage">删除 {{fileIndex + 1}}</button>
+      </view>
+      <input wx:else class="staff-input" data-key="{{item.fieldKey}}" value="{{customFields[item.fieldKey]}}" bindinput="customInput" />
+    </view>
+    </block>
+    <view class="staff-field"><view class="staff-label">处理前后照片（{{files.length}}/6）</view><button class="staff-button secondary" bindtap="chooseImages" disabled="{{submitting || files.length >= 6}}">选择并上传</button></view>
+    <checkbox-group wx:if="{{canComplete}}" bindchange="toggleComplete"><label><checkbox value="complete" />保存记录后完成工单</label></checkbox-group>
+    <button class="staff-button" bindtap="submit" loading="{{submitting}}" disabled="{{submitting || !content}}">保存处理记录</button>
+  </view>
+</view>

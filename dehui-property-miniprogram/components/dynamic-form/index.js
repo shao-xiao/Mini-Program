@@ -10,7 +10,7 @@ Component({
     readonly: Boolean,
     compact: Boolean
   },
-  data: { fields: [], model: {}, errors: {}, uploading: false },
+  data: { fields: [], model: {}, displayValues: {}, errors: {}, uploading: false },
   observers: {
     'schema,values': function (schema, values) {
       const fields = normalizeFields(schema && schema.fields || schema)
@@ -19,7 +19,7 @@ Component({
         const raw = values && (values[field.apiField] ?? values[field.fieldKey] ?? (values.customFields || {})[field.fieldKey])
         model[field.fieldKey] = ['IMAGE', 'ATTACHMENT'].includes(field.dataType) ? normalizeFileValue(raw) : (raw ?? '')
       })
-      this.setData({ fields, model })
+      this.setData({ fields, model, displayValues: selectDisplayValues(fields, model) })
     }
   },
   methods: {
@@ -57,6 +57,7 @@ Component({
             fileId: Number(uploaded.fileId || uploaded.id),
             name: uploaded.name || item.name || '',
             url: uploaded.url || '',
+            previewUrl: item.path,
             sortOrder: current.files.length
           })
         }
@@ -75,15 +76,20 @@ Component({
       this.change(key, current)
     },
     previewFile(event) {
-      const file = normalizeFileValue(this.data.model[event.currentTarget.dataset.key]).files[Number(event.currentTarget.dataset.index)]
-      if (!file || !file.url) return
-      wx.previewImage({ current: file.url, urls: normalizeFileValue(this.data.model[event.currentTarget.dataset.key]).files.map(item => item.url).filter(Boolean) })
+      const files = normalizeFileValue(this.data.model[event.currentTarget.dataset.key]).files
+      const file = files[Number(event.currentTarget.dataset.index)]
+      const current = file && (file.previewUrl || file.url)
+      if (!current) return
+      wx.previewImage({
+        current,
+        urls: files.map(item => item.previewUrl || item.url).filter(Boolean)
+      })
     },
     change(key, value) {
       const model = { ...this.data.model, [key]: value }
       const errors = { ...this.data.errors }
       delete errors[key]
-      this.setData({ model, errors })
+      this.setData({ model, displayValues: selectDisplayValues(this.data.fields, model), errors })
       this.triggerEvent('change', { values: model, payload: buildSubmission({ fields: this.data.fields }, model) })
     },
     validate() {
@@ -121,3 +127,17 @@ Component({
     }
   }
 })
+
+function selectDisplayValues(fields, model) {
+  const result = {}
+  ;(fields || []).forEach(field => {
+    const value = model && model[field.fieldKey]
+    if (field.dataType !== 'SELECT') {
+      result[field.fieldKey] = value
+      return
+    }
+    const option = (field.options || []).find(item => String(item.value) === String(value))
+    result[field.fieldKey] = option ? option.label : value
+  })
+  return result
+}

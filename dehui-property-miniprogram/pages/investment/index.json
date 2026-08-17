@@ -1,3 +1,7 @@
 {
-  "navigationBarTitleText": "招商中心"
+  "navigationBarTitleText": "招商中心",
+  "usingComponents": {
+    "calendar-date-field": "../../components/calendar-date-field/index",
+    "calendar-time-field": "../../components/calendar-time-field/index"
+  }
 }

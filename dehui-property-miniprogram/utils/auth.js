@@ -166,7 +166,7 @@ function getWechatCode() {
     wx.login({
       success(result) {
         if (result && result.code) resolve(result.code)
-        else reject(new Error('微信登录失败'))
+        else reject(new Error('登录失败'))
       },
       fail: reject
     })
@@ -202,7 +202,7 @@ function ensureWechatSession(options = {}) {
       data: { code, restoreBoundIdentity },
       silent
     })
-    if (!session || !session.token) throw new Error('微信登录未返回有效会话')
+    if (!session || !session.token) throw new Error('登录未返回有效会话')
     const returnedIdentity = normalizeUserType(session.userType || session.identity)
     if (!restoreBoundIdentity && returnedIdentity !== 'PUBLIC') {
       const error = new Error('公开会话不能恢复业务身份')
@@ -229,7 +229,7 @@ function loginWithWechat() {
 }
 
 async function authorizeWechatPhone(phoneCode, options = {}) {
-  if (!phoneCode) throw new Error('未取得微信手机号授权码')
+  if (!phoneCode) throw new Error('未取得手机号授权码')
   await ensureWechatSession({ silent: options.silent !== false, userInitiated: true })
   const login = () => api.request({
     url: '/mobile/auth/wechat-phone-login',

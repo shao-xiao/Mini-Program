@@ -1,0 +1,122 @@
+<view class="page">
+  <view class="energy-hero">
+    <view class="hero-heading">
+      <view>
+        <view class="hero-kicker">ENERGY OVERVIEW</view>
+        <view class="hero-title">企业能耗总览</view>
+      </view>
+      <view class="source-badge">
+        <view class="source-dot"></view>
+        <text>后台结算数据</text>
+      </view>
+    </view>
+    <view class="hero-desc">用量和费用来自抄表记录及已保存的计费快照</view>
+    <picker mode="date" fields="month" value="{{periodMonth}}" bindchange="onMonthChange">
+      <view class="month-picker">
+        <view class="month-label">当前账期</view>
+        <view class="month-value">{{periodMonth}} <text class="month-arrow">›</text></view>
+      </view>
+    </picker>
+  </view>
+
+  <view wx:if="{{state === 'loading'}}" class="state-card">
+    <view class="loading-dot"></view>
+    <view>正在加载能耗数据...</view>
+  </view>
+  <view wx:elif="{{state === 'unauthorized' || state === 'error'}}" class="state-card state-card--column">
+    <view class="empty-title">{{state === 'unauthorized' ? '当前身份不可查看' : '加载失败'}}</view>
+    <view class="empty-desc">{{message}}</view>
+    <button class="button-primary retry-button" bindtap="load">重新加载</button>
+  </view>
+  <block wx:else>
+    <view class="energy-section">
+      <view class="section-heading">
+        <view>
+          <view class="section-title">本月汇总</view>
+          <view class="section-caption">{{periodMonth}} 结算快照</view>
+        </view>
+        <view class="section-count">{{summary.length}} 项</view>
+      </view>
+      <view wx:if="{{summary.length === 0}}" class="empty-panel">当前账期暂无已抄表数据</view>
+      <view wx:else class="summary-grid">
+        <view wx:for="{{summary}}" wx:key="meterType" class="summary-card">
+          <view class="summary-head">
+            <view class="meter-identity">
+              <view class="meter-icon meter-icon--{{item.meterTypeClass}}">
+                <view class="meter-icon-core"></view>
+              </view>
+              <view class="meter-name">{{item.meterTypeText}}费</view>
+            </view>
+            <view class="reading-count">{{item.readingCount}} 条</view>
+          </view>
+          <view class="summary-amount"><text class="currency">¥</text>{{item.amountText}}</view>
+          <view class="summary-usage">
+            <text>本期用量</text>
+            <text class="summary-usage-value">{{item.usageText}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="energy-section">
+      <view class="section-heading">
+        <view>
+          <view class="section-title">历史趋势</view>
+          <view class="section-caption">按账期查看费用变化</view>
+        </view>
+        <view class="section-count">{{historyTotal}} 条</view>
+      </view>
+      <view wx:if="{{history.length === 0}}" class="empty-panel">暂无历史月份数据</view>
+      <view wx:else class="data-panel">
+        <view wx:for="{{history}}" wx:key="index" class="data-row">
+          <view class="data-main">
+            <view class="meter-mark meter-mark--{{item.meterTypeClass}}"></view>
+            <view>
+              <view class="data-title">{{item.periodMonth}}</view>
+              <view class="data-meta">{{item.meterTypeText}} · 用量 {{item.usageText}}</view>
+            </view>
+          </view>
+          <view class="data-amount">¥{{item.amountText}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="energy-section">
+      <view class="section-heading">
+        <view>
+          <view class="section-title">抄表明细</view>
+          <view class="section-caption">{{periodMonth}} 原始记录</view>
+        </view>
+        <view class="section-count">{{readingsTotal}} 条</view>
+      </view>
+      <view wx:if="{{readings.length === 0}}" class="empty-panel">当前月份暂无抄表明细</view>
+      <view wx:else class="data-panel">
+        <view
+          wx:for="{{readings}}"
+          wx:key="id"
+          class="data-row reading-row"
+          data-id="{{item.id}}"
+          bindtap="openDetail"
+          hover-class="reading-row--active"
+        >
+          <view class="data-main">
+            <view class="meter-mark meter-mark--{{item.meterTypeClass}}"></view>
+            <view>
+              <view class="data-title">{{item.meterNo || item.meterTypeText}}</view>
+              <view class="data-meta">{{item.meterTypeText}} · 用量 {{item.usageText}}</view>
+            </view>
+          </view>
+          <view class="reading-tail">
+            <view class="data-amount">¥{{item.amountText}}</view>
+            <view class="row-arrow">›</view>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{historyTotal > 0 || readingsTotal > 0}}" class="more">
+      <view class="more-line"></view>
+      <text>{{loadingMore ? '加载中…' : (noMore ? '已加载全部数据' : '上拉加载更多')}}</text>
+      <view class="more-line"></view>
+    </view>
+  </block>
+</view>

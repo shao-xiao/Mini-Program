@@ -1,3 +1,10 @@
 {
-  "navigationBarTitleText": "会议预约"
+  "navigationBarTitleText": "会议预约",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "calendar-date-field": "../../components/calendar-date-field/index",
+    "calendar-time-field": "../../components/calendar-time-field/index",
+    "dynamic-form": "../../components/dynamic-form/index",
+    "data-source-panel": "../../components/data-source-panel/index"
+  }
 }

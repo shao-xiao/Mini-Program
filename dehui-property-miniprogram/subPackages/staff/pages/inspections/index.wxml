@@ -1,0 +1,24 @@
+<view class="page">
+  <view class="staff-header">
+    <view class="staff-header-title">巡检记录</view>
+    <view class="staff-header-desc">服务端分页，巡检人由当前员工身份自动确定。</view>
+  </view>
+  <view class="staff-filter">
+    <view class="staff-filter-item {{status === '' ? 'active' : ''}}" data-status="" bindtap="filter">全部</view>
+    <view class="staff-filter-item {{status === 'OPEN' ? 'active' : ''}}" data-status="OPEN" bindtap="filter">待处理</view>
+    <view class="staff-filter-item {{status === 'CLOSED' ? 'active' : ''}}" data-status="CLOSED" bindtap="filter">已关闭</view>
+  </view>
+  <button wx:if="{{canCreate}}" class="staff-button" bindtap="create">新增巡检</button>
+  <view wx:if="{{error}}" class="staff-empty">{{error}}</view>
+  <view wx:for="{{records}}" wx:key="id" class="staff-record" data-id="{{item.id}}" bindtap="detail">
+    <view class="staff-row">
+      <view class="staff-record-title">{{item.inspectionTypeName || item.inspectionType}} · {{item.location}}</view>
+      <view class="staff-status inspection-result {{item.resultClass}}">{{item.resultLabel}}</view>
+    </view>
+    <view class="staff-record-meta">{{item.inspectionDate}} · {{item.inspector}} · {{item.statusLabel}}</view>
+    <view class="staff-record-meta" wx:if="{{item.problemDescription}}">{{item.problemDescription}}</view>
+  </view>
+  <view wx:if="{{!loading && !records.length}}" class="staff-empty">暂无巡检记录</view>
+  <view wx:if="{{loading}}" class="staff-empty">正在加载…</view>
+  <view wx:if="{{!hasMore && records.length}}" class="more">没有更多了</view>
+</view>

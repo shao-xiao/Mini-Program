@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import MainLayout from '../layout/MainLayout.vue'
-import { canAccessPath, getCurrentRoles } from '../config/access'
+import { createAuthGuard } from './authGuard.js'
 
 const routes = [
   {
@@ -13,7 +13,6 @@ const routes = [
   {
     path: '/',
     component: MainLayout,
-    redirect: '/dashboard',
     children: [
       {
         path: '/dashboard',
@@ -21,49 +20,99 @@ const routes = [
         component: () => import('../views/dashboard/DashboardView.vue'),
         meta: { title: '首页驾驶舱' }
       },
+      {
+        path: '/403',
+        name: 'Forbidden',
+        component: () => import('../views/error/ForbiddenView.vue'),
+        meta: { title: '无权限访问', publicAuth: true }
+      },
 
       {
-        path: '/buildings',
-        name: 'BuildingList',
-        component: () => import('../views/building/BuildingList.vue'),
-        meta: { title: '楼宇管理' }
+        path: '/assets/spaces',
+        name: 'AssetSpaces',
+        component: () => import('../views/assets/AssetSpacesView.vue'),
+        meta: { title: '楼宇空间管理' }
       },
       {
-        path: '/floors',
-        name: 'FloorList',
-        component: () => import('../views/building/FloorList.vue'),
-        meta: { title: '楼层管理' }
-      },
-      {
-        path: '/rooms',
-        name: 'RoomList',
-        component: () => import('../views/building/RoomList.vue'),
-        meta: { title: '房间管理' }
-      },
-      {
-        path: '/equipment',
-        name: 'EquipmentList',
+        path: '/assets/equipment',
+        name: 'AssetEquipment',
         component: () => import('../views/building/EquipmentList.vue'),
         meta: { title: '设备台账' }
       },
       {
+        path: '/assets/energy',
+        name: 'AssetEnergy',
+        component: () => import('../views/assets/AssetEnergyView.vue'),
+        meta: { title: '能耗管理' }
+      },
+      {
+        path: '/assets/parking',
+        name: 'AssetParking',
+        component: () => import('../views/assets/AssetParkingView.vue'),
+        meta: { title: '停车位管理' }
+      },
+      {
+        path: '/assets/meetings',
+        name: 'AssetMeetings',
+        component: () => import('../views/assets/AssetMeetingsView.vue'),
+        meta: { title: '会议管理' }
+      },
+      {
         path: '/assets',
-        name: 'AssetList',
-        component: () => import('../views/building/AssetList.vue'),
-        meta: { title: '空间资产' }
+        redirect: '/assets/spaces'
+      },
+      {
+        path: '/buildings',
+        name: 'BuildingList',
+        redirect: to => ({ path: '/assets/spaces', query: to.query })
+      },
+      {
+        path: '/floors',
+        name: 'FloorList',
+        redirect: to => ({ path: '/assets/spaces', query: to.query })
+      },
+      {
+        path: '/rooms',
+        name: 'RoomList',
+        redirect: to => ({ path: '/assets/spaces', query: to.query })
+      },
+      {
+        path: '/equipment',
+        name: 'EquipmentList',
+        redirect: to => ({ path: '/assets/equipment', query: to.query })
       },
 
       {
+        path: '/tenant/workspace',
+        name: 'TenantWorkspace',
+        component: () => import('../views/tenant/TenantWorkspaceView.vue'),
+        meta: { title: '租户档案' }
+      },
+      {
         path: '/tenants',
         name: 'TenantList',
-        component: () => import('../views/tenant/TenantList.vue'),
-        meta: { title: '租户管理' }
+        redirect: to => ({ path: '/tenant/workspace', query: to.query })
       },
       {
         path: '/leases',
         name: 'LeaseList',
-        component: () => import('../views/tenant/LeaseList.vue'),
-        meta: { title: '租约管理' }
+        redirect: to => ({ path: '/tenant/workspace', query: { ...to.query, panel: 'occupancy' } })
+      },
+      {
+        path: '/fee-rules',
+        name: 'FeeRuleList',
+        redirect: to => ({ path: '/bills', query: to.query })
+      },
+      {
+        path: '/billing-plans',
+        name: 'BillingPlanList',
+        redirect: to => ({ path: '/bills', query: to.query })
+      },
+      {
+        path: '/investment/manage',
+        name: 'InvestmentManage',
+        component: () => import('../views/investment/InvestmentManageView.vue'),
+        meta: { title: '招商管理' }
       },
       {
         path: '/investment/leads',
@@ -74,14 +123,23 @@ const routes = [
       {
         path: '/investment/contents',
         name: 'InvestmentContentList',
-        component: () => import('../views/investment/InvestmentContentList.vue'),
-        meta: { title: '招商内容' }
+        redirect: to => ({ path: '/investment/manage', query: { ...to.query, tab: 'content' } })
+      },
+      {
+        path: '/investment/listings',
+        name: 'InvestmentRoomListingList',
+        redirect: to => ({ path: '/investment/manage', query: { ...to.query, tab: 'listings' } })
+      },
+      {
+        path: '/investment/announcements',
+        name: 'InvestmentAnnouncementList',
+        component: () => import('../views/operation/AnnouncementList.vue'),
+        meta: { title: '公告管理' }
       },
       {
         path: '/contracts',
         name: 'ContractList',
-        component: () => import('../views/tenant/ContractList.vue'),
-        meta: { title: '合同管理' }
+        redirect: to => ({ path: '/tenant/workspace', query: { ...to.query, panel: 'contracts' } })
       },
       {
         path: '/bills',
@@ -99,27 +157,23 @@ const routes = [
       {
         path: '/parking/spaces',
         name: 'ParkingSpaceList',
-        component: () => import('../views/parking/ParkingSpaceList.vue'),
-        meta: { title: '车位管理' }
+        redirect: to => ({ path: '/assets/parking', query: { ...to.query, tab: 'spaces' } })
       },
       {
         path: '/parking/bills',
         name: 'ParkingBillList',
-        component: () => import('../views/parking/ParkingBillList.vue'),
-        meta: { title: '停车账单' }
+        redirect: to => ({ path: '/bills', query: { ...to.query, billType: 'PARKING' } })
       },
 
       {
         path: '/meetings/rooms',
         name: 'MeetingRoomList',
-        component: () => import('../views/meeting/MeetingRoomList.vue'),
-        meta: { title: '会议室管理' }
+        redirect: to => ({ path: '/assets/meetings', query: { ...to.query, tab: 'rooms' } })
       },
       {
         path: '/meetings/bookings',
         name: 'MeetingBookingList',
-        component: () => import('../views/meeting/MeetingBookingList.vue'),
-        meta: { title: '会议预约' }
+        redirect: to => ({ path: '/assets/meetings', query: { ...to.query, tab: 'bookings' } })
       },
 
       {
@@ -143,21 +197,27 @@ const routes = [
       {
         path: '/announcements',
         name: 'AnnouncementList',
-        component: () => import('../views/operation/AnnouncementList.vue'),
-        meta: { title: '公告管理' }
+        redirect: to => ({ path: '/investment/announcements', query: { ...to.query } })
       },
 
       {
+        path: '/energy/meters',
+        name: 'EnergyMeterList',
+        redirect: to => ({ path: '/assets/energy', query: { ...to.query, tab: 'meters' } })
+      },
+      {
         path: '/energy/records',
         name: 'EnergyRecordList',
-        component: () => import('../views/energy/EnergyRecordList.vue'),
-        meta: { title: '能耗抄表' }
+        redirect: to => ({ path: '/assets/energy', query: { ...to.query, tab: 'records' } })
       },
       {
         path: '/energy/stats',
         name: 'EnergyStats',
-        component: () => import('../views/energy/EnergyStats.vue'),
-        meta: { title: '能耗统计' }
+        redirect: to => ({ path: '/assets/energy', query: { ...to.query, tab: 'statistics' } })
+      },
+      {
+        path: '/energy/statistics',
+        redirect: to => ({ path: '/assets/energy', query: { ...to.query, tab: 'statistics' } })
       },
 
       {
@@ -174,6 +234,12 @@ const routes = [
         meta: { title: '用户管理' }
       },
       {
+        path: '/system/mobile-users',
+        name: 'MobileUserList',
+        component: () => import('../views/system/MobileUserList.vue'),
+        meta: { title: '小程序用户' }
+      },
+      {
         path: '/system/roles',
         name: 'SystemRoleList',
         component: () => import('../views/system/RoleList.vue'),
@@ -188,26 +254,6 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
-  if (to.path === '/login') {
-    next()
-    return
-  }
-
-  const token = localStorage.getItem('token')
-  if (!token) {
-    next('/login')
-    return
-  }
-
-  const roles = getCurrentRoles()
-
-  if (!canAccessPath(roles, to.path)) {
-    next('/dashboard')
-    return
-  }
-
-  next()
-})
+router.beforeEach(createAuthGuard())
 
 export default router

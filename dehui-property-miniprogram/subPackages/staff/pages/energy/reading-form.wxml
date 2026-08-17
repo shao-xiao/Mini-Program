@@ -1,0 +1,21 @@
+<view class="page">
+  <view class="staff-form">
+    <view class="staff-field"><view class="staff-label">表具</view><picker range="{{meters}}" range-key="meterName" value="{{meterIndex}}" bindchange="chooseMeter"><view class="staff-picker">{{meterIndex >= 0 ? meters[meterIndex].meterName + ' · ' + (meters[meterIndex].tenantName || '未绑定企业') : '请选择启用且已绑定计量主体的表具'}}</view></picker></view>
+    <view class="staff-field"><view class="staff-label">抄表月份</view><picker mode="date" fields="month" value="{{form.periodMonth}}" data-key="periodMonth" bindchange="input"><view class="staff-picker">{{form.periodMonth}}</view></picker></view>
+    <view class="staff-field"><view class="staff-label">本次读数</view><input type="digit" class="staff-input" value="{{form.currentReading}}" data-key="currentReading" bindinput="input" /></view>
+    <view class="staff-field"><view class="staff-label">抄表日期</view><picker mode="date" value="{{form.readingDate}}" data-key="readingDate" bindchange="input"><view class="staff-picker">{{form.readingDate}}</view></picker></view>
+    <view class="staff-field"><view class="staff-label">回退/归零原因</view><textarea class="staff-textarea" value="{{form.resetReason}}" data-key="resetReason" bindinput="input" /></view>
+    <view class="staff-field" wx:for="{{schemaFields}}" wx:key="fieldKey">
+      <view class="staff-label">{{item.label}}{{item.required ? ' *' : ''}}</view>
+      <view wx:if="{{item.dataType === 'IMAGE'}}" class="staff-actions">
+        <button class="staff-button secondary" data-key="{{item.fieldKey}}" bindtap="chooseCustomImages" disabled="{{submitting}}">选择并上传</button>
+        <button wx:for="{{customFiles[item.fieldKey]}}" wx:for-item="file" wx:for-index="fileIndex" wx:key="fileId" class="staff-button secondary" data-key="{{item.fieldKey}}" data-url="{{file.url}}" bindtap="previewCustomImage">预览 {{fileIndex + 1}}</button>
+        <button wx:for="{{customFiles[item.fieldKey]}}" wx:for-item="file" wx:for-index="fileIndex" wx:key="fileId" class="staff-button secondary" data-key="{{item.fieldKey}}" data-index="{{fileIndex}}" bindtap="removeCustomImage">删除 {{fileIndex + 1}}</button>
+      </view>
+      <input wx:else class="staff-input" data-key="{{item.fieldKey}}" value="{{customFields[item.fieldKey]}}" bindinput="customInput" />
+    </view>
+    <view class="staff-field"><view class="staff-label">现场照片</view><button class="staff-button secondary" bindtap="chooseImage" disabled="{{submitting}}">{{file ? '重新选择' : '选择并上传'}}</button></view>
+    <view class="staff-hint">上期读数、用量、单价和费用由后端计算；重复月份、停用表具和无计量主体将被后端拒绝。</view>
+    <button class="staff-button" bindtap="submit" loading="{{submitting}}" disabled="{{submitting}}">提交抄表</button>
+  </view>
+</view>

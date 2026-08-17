@@ -1,0 +1,35 @@
+.service-agreement-page {
+  min-height: 100vh;
+  padding: 24rpx;
+  box-sizing: border-box;
+  background: var(--dhic-page-bg);
+}
+
+.service-card {
+  padding: 32rpx;
+  border: 1rpx solid var(--dhic-border-light);
+  border-radius: var(--dhic-radius-panel);
+  background: var(--dhic-surface);
+  box-shadow: var(--dhic-shadow-card);
+}
+
+.service-title {
+  color: var(--dhic-text-primary);
+  font-size: 36rpx;
+  font-weight: var(--dhic-weight-heading);
+  line-height: 1.4;
+}
+
+.service-section-title {
+  margin-top: 32rpx;
+  color: var(--dhic-text-primary);
+  font-size: 28rpx;
+  font-weight: var(--dhic-weight-heading);
+}
+
+.service-paragraph {
+  margin-top: 16rpx;
+  color: var(--dhic-text-secondary);
+  font-size: 26rpx;
+  line-height: 1.75;
+}

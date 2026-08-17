@@ -1,0 +1,16 @@
+<view class="page">
+  <view class="staff-header"><view class="staff-header-title">报修工单</view><view class="staff-header-desc">仅显示后台指派给当前员工的工单。</view></view>
+  <view class="staff-filter">
+    <view class="staff-filter-item {{status === '' ? 'active' : ''}}" data-status="" bindtap="filter">全部</view>
+    <view class="staff-filter-item {{status === 'ASSIGNED' ? 'active' : ''}}" data-status="ASSIGNED" bindtap="filter">已派单</view>
+    <view class="staff-filter-item {{status === 'PROCESSING' ? 'active' : ''}}" data-status="PROCESSING" bindtap="filter">处理中</view>
+    <view class="staff-filter-item {{status === 'COMPLETED' ? 'active' : ''}}" data-status="COMPLETED" bindtap="filter">已完成</view>
+  </view>
+  <view wx:if="{{error}}" class="staff-empty">{{error}}</view>
+  <view wx:for="{{records}}" wx:key="id" class="staff-record" data-id="{{item.id}}" bindtap="detail">
+    <view class="staff-row"><view class="staff-record-title">{{item.orderNumber}} · {{item.title}}</view><view class="staff-status">{{item.status}}</view></view>
+    <view class="staff-record-meta">{{item.categoryText}} · {{item.priorityText}} · {{item.location}}</view>
+    <view class="staff-record-meta">{{item.submittedTime}}</view>
+  </view>
+  <view wx:if="{{loading}}" class="staff-empty">正在加载…</view><view wx:if="{{!loading && !records.length}}" class="staff-empty">暂无指派工单</view><view wx:if="{{!hasMore && records.length}}" class="more">没有更多了</view>
+</view>

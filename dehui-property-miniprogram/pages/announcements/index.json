@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "公告通知"
+  "navigationBarTitleText": "公告通知",
+  "usingComponents": {
+    "data-source-panel": "../../components/data-source-panel/index"
+  }
 }

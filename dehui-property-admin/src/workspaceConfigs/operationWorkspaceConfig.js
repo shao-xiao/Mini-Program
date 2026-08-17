@@ -1,4 +1,5 @@
-﻿import { defineWorkspaceConfig } from './workspaceConfig.js'
+﻿import { reactive } from 'vue'
+import { defineWorkspaceConfig } from './workspaceConfig.js'
 
 const serverFilter = (param, operators = ['equals']) => ({ mode: 'server', param, operators })
 const serverOrder = param => ({ mode: 'server', param })
@@ -12,11 +13,12 @@ export const visitorStatusOptions = [
   { label: '已取消', value: 'CANCELLED', tone: 'danger' }
 ]
 
-export const inspectionTypeOptions = []
+export const inspectionTypeOptions = reactive([])
 
 export const inspectionResultOptions = [
   { label: '正常', value: 'NORMAL', tone: 'success' },
-  { label: '异常', value: 'ABNORMAL', tone: 'danger' }
+  { label: '异常', value: 'ABNORMAL', tone: 'danger' },
+  { label: '待处理', value: 'PENDING', tone: 'warning' }
 ]
 
 export const inspectionStatusOptions = [
@@ -114,7 +116,7 @@ export const inspectionWorkspaceConfig = defineWorkspaceConfig({
       query: { filter: serverFilter('inspector', ['contains', 'equals']), sort: serverOrder('inspector'), group: serverOrder('inspector') }
     },
     {
-      key: 'inspectionType', label: '巡检类型', type: 'select', options: inspectionTypeOptions,
+      key: 'inspectionType', label: '巡检类型', type: 'select', options: () => inspectionTypeOptions,
       sortable: true, groupable: true, width: 125,
       query: { filter: serverFilter('inspectionType'), sort: serverOrder('inspectionType'), group: serverOrder('inspectionType') }
     },

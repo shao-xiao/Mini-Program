@@ -1,17 +1,39 @@
-# frontend
-dehui-property-admin/node_modules
-dehui-property-admin/dist
+# Java / Maven
+target/
+*.jar
+*.class
 
-# backend
-dehui-property-management/target
-dehui-property-management/uploads
+# Node / Vue
+node_modules/
+dist/
+*.zip
 
 # IDE
-.idea
-.vscode
+.idea/
+.vscode/
 
-# logs
+# Logs and local runtime state
 *.log
+.run-logs/
 
-# linux
+# Browser automation artifacts
+.playwright-cli/
+
+# Release artifacts
+release/
+
+# Backend runtime uploads
+dehui-property-management/uploads/
+
+# Known local validation entry
+dehui-property-admin/tmp-rolelist-entry.js
+
+# Local repository recovery metadata and duplicate context snapshot
+.git.old-computer-pointer
+/CONTEXT_SUMMARY_before_cleanup_20260714.md.md
+
+# npm is the authoritative package manager for the admin application
+dehui-property-admin/pnpm-lock.yaml
+
+# OS metadata
 .DS_Store

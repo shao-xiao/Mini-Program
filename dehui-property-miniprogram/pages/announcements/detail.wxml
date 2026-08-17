@@ -1,11 +1,24 @@
 <view class="page">
-  <view wx:if="{{loading}}" class="card muted">正在加载公告...</view>
+  <view wx:if="{{pageState === 'loading'}}" class="card state-card" aria-busy="true">
+    <view class="state-title">正在加载公告</view>
+  </view>
 
-  <view wx:elif="{{!announcement.id}}" class="card muted">公告不存在或已下线</view>
+  <view wx:elif="{{pageState === 'error' || pageState === 'login-required' || pageState === 'unauthorized'}}" class="card state-card">
+    <view class="state-title">{{pageState === 'unauthorized' ? '当前账号无法查看公告' : '公告暂时无法加载'}}</view>
+    <view class="state-desc">{{errorMessage}}</view>
+    <button class="button-primary state-action" bindtap="retry">重新加载</button>
+  </view>
 
-  <view wx:else class="card">
+  <view wx:elif="{{pageState === 'empty'}}" class="card state-card">
+    <view class="state-title">公告不存在或已下线</view>
+    <view class="state-desc">请返回公告列表查看其他已发布内容。</view>
+  </view>
+
+  <view wx:elif="{{pageState === 'success'}}" class="card">
+    <image wx:if="{{announcement.coverImageUrl}}" class="detail-cover" src="{{announcement.coverImageUrl}}" mode="aspectFill" />
     <view class="detail-type">{{announcement.typeText}}</view>
     <view class="title">{{announcement.title}}</view>
+    <view wx:if="{{announcement.summary}}" class="detail-summary">{{announcement.summary}}</view>
     <view class="subtitle">{{announcement.publishTimeText}}</view>
     <view class="detail-content">{{announcement.content}}</view>
   </view>

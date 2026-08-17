@@ -1,116 +1,410 @@
-<view class="page">
-  <view class="section card">
-    <view class="title">会议预约</view>
-    <view class="subtitle">{{identityText || '先登录绑定身份'}}，先选时间，再查看会议室可用性</view>
+<view class="page meeting-page">
+  <view class="section">
+    <data-source-panel
+      title="{{isPublicMode ? '访客会议服务' : (isRecordMode ? '会议预约台账' : '租户会议预约')}}"
+      description="{{isPublicMode ? '查看园区开放会议室，验证手机号后可提交预约' : (isRecordMode ? '查看当前身份范围内的历史预约和实时状态' : '会议室、预约记录与时段占用由物业业务平台实时提供')}}"
+      source="{{isPublicMode ? '会议资源中心 · 公开会议室' : '会议预约台账 · 会议资源中心'}}"
+      scope="{{isPublicMode ? '公开会议资源' : (isRecordMode ? '当前身份预约记录' : '当前租户业务范围')}}"
+      status="服务端同步"
+      tone="service"
+    />
   </view>
 
-  <view wx:if="{{errorMessage}}" class="card section">
-    <view class="empty-title">暂时无法预约会议室</view>
+  <view wx:if="{{isPublicMode}}" class="section card guest-login-card {{guestPhoneReady ? 'verified' : ''}}">
+    <view class="guest-login-title">{{guestPhoneReady ? '手机号已验证' : '预约前请完成手机号快捷登录'}}</view>
+    <view class="guest-login-desc">
+      浏览会议室无需登录；联系电话可手动填写，仅用于本次预约联系。提交仍需完成手机号快捷登录以验证身份，手填号码不用于匹配租户身份。
+    </view>
+    <view wx:if="{{guestPhoneReady}}" class="guest-phone">身份验证手机号：{{bookingIdentity.contactPhone}}</view>
+    <block wx:else>
+      <button
+        wx:if="{{agreementsAccepted}}"
+        class="button-primary guest-login-button"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="authorizeGuestPhone"
+        loading="{{phoneLoginLoading}}"
+        disabled="{{phoneLoginLoading}}"
+      >手机号快捷登录</button>
+      <button wx:else class="button-primary guest-login-button" bindtap="promptAgreementRequired">
+        手机号快捷登录
+      </button>
+      <checkbox-group class="agreement-checkbox-group" bindchange="onAgreementChange">
+        <label class="agreement-label">
+          <checkbox value="accepted" checked="{{agreementsAccepted}}" color="#D71920" />
+          <view class="agreement-text">我已阅读并同意服务协议和隐私保护指引</view>
+        </label>
+      </checkbox-group>
+    </block>
+  </view>
+
+  <view wx:if="{{pageState === 'login-required'}}" class="card section">
+    <view class="empty-title">登录后使用会议预约</view>
     <view class="empty-desc">{{errorMessage}}</view>
-    <button class="button-primary bind-button" bindtap="goProfile">去登录或绑定身份</button>
+    <button class="button-primary bind-button" bindtap="goProfile">去登录</button>
   </view>
 
-  <view wx:if="{{!errorMessage}}" class="section card form-card">
-    <view class="form-row">
-      <view class="form-label">日期</view>
-      <picker mode="date" value="{{form.date}}" bindchange="onDateChange">
-        <view class="picker-value">{{form.date}}</view>
-      </picker>
-    </view>
-    <view class="form-row">
-      <view class="form-label">开始</view>
-      <picker mode="time" value="{{form.startTime}}" bindchange="onStartTimeChange">
-        <view class="picker-value">{{form.startTime}}</view>
-      </picker>
-    </view>
-    <view class="form-row">
-      <view class="form-label">结束</view>
-      <picker mode="time" value="{{form.endTime}}" bindchange="onEndTimeChange">
-        <view class="picker-value">{{form.endTime}}</view>
-      </picker>
-    </view>
+  <view wx:elif="{{pageState === 'unauthorized'}}" class="card section">
+    <view class="empty-title">当前账号暂无会议预约资格</view>
+    <view class="empty-desc">{{errorMessage}}</view>
+    <button class="button-primary bind-button" bindtap="goProfile">查看账号</button>
   </view>
 
-  <view wx:if="{{loading}}" class="card muted">正在查询会议室...</view>
+  <view wx:elif="{{pageState === 'error'}}" class="card section">
+    <view class="empty-title">会议数据加载失败</view>
+    <view class="empty-desc">{{errorMessage}}</view>
+    <button class="button-primary bind-button" bindtap="retryLoad">重新加载</button>
+  </view>
 
-  <view wx:if="{{!errorMessage && !loading}}" class="section">
-    <view class="section-title">选择会议室</view>
-    <view
-      wx:for="{{rooms}}"
-      wx:key="id"
-      class="room-card {{item.available ? '' : 'disabled'}} {{item.selected ? 'selected' : ''}}"
-      data-id="{{item.id}}"
-      bindtap="selectRoom"
-    >
-      <view class="room-head">
-        <view>
-          <view class="room-name">{{item.roomName}}</view>
-          <view class="room-location">{{item.location || '位置未填写'}} · {{item.capacity || 0}} 人</view>
+  <view wx:elif="{{pageState === 'loading'}}" class="card muted">正在加载会议数据...</view>
+
+  <block wx:else>
+    <view wx:if="{{!isPublicMode}}" class="section records-section records-section-top">
+      <view class="records-section-head">
+        <view class="section-heading-copy">
+          <view class="section-index">01</view>
+          <view class="section-title">会议预约记录</view>
+          <view wx:if="{{isBookingMode}}" class="section-helper">最近预约，点击可查看详情</view>
+          <view class="section-source-trace">
+            <view class="section-source-dot"></view>
+            <text>信息源 · 会议预约台账</text>
+            <text class="section-source-scope">{{isRecordMode ? '服务端分页' : '最近记录'}}</text>
+          </view>
         </view>
-        <view class="room-status">{{item.available ? '可预约' : '不可用'}}</view>
+        <view
+          wx:if="{{isBookingMode && hasMoreBookings}}"
+          class="records-all-link"
+          bindtap="openAllBookingRecords"
+        >查看全部</view>
       </view>
-      <view class="room-facilities">{{item.facilities || '设施待完善'}}</view>
-      <view class="room-rates">
-        <view>{{item.rateText}}</view>
-        <view>{{item.offRateText}}</view>
-        <view>{{item.holidayRateText}}</view>
-      </view>
-      <view wx:if="{{!item.available}}" class="room-reason">{{item.unavailableReason}}</view>
-    </view>
-  </view>
-
-  <view wx:if="{{!errorMessage}}" class="section card">
-    <view class="section-title compact">预约信息</view>
-    <input
-      class="input"
-      placeholder-class="input-placeholder"
-      placeholder="部门名称，内部员工建议填写"
-      value="{{form.departmentName}}"
-      data-field="departmentName"
-      bindinput="onInput"
-    />
-    <input
-      class="input"
-      placeholder-class="input-placeholder"
-      placeholder="联系电话"
-      value="{{form.contactPhone}}"
-      data-field="contactPhone"
-      bindinput="onInput"
-    />
-    <textarea
-      class="textarea"
-      placeholder-class="input-placeholder"
-      placeholder="会议用途"
-      value="{{form.purpose}}"
-      data-field="purpose"
-      bindinput="onInput"
-    />
-    <button class="button-primary submit-button" loading="{{submitting}}" bindtap="submitBooking">
-      提交预约
-    </button>
-  </view>
-
-  <view wx:if="{{!errorMessage && bookings.length > 0}}" class="section">
-    <view class="section-title">我的预约</view>
-    <view wx:for="{{bookings}}" wx:key="id" class="booking-card">
-      <view class="booking-head">
-        <view class="booking-room">{{item.meetingRoomName}}</view>
-        <view class="booking-status">{{item.statusText}}</view>
-      </view>
-      <view class="booking-meta">{{item.timeText}}</view>
-      <view class="booking-meta">{{item.purpose || '未填写用途'}}</view>
-      <view class="booking-footer">
-        <view class="booking-amount">预计金额 ¥ {{item.amountText}}</view>
-        <button
-          wx:if="{{item.cancellable}}"
-          class="cancel-button"
-          size="mini"
+      <view wx:if="{{bookings.length === 0}}" class="records-empty">暂无会议预约记录</view>
+      <view class="booking-stack {{isBookingMode && hasMoreBookings ? 'has-stack' : ''}}">
+        <view
+          wx:for="{{isRecordMode ? bookings : recentBookings}}"
+          wx:key="id"
+          class="booking-card compact"
           data-id="{{item.id}}"
-          bindtap="cancelBooking"
+          bindtap="openBookingDetail"
         >
-          取消预约
+          <view class="booking-source-row">
+            <view class="booking-source-dot"></view>
+            <text>预约记录</text>
+            <text class="booking-number">{{item.bookingNumber || '服务端记录'}}</text>
+          </view>
+          <view class="booking-head">
+            <view class="booking-room">{{item.meetingRoomName}}</view>
+            <view class="booking-status status-{{item.status}}">{{item.statusText}}</view>
+          </view>
+          <view class="booking-meta">{{item.timeText}}</view>
+          <view class="booking-meta">{{item.purpose || '未填写用途'}}<text wx:if="{{item.participantCount}}"> ｜ {{item.participantCount}} 人</text></view>
+          <view wx:if="{{item.reviewReply}}" class="booking-review">
+            <text class="booking-review-label">物业回复：</text>{{item.reviewReply}}
+          </view>
+          <view class="booking-footer">
+            <view wx:if="{{item.hasAmount}}" class="booking-amount">预计金额 ¥{{item.amountText}}</view>
+            <view wx:else class="booking-amount"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{isBookingMode && !selectedRoom}}" class="section room-list-section">
+      <view class="room-section-head">
+        <view class="section-heading-copy">
+          <view class="section-index">{{isPublicMode ? '01' : '02'}}</view>
+          <view class="section-title room-section-title">选择会议室</view>
+          <view class="section-helper">会议室默认展开，点击后再选择预约时间</view>
+          <view class="section-source-trace">
+            <view class="section-source-dot"></view>
+            <text>信息源 · 会议资源中心</text>
+            <text class="section-source-scope">开放会议室</text>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{rooms.length === 0}}" class="card muted">暂无开放会议室</view>
+      <view
+        wx:for="{{rooms}}"
+        wx:key="id"
+        class="room-card {{item.selected ? 'selected' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="selectRoom"
+      >
+        <view class="room-card-body">
+          <view class="room-summary">
+            <view class="room-summary-head">
+              <view class="room-name">{{item.roomName}}</view>
+              <view class="room-enter-action">选择时间</view>
+            </view>
+            <view class="room-location">{{item.locationText}} ｜ {{item.capacityText}}</view>
+            <view wx:if="{{item.hasCoverImage}}" class="room-facilities">{{item.facilitiesText}}</view>
+            <view class="room-open-hours">开放 {{item.openHoursText}}</view>
+            <view wx:if="{{!isPublicMode && item.hasRates}}" class="room-rates">
+              <view wx:for="{{item.rateLines}}" wx:key="label">{{item.label}} {{item.text}}</view>
+            </view>
+          </view>
+          <image
+            wx:if="{{item.hasCoverImage}}"
+            class="room-cover-image"
+            src="{{item.coverImageUrl}}"
+            mode="aspectFill"
+            data-id="{{item.id}}"
+            binderror="onRoomImageError"
+          />
+          <view wx:else class="room-detail-fallback">
+            <view class="room-detail-title">会议室详情</view>
+            <view class="room-detail-description">{{item.descriptionText}}</view>
+            <view class="room-detail-meta">开放 {{item.openHoursText}}</view>
+            <view class="room-detail-meta">{{item.facilitiesText}}</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view
+      id="bookingForm"
+      wx:if="{{isBookingMode && selectedRoom}}"
+      class="section card booking-form-card"
+    >
+      <view class="form-source-head">
+        <view>
+          <view class="form-source-kicker">BOOKING CONFIGURATION</view>
+          <view class="form-source-title">预约配置</view>
+        </view>
+        <view class="form-source-badge">信息源 · 当前所选会议室</view>
+      </view>
+      <view class="booking-selection-strip">
+        <view class="booking-selection-main">
+          <text class="booking-selection-room">{{selectedRoom.roomName}}</text>
+          <text class="booking-selection-meta">
+            {{selectedRoom.locationText}} ｜ {{selectedRoom.capacityText}} ｜ 开放 {{selectedRoom.openHoursText}}
+          </text>
+          <text class="booking-selection-detail">{{selectedRoom.descriptionText}}</text>
+          <text class="booking-selection-facilities">设施：{{selectedRoom.facilitiesText}}</text>
+          <view wx:if="{{!isPublicMode && selectedRoom.hasRates}}" class="booking-selection-rates">
+            <text wx:for="{{selectedRoom.rateLines}}" wx:key="label">{{item.label}} {{item.text}}</text>
+          </view>
+        </view>
+        <view class="booking-selection-aside">
+          <image
+            wx:if="{{selectedRoom.hasCoverImage}}"
+            class="booking-selection-cover"
+            src="{{selectedRoom.coverImageUrl}}"
+            mode="aspectFill"
+            data-id="{{selectedRoom.id}}"
+            binderror="onRoomImageError"
+          />
+          <view wx:else class="booking-selection-no-image">暂无图片</view>
+          <view class="change-room-link" bindtap="changeRoom">更换</view>
+        </view>
+      </view>
+
+      <view class="booking-time-section">
+        <view class="booking-time-head">
+          <view>
+            <view class="stage-title-row">
+              <view class="stage-index">{{isPublicMode ? '02' : '03'}}</view>
+              <view class="field-label time-section-title">预约时间<text class="required-mark">*</text></view>
+            </view>
+            <view class="stage-source">信息源 · 实时占用校验</view>
+          </view>
+          <view class="time-section-help">滑动选择开始和结束时间，确认后自动检查</view>
+        </view>
+        <view class="booking-date-row">
+          <view class="form-label">日期</view>
+          <calendar-date-field
+            id="meetingDate"
+            class="date-field"
+            value="{{form.date}}"
+            min-date="{{today}}"
+            bind:change="onDateChange"
+          />
+        </view>
+        <view class="booking-time-grid">
+          <view class="form-row">
+            <view class="form-label">开始</view>
+            <calendar-time-field
+              id="meetingStartTime"
+              class="time-field"
+              value="{{form.startTime}}"
+              title="选择开始时间"
+              placeholder="选择开始时间"
+              bind:change="onStartTimeChange"
+            />
+          </view>
+          <view class="time-separator">至</view>
+          <view class="form-row">
+            <view class="form-label">结束</view>
+            <calendar-time-field
+              id="meetingEndTime"
+              class="time-field"
+              value="{{form.endTime}}"
+              title="选择结束时间"
+              placeholder="选择结束时间"
+              bind:change="onEndTimeChange"
+            />
+          </view>
+        </view>
+        <view class="time-availability {{availabilityState}}">
+          <view class="availability-indicator"></view>
+          <view class="availability-content">
+            <view class="availability-message">
+              <text wx:if="{{availabilityState === 'available'}}">该时间段空闲，可以预约</text>
+              <text wx:elif="{{availabilityState === 'occupied'}}">该时间段已被占用，请调整时间</text>
+              <text wx:else>{{availabilityMessage}}</text>
+            </view>
+            <view wx:if="{{availabilityRangeText}}" class="availability-range">{{availabilityRangeText}}</view>
+            <view wx:if="{{availabilityState === 'error'}}" class="availability-retry" bindtap="retryAvailabilityCheck">点击重试</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="identity-summary">
+        <view class="identity-source-head">
+          <view class="stage-title-row">
+            <view class="stage-index">{{isPublicMode ? '03' : '04'}}</view>
+            <view class="identity-stage-title">预约身份</view>
+          </view>
+          <view class="stage-source">
+            信息源 · {{isPublicMode ? '手机号验证与本次联系信息' : '当前移动账号档案'}}
+          </view>
+        </view>
+        <block wx:if="{{isPublicMode}}">
+          <view class="identity-summary-main guest-identity-head">
+            <text class="identity-source">{{bookingIdentity.sourceTypeText}}</text>
+            <text wx:if="{{guestPhoneReady}}" class="guest-identity-status">身份已验证 {{bookingIdentity.contactPhone}}</text>
+            <text wx:else class="guest-identity-status">手机号待验证</text>
+          </view>
+          <view class="guest-contact-grid">
+            <view class="guest-contact-field">
+              <view class="identity-label">申请人<text class="required-mark">*</text></view>
+              <input
+                class="input identity-contact-input"
+                placeholder-class="input-placeholder"
+                placeholder="请输入姓名"
+                maxlength="64"
+                value="{{form.applicantName}}"
+                data-field="applicantName"
+                bindinput="onInput"
+              />
+            </view>
+            <view class="guest-contact-field">
+              <view class="identity-label">联系电话<text class="required-mark">*</text></view>
+              <input
+                class="input identity-contact-input"
+                placeholder-class="input-placeholder"
+                placeholder="手机或座机"
+                maxlength="16"
+                value="{{form.contactPhone}}"
+                data-field="contactPhone"
+                bindinput="onInput"
+              />
+            </view>
+          </view>
+        </block>
+        <view wx:else class="identity-summary-main">
+          <text class="identity-source">{{bookingIdentity.sourceTypeText}}</text>
+          <text class="identity-label">申请人</text>
+          <text class="identity-value">{{bookingIdentity.applicantName || '-'}}</text>
+          <text class="identity-label identity-phone-label">联系电话</text>
+          <text class="identity-phone">{{bookingIdentity.contactPhone || '-'}}</text>
+        </view>
+        <view wx:if="{{!isPublicMode}}" class="identity-summary-tenant">
+          <text class="identity-label">所属企业</text>
+          <text class="identity-tenant-value">{{bookingIdentity.tenantName || '-'}}</text>
+          <text class="identity-derived">服务端确认</text>
+        </view>
+      </view>
+      <view class="core-field-grid">
+        <view class="field-group purpose-group">
+          <view class="field-label">会议用途<text class="required-mark">*</text></view>
+          <input
+            class="input form-control purpose-control"
+            placeholder-class="input-placeholder"
+            placeholder="填写会议主题或用途"
+            maxlength="500"
+            value="{{form.purpose}}"
+            data-field="purpose"
+            bindinput="onInput"
+          />
+        </view>
+        <view class="field-group participant-group">
+          <view class="field-label">参会人数<text class="required-mark">*</text></view>
+          <input
+            class="input form-control participant-control"
+            placeholder-class="input-placeholder"
+            placeholder="1-{{selectedRoom.capacity || 9999}}人"
+            type="number"
+            maxlength="4"
+            value="{{form.participantCount}}"
+            data-field="participantCount"
+            bindinput="onInput"
+          />
+        </view>
+      </view>
+
+      <view class="extra-fields-toggle" bindtap="toggleExtraFields">
+        <view>
+          <text class="extra-fields-title">补充需求</text>
+          <text class="optional-label">备注及扩展信息，选填</text>
+        </view>
+        <text class="extra-fields-action">{{showExtraFields ? '收起' : '展开'}}</text>
+      </view>
+
+      <view hidden="{{!showExtraFields}}" class="extra-fields-content">
+        <view class="field-group extra-field-group">
+          <view class="field-label">备注<text class="optional-label">选填</text></view>
+          <textarea
+            class="textarea form-control remark-control"
+            placeholder-class="input-placeholder"
+            placeholder="设备、布置或其他补充要求"
+            maxlength="500"
+            value="{{form.remark}}"
+            data-field="remark"
+            bindinput="onInput"
+          />
+        </view>
+
+        <view wx:if="{{!isPublicMode && customFieldSchema.fields.length}}" class="custom-field-section">
+          <dynamic-form
+            id="meetingCustomForm"
+            module-key="meeting-bookings"
+            schema="{{customFieldSchema}}"
+            values="{{form.customFields}}"
+            bind:change="onSchemaChange"
+            bind:uploadstate="onUploadState"
+          />
+        </view>
+      </view>
+
+      <view class="booking-action-bar">
+        <button
+          wx:if="{{isPublicMode && !guestPhoneReady && agreementsAccepted}}"
+          class="button-primary submit-button"
+          open-type="getPhoneNumber"
+          bindgetphonenumber="authorizeGuestPhone"
+          loading="{{phoneLoginLoading}}"
+          disabled="{{phoneLoginLoading}}"
+        >
+          验证手机号并继续
+        </button>
+        <button
+          wx:elif="{{isPublicMode && !guestPhoneReady}}"
+          class="button-primary submit-button"
+          bindtap="promptAgreementRequired"
+        >
+          验证手机号并继续
+        </button>
+        <button
+          wx:else
+          class="button-primary submit-button"
+          loading="{{submitting}}"
+          disabled="{{submitting || availabilityState !== 'available'}}"
+          bindtap="submitBooking"
+        >
+          提交预约
         </button>
       </view>
     </view>
-  </view>
+
+    <view class="more" wx:if="{{(isPublicMode && !selectedRoom && rooms.length > 0) || (isRecordMode && bookings.length > 0)}}">{{loadingMore ? '加载中…' : (noMore ? '没有更多数据' : '上拉加载更多')}}</view>
+  </block>
 </view>

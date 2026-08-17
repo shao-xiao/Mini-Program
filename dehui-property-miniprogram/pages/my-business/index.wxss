@@ -1,0 +1,71 @@
+page {
+  --dhic-page-action-primary: var(--dhic-tech-primary);
+  --dhic-page-action-soft: var(--dhic-tech-soft);
+  --dhic-page-action-rgb: var(--dhic-tech-primary-rgb);
+}
+
+.page {
+  padding: 24rpx;
+}
+
+.company {
+  margin-bottom: 24rpx;
+  color: var(--dhic-text-primary);
+  font-size: 34rpx;
+  font-weight: var(--dhic-weight-heading);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18rpx;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  padding: 28rpx;
+  border: 1rpx solid var(--dhic-border-light);
+  border-radius: var(--dhic-radius-card);
+  background: var(--dhic-surface);
+  box-shadow: var(--dhic-shadow-card);
+  box-sizing: border-box;
+}
+
+.label {
+  color: var(--dhic-text-secondary);
+  font-size: var(--dhic-font-body-lg);
+}
+
+.value {
+  margin-top: 12rpx;
+  color: var(--dhic-tech-800);
+  font-size: 38rpx;
+  font-weight: var(--dhic-weight-data);
+  font-variant-numeric: tabular-nums;
+}
+
+.state {
+  padding: 100rpx 24rpx;
+  color: var(--dhic-text-tertiary);
+  text-align: center;
+}
+
+.error {
+  color: var(--dhic-danger);
+}
+
+.state button {
+  width: 220rpx;
+  margin-top: 24rpx;
+  border: 0;
+  border-radius: var(--dhic-radius-card);
+  background: var(--dhic-action-primary);
+  color: var(--dhic-text-inverse);
+  font-weight: var(--dhic-weight-heading);
+  box-shadow: var(--dhic-shadow-action);
+}
+
+.state button::after {
+  border: 0;
+}

@@ -1,203 +1,336 @@
+const {
+  getUserType,
+  isTenantProfile,
+  getVisibleMineFeatures,
+  getFeatureAccessState
+} = require('../../utils/capabilities')
 const api = require('../../utils/request')
-const { activeEnv, getBaseURL, prodBaseURL } = require('../../config/env')
+const { ensureWechatSession, refreshCurrentProfile } = require('../../utils/auth')
 
-const identityItems = [
-  {
-    key: 'tenant',
-    icon: '租',
-    title: '租户账号绑定',
-    subtitle: '绑定后可使用租户功能',
-    url: '/pages/mine/tenant-bind/index'
+const PUBLIC_PROFILE = {
+  userType: 'PUBLIC'
+}
+
+const FEATURE_ALIASES = {
+  bills: 'bill',
+  contracts: 'contract',
+  workorders: 'workorder',
+  meetings: 'meeting',
+  energySummary: 'energy',
+  parking: 'parkingMine',
+  visitors: 'visitor'
+}
+
+const BUSINESS_DETAILS = {
+  bill: {
+    key: 'bill',
+    label: '账',
+    title: '我的账单',
+    description: '查看租金、物业、能耗、停车及其他服务账单',
+    url: '/pages/bills/index'
   },
-  {
-    key: 'staff',
-    icon: '员',
-    title: '内部员工绑定',
-    subtitle: '绑定后可进行员工签到',
-    url: '/pages/mine/staff-bind/index'
-  }
-]
-
-const overviewItems = [
-  {
-    key: 'announcement',
-    icon: '告',
-    title: '已发布公告',
-    subtitle: '园区公告与运营提醒',
-    target: '/pages/announcements/index'
+  contract: {
+    key: 'contract',
+    label: '合',
+    title: '我的合同',
+    description: '查看当前租户电子合同与附件',
+    url: '/pages/contracts/index'
   },
-  {
-    key: 'room',
-    icon: '房',
-    title: '可租房源',
-    subtitle: '查看可租房源并预约看房',
-    target: '/pages/investment/index'
+  workorder: {
+    key: 'workorder',
+    label: '修',
+    title: '我的报修',
+    description: '提交报修并查看受理和处理进度',
+    url: '/pages/workorders/index'
+  },
+  meeting: {
+    key: 'meeting',
+    label: '会',
+    title: '我的会议',
+    description: '预约会议室并管理本人预约记录',
+    url: '/pages/meeting/index?mode=records',
+    target: '/pages/meeting/index?mode=records'
+  },
+  energy: {
+    key: 'energy',
+    label: '能',
+    title: '企业能耗',
+    description: '查看真实抄表用量、趋势及费用依据',
+    url: '/pages/energy/index'
+  },
+  parkingCompany: {
+    key: 'parkingCompany',
+    label: '企',
+    title: '企业车位',
+    description: '查看企业有效车位及车辆绑定',
+    url: '/pages/parking/index?scope=company'
+  },
+  parkingMine: {
+    key: 'parkingMine',
+    label: '车',
+    title: '我的车位',
+    description: '查看本人车位、车牌和有效期',
+    url: '/pages/parking/index?scope=mine'
+  },
+  visitor: {
+    key: 'visitor',
+    label: '访',
+    title: '我的访客预约',
+    description: '提交访客预约并查看审核状态',
+    url: '/pages/visitors/index'
+  },
+  staffWorkbench: {
+    key: 'staffWorkbench',
+    label: '物',
+    title: '物业移动工作台',
+    description: '进入后台权限允许的巡检、工单和园区管理功能',
+    url: '/subPackages/staff/pages/workbench/index'
   }
-]
-
-const businessItems = [
-  { key: 'bill', icon: '账', title: '我的账单', subtitle: '租金、能耗、停车和服务账单', target: '/pages/bills/index' },
-  { key: 'meeting', icon: '会', title: '我的会议', subtitle: '查看会议室预约记录', target: '/pages/meeting/index' },
-  { key: 'workorder', icon: '修', title: '我的工单', subtitle: '查看报修处理进度', target: '/pages/workorders/index' },
-  { key: 'visitor', icon: '访', title: '访客预约', subtitle: '登记访客并查看到访状态', target: '/pages/visitors/index' }
-]
-
-const emptyMe = {
-  loginStatus: false,
-  role: 'guest',
-  tenantBound: false,
-  staffBound: false,
-  tenantInfo: null,
-  staffInfo: null
 }
 
-const emptySummary = {
-  announcementCount: 0,
-  availableRoomCount: 0,
-  billCount: null,
-  meetingCount: null,
-  workOrderCount: null,
-  visitorCount: null,
-  needTenantBind: true
+function featureKeyOf(feature) {
+  const rawKey = typeof feature === 'string'
+    ? feature
+    : feature && (feature.key || feature.featureKey || feature.id)
+  return FEATURE_ALIASES[rawKey] || rawKey
 }
 
-function roleText(role) {
-  if (role === 'tenant' || role === 'TENANT') return '租户'
-  if (role === 'staff' || role === 'INTERNAL' || role === 'STAFF') return '内部员工'
-  return '游客'
-}
-
-function statusText(bound) {
-  return bound ? '已绑定' : '未绑定'
-}
-
-function buildIdentityItems(me) {
-  const safeMe = me || emptyMe
-  return identityItems.map((item) => ({
-    ...item,
-    valueText: item.key === 'tenant' ? statusText(safeMe.tenantBound) : statusText(safeMe.staffBound),
-    valueClass: item.key === 'tenant'
-      ? (safeMe.tenantBound ? 'bound' : 'not-bound')
-      : (safeMe.staffBound ? 'bound' : 'not-bound')
-  }))
-}
-
-function buildOverviewItems(summary) {
-  const safeSummary = summary || emptySummary
-  return [
-    {
-      ...overviewItems[0],
-      valueText: String(safeSummary.announcementCount || 0)
-    },
-    {
-      ...overviewItems[1],
-      valueText: String(safeSummary.availableRoomCount || 0)
+function buildBusinessCards(profile) {
+  const visible = getVisibleMineFeatures(profile) || []
+  return visible.map((feature) => {
+    const key = featureKeyOf(feature)
+    const details = BUSINESS_DETAILS[key]
+    if (!details) return null
+    return {
+      ...(typeof feature === 'object' ? feature : {}),
+      ...details,
+      key
     }
-  ]
+  }).filter(Boolean)
 }
 
-function buildBusinessItems(summary) {
-  const safeSummary = summary || emptySummary
-  if (safeSummary.needTenantBind) {
-    return businessItems.map((item) => ({ ...item, valueText: '未绑定' }))
+function normalizeProfile(payload) {
+  if (!payload) return PUBLIC_PROFILE
+  const display = payload.profile || payload.userInfo || {}
+  const profile = {
+    ...payload,
+    ...display,
+    profile: display
   }
-
-  return [
-    { ...businessItems[0], valueText: String(safeSummary.billCount || 0) },
-    { ...businessItems[1], valueText: String(safeSummary.meetingCount || 0) },
-    { ...businessItems[2], valueText: String(safeSummary.workOrderCount || 0) },
-    { ...businessItems[3], valueText: String(safeSummary.visitorCount || 0) }
-  ]
+  return {
+    ...profile,
+    loginStatus: payload.sessionState === 'AUTHENTICATED',
+    tenantInfo: payload.tenantInfo || profile.tenantInfo || null
+  }
 }
 
-function shouldShowApiSetting() {
-  const baseURL = getBaseURL()
-  return activeEnv !== 'prod' && baseURL !== prodBaseURL
+function profilePresentation(profile) {
+  const userType = getUserType(profile)
+  const tenantInfo = profile.tenantInfo || {}
+  if (userType === 'TENANT') {
+    return {
+      identityText: '租户用户',
+      identityStatus: '租户身份已匹配',
+      identityDescription: '仅展示与当前租户联系人关联的业务记录。',
+      tenantName: profile.boundTenantName || tenantInfo.tenantName || tenantInfo.name || '',
+      tenantLogoUrl: String(tenantInfo.logoUrl || '').trim(),
+      contactName: profile.name || '',
+      contactPhone: profile.maskedPhone || '',
+      accountActionText: '账号管理',
+      accountStatusText: '已绑定'
+    }
+  }
+  if (userType === 'STAFF') {
+    return {
+      identityText: '物业员工',
+      identityStatus: '员工身份已绑定',
+      identityDescription: '移动能力来自后台角色权限，仅显示服务端返回的能力白名单。',
+      tenantName: '',
+      tenantLogoUrl: '',
+      contactName: '',
+      contactPhone: profile.maskedPhone || '',
+      accountActionText: '查看账号',
+      accountStatusText: '员工账号'
+    }
+  }
+  return {
+    identityText: '公开用户',
+    identityStatus: '尚未登录租户服务',
+    identityDescription: '公告和招商可直接查看；租户业务需完成手机号快捷登录以匹配身份。',
+    tenantName: '',
+    tenantLogoUrl: '',
+    contactName: '',
+    contactPhone: profile.maskedPhone || '',
+    accountActionText: '手机号快捷登录',
+    accountStatusText: '未绑定'
+  }
+}
+
+function accessAllowed(state) {
+  if (typeof state === 'boolean') return state
+  if (!state) return true
+  if (typeof state === 'string') return state === 'allowed' || state === 'granted'
+  if (typeof state.allowed === 'boolean') return state.allowed
+  return state.state === 'allowed' || state.status === 'allowed' || state.access === 'allowed'
 }
 
 Page({
   data: {
-    loading: false,
-    me: emptyMe,
-    summary: emptySummary,
-    identityText: '游客',
-    identityCards: buildIdentityItems(emptyMe),
-    overviewCards: buildOverviewItems(emptySummary),
-    businessCards: buildBusinessItems(emptySummary),
-    showApiSettings: shouldShowApiSetting()
+    pageState: 'loading',
+    errorMessage: '',
+    profile: PUBLIC_PROFILE,
+    userType: 'PUBLIC',
+    isTenant: false,
+    isStaff: false,
+    identityText: '公开用户',
+    identityStatus: '正在确认身份',
+    identityDescription: '',
+    tenantName: '',
+    tenantLogoUrl: '',
+    tenantLogoPath: '',
+    contactName: '',
+    contactPhone: '',
+    accountActionText: '手机号快捷登录',
+    accountStatusText: '确认中',
+    businessCards: []
+  },
+
+  onLoad() {
+    this._active = true
+    this._refreshSequence = 0
   },
 
   onShow() {
+    this._active = true
     this.refresh()
   },
 
+  onHide() {
+    this._active = false
+    this._refreshSequence = Number(this._refreshSequence || 0) + 1
+  },
+
+  onUnload() {
+    this._active = false
+    this._refreshSequence = Number(this._refreshSequence || 0) + 1
+  },
+
+  safeSetData(payload) {
+    if (!this._active) return
+    this.setData(payload)
+  },
+
   async refresh() {
-    this.setData({ loading: true, showApiSettings: shouldShowApiSetting() })
+    const requestId = Number(this._refreshSequence || 0) + 1
+    this._refreshSequence = requestId
+    this.safeSetData({
+      pageState: 'loading',
+      errorMessage: '',
+      tenantLogoUrl: '',
+      tenantLogoPath: ''
+    })
     try {
-      const [me, summary] = await Promise.all([
-        api.request({ url: '/mobile/me', method: 'GET', silent: true }),
-        api.request({ url: '/mobile/mine/summary', method: 'GET', silent: true })
-      ])
-      const safeMe = me || emptyMe
-      const safeSummary = summary || emptySummary
-      this.setData({
-        me: safeMe,
-        summary: safeSummary,
-        identityText: roleText(safeMe.role),
-        identityCards: buildIdentityItems(safeMe),
-        overviewCards: buildOverviewItems(safeSummary),
-        businessCards: buildBusinessItems(safeSummary)
+      await ensureWechatSession()
+      const payload = await refreshCurrentProfile()
+      if (!this._active || requestId !== this._refreshSequence) return
+      const profile = normalizeProfile(payload)
+      const presentation = profilePresentation(profile)
+      const isTenant = isTenantProfile(profile)
+      this.safeSetData({
+        pageState: 'success',
+        profile,
+        userType: getUserType(profile),
+        isTenant,
+        isStaff: getUserType(profile) === 'STAFF',
+        businessCards: buildBusinessCards(profile),
+        tenantLogoPath: '',
+        ...presentation
       })
+      this.loadTenantLogo(presentation.tenantLogoUrl, requestId)
     } catch (error) {
-      this.setData({
-        me: emptyMe,
-        summary: emptySummary,
-        identityText: roleText('guest'),
-        identityCards: buildIdentityItems(emptyMe),
-        overviewCards: buildOverviewItems(emptySummary),
-        businessCards: buildBusinessItems(emptySummary)
+      if (!this._active || requestId !== this._refreshSequence) return
+      const code = Number(error && (error.code || error.statusCode))
+      const presentation = profilePresentation(PUBLIC_PROFILE)
+      this.safeSetData({
+        pageState: code === 401 ? 'login-required' : (code === 403 ? 'unauthorized' : 'error'),
+        errorMessage: error && error.message ? error.message : '暂时无法确认当前身份，请稍后重试。',
+        profile: PUBLIC_PROFILE,
+        userType: 'PUBLIC',
+        isTenant: false,
+        isStaff: false,
+        businessCards: [],
+        tenantLogoPath: '',
+        ...presentation
       })
-    } finally {
-      this.setData({ loading: false })
     }
   },
 
-  openIdentityItem(event) {
-    const url = event.currentTarget.dataset.url
-    if (!url) return
-    wx.navigateTo({ url })
-  },
-
-  openOverviewItem(event) {
-    const url = event.currentTarget.dataset.url
-    if (url) wx.navigateTo({ url })
-  },
-
-  openBusinessItem(event) {
-    if (this.data.summary.needTenantBind) {
-      this.promptBindTenant()
-      return
+  async loadTenantLogo(logoUrl, requestId) {
+    const normalizedLogoUrl = String(logoUrl || '').trim()
+    if (!normalizedLogoUrl) return
+    try {
+      const tenantLogoPath = await api.download(
+        normalizedLogoUrl,
+        'tenant-logo.png',
+        { silent: true, temporary: true }
+      )
+      if (!this._active || requestId !== this._refreshSequence) return
+      if (!this.data.isTenant || this.data.tenantLogoUrl !== normalizedLogoUrl) return
+      this.safeSetData({ tenantLogoPath })
+    } catch (error) {
+      if (!this._active || requestId !== this._refreshSequence) return
+      if (!this.data.isTenant || this.data.tenantLogoUrl !== normalizedLogoUrl) return
+      this.safeSetData({ tenantLogoPath: '' })
     }
-    const url = event.currentTarget.dataset.url
-    if (url) wx.navigateTo({ url })
   },
 
-  openApiSetting() {
+  openAccount() {
     wx.navigateTo({ url: '/pages/me/index' })
   },
 
-  promptBindTenant() {
-    wx.showModal({
-      title: '提示',
-      content: '当前功能需要绑定租户账号后使用，是否前往绑定？',
-      cancelText: '取消',
-      confirmText: '前往绑定',
-      confirmColor: '#E4312B',
-      success: (res) => {
-        if (res.confirm) {
-          wx.navigateTo({ url: '/pages/mine/tenant-bind/index' })
+  openBusiness(event) {
+    const key = event.currentTarget.dataset.key
+    const item = this.data.businessCards.find((card) => card.key === key)
+    if (!item) return
+
+    const accessState = getFeatureAccessState(item.key, this.data.profile)
+    if (!accessAllowed(accessState)) {
+      const loginRequired = !!(accessState && accessState.loginRequired)
+      wx.showModal({
+        title: loginRequired ? '请先登录租户身份' : '当前不可访问',
+        content: loginRequired
+          ? '该服务仅向已匹配的租户联系人开放。'
+          : '当前账号没有该租户服务资格，请联系物业确认。',
+        showCancel: false,
+        confirmColor: '#D71920'
+      })
+      return
+    }
+
+    wx.navigateTo({ url: item.url })
+  },
+
+  openServiceAgreement() {
+    wx.navigateTo({ url: '/pages/agreements/service/index' })
+  },
+
+  openPrivacyPolicy() {
+    if (wx.openPrivacyContract) {
+      wx.openPrivacyContract({
+        fail() {
+          wx.showModal({
+            title: '用户隐私保护指引',
+            content: '请在小程序资料页或手机号授权弹窗中查看用户隐私保护指引。',
+            showCancel: false
+          })
         }
-      }
+      })
+      return
+    }
+    wx.showModal({
+      title: '用户隐私保护指引',
+      content: '当前客户端版本暂不支持直接打开隐私保护指引，请升级客户端后查看。',
+      showCancel: false
     })
   }
 })

@@ -1,0 +1,17 @@
+page {
+  --dhic-page-action-primary: var(--dhic-tech-700);
+  --dhic-page-action-soft: var(--dhic-tech-soft);
+  --dhic-page-action-rgb: var(--dhic-tech-rgb);
+}
+
+.staff-button[data-status="CONVERTED"] {
+  background: var(--dhic-success);
+  color: var(--dhic-text-inverse);
+  box-shadow: 0 10rpx 24rpx rgba(var(--dhic-success-rgb), 0.18);
+}
+
+.staff-button[data-status="INVALID"] {
+  border: 1rpx solid var(--dhic-danger);
+  background: var(--dhic-danger-soft);
+  color: var(--dhic-danger);
+}

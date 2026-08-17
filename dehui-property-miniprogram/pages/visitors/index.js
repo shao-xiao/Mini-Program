@@ -451,7 +451,7 @@ Page({
       title: '取消预约',
       content: visitor ? `确定取消“${visitor.visitorName}”的访客预约吗？` : '确定取消该预约吗？',
       confirmText: '取消预约',
-      confirmColor: '#d93025',
+      confirmColor: '#D71920',
       success: async res => {
         if (!res.confirm) return
         try {

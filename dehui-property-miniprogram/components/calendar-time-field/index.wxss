@@ -1,3 +1,5 @@
+@import "../../styles/theme.wxss";
+
 .time-field {
   width: 100%;
 }
@@ -7,16 +9,18 @@
   align-items: center;
   min-height: 72rpx;
   padding: 0 18rpx;
-  border-radius: 8rpx;
-  background: #f5f6f8;
+  border: 1rpx solid var(--dhic-border-light);
+  border-radius: var(--dhic-radius-control);
+  background: var(--dhic-surface-muted);
   box-sizing: border-box;
-  color: #1f1b1b;
-  font-size: 26rpx;
+  color: var(--dhic-text-primary);
+  font-size: var(--dhic-font-body-lg);
+  font-weight: var(--dhic-weight-body);
   line-height: 1.4;
 }
 
 .time-placeholder {
-  color: #a8abb2;
+  color: var(--dhic-text-tertiary);
 }
 
 .time-mask {
@@ -28,28 +32,28 @@
   justify-content: center;
   padding: 32rpx;
   box-sizing: border-box;
-  background: rgba(15, 23, 42, 0.12);
+  background: rgba(var(--dhic-ink-rgb), 0.12);
 }
 
 .time-panel {
   width: 100%;
   max-width: 680rpx;
   padding: 20rpx 20rpx 18rpx;
-  border-radius: 22rpx;
+  border-radius: var(--dhic-radius-section);
   box-sizing: border-box;
-  background: #ffffff;
-  box-shadow: 0 18rpx 52rpx rgba(15, 23, 42, 0.14);
+  background: var(--dhic-surface);
+  box-shadow: var(--dhic-shadow-raised);
 }
 
 .time-toolbar {
   padding: 8rpx 4rpx 14rpx;
-  border-bottom: 1rpx solid #f0f2f5;
+  border-bottom: 1rpx solid var(--dhic-border-light);
 }
 
 .time-title {
-  color: #1f1b1b;
-  font-size: 30rpx;
-  font-weight: 700;
+  color: var(--dhic-text-primary);
+  font-size: var(--dhic-font-title);
+  font-weight: var(--dhic-weight-title);
 }
 
 .time-picker-view {
@@ -60,8 +64,8 @@
 
 .time-picker-indicator {
   height: 72rpx;
-  border-top: 1rpx solid #f0f2f5;
-  border-bottom: 1rpx solid #f0f2f5;
+  border-top: 1rpx solid var(--dhic-border-light);
+  border-bottom: 1rpx solid var(--dhic-border-light);
 }
 
 .time-option {
@@ -69,8 +73,9 @@
   align-items: center;
   justify-content: center;
   height: 72rpx;
-  color: #1f1b1b;
-  font-size: 28rpx;
+  color: var(--dhic-text-primary);
+  font-size: var(--dhic-font-emphasis);
+  font-weight: var(--dhic-weight-medium);
 }
 
 .time-footer {
@@ -83,17 +88,21 @@
 .time-button {
   min-width: 120rpx;
   padding: 12rpx 18rpx;
-  border-radius: 999rpx;
-  font-size: 24rpx;
+  border: 1rpx solid transparent;
+  border-radius: var(--dhic-radius-pill);
+  font-size: var(--dhic-font-body);
+  font-weight: var(--dhic-weight-medium);
   text-align: center;
 }
 
 .time-button--muted {
-  background: #f5f6f8;
-  color: #606266;
+  border-color: var(--dhic-border-light);
+  background: var(--dhic-surface-muted);
+  color: var(--dhic-text-secondary);
 }
 
 .time-button--primary {
-  background: #2f6df6;
-  color: #ffffff;
+  background: var(--dhic-action-primary);
+  color: var(--dhic-text-inverse);
+  box-shadow: var(--dhic-shadow-focus);
 }

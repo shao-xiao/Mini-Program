@@ -1,0 +1,13 @@
+<view class="page">
+  <view class="state" wx:if="{{loading}}">正在加载房间…</view>
+  <view class="state error" wx:elif="{{pageState === 'error' || pageState === 'unauthorized'}}">{{errorMessage}}<button wx:if="{{pageState === 'error'}}" bindtap="retryLoad">重试</button></view>
+  <view class="state" wx:elif="{{pageState === 'empty'}}">暂无有效租赁房间</view>
+  <view wx:else>
+    <view class="card" wx:for="{{records}}" wx:key="id" data-id="{{item.id}}" bindtap="openDetail">
+      <view class="title">{{item.buildingName}} · {{item.roomNumber}}</view>
+      <view class="meta">{{item.floorName || '-'}}　{{item.area || 0}}㎡</view>
+      <view class="meta">合同：{{item.contractStartDate || '-'}} 至 {{item.contractEndDate || '-'}}</view>
+    </view>
+    <view class="more">{{loadingMore ? '加载中…' : (noMore ? '没有更多数据' : '上拉加载更多')}}</view>
+  </view>
+</view>

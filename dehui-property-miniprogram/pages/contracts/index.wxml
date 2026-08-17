@@ -1,0 +1,127 @@
+<view class="page contract-page">
+  <view class="section">
+    <data-source-panel
+      title="电子合同档案"
+      description="展示物业后台归档并授权当前租户查看的合同文件"
+      source="租赁合同管理"
+      scope="{{tenantName || '当前租户'}}"
+      status="安全读取"
+      tone="secure"
+    />
+  </view>
+
+  <view wx:if="{{pageState === 'login-required'}}" class="card section">
+    <view class="empty-title">登录后查看合同</view>
+    <view class="empty-desc">{{errorMessage}}</view>
+    <button class="button-primary bind-button" bindtap="goProfile">去登录</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'unauthorized'}}" class="card section">
+    <view class="empty-title">当前账号暂无合同权限</view>
+    <view class="empty-desc">{{errorMessage}}</view>
+    <button class="button-primary bind-button" bindtap="goProfile">查看账号</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'error'}}" class="card section">
+    <view class="empty-title">电子合同加载失败</view>
+    <view class="empty-desc">{{errorMessage}}</view>
+    <button class="button-primary bind-button" bindtap="retryLoad">重新加载</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'loading'}}" class="card muted">正在加载电子合同...</view>
+
+  <view wx:elif="{{pageState === 'empty'}}" class="card muted">
+    当前租户暂无电子合同
+  </view>
+
+  <view wx:else class="section">
+    <view class="contract-overview">
+      <view class="contract-overview-copy">
+        <view class="contract-overview-label">CONTRACT ARCHIVE</view>
+        <view class="contract-overview-title">{{tenantName || '当前租户'}}</view>
+      </view>
+      <view class="contract-overview-value">
+        <text class="contract-overview-number">{{total}}</text>
+        <text class="contract-overview-unit">份合同</text>
+      </view>
+    </view>
+    <view wx:for="{{contracts}}" wx:key="id" class="contract-card" data-id="{{item.id}}" bindtap="openDetail">
+      <view class="contract-source-row">
+        <view class="contract-source-dot"></view>
+        <text>信息源 · 物业合同管理档案库</text>
+        <text class="contract-secure-tag">权限内可见</text>
+      </view>
+      <view class="contract-head">
+        <view class="contract-main">
+          <view class="contract-title">{{item.contractName}}</view>
+          <view class="contract-number">CONTRACT · {{item.contractNumber}}</view>
+        </view>
+        <view class="contract-status">{{item.statusText}}</view>
+      </view>
+
+      <view class="contract-info-grid">
+        <view class="contract-info-item">
+          <text class="contract-info-label">租户主体</text>
+          <text class="contract-info-value">{{item.tenantName || tenantName || '-'}}</text>
+        </view>
+        <view class="contract-info-item">
+          <text class="contract-info-label">关联房间</text>
+          <text class="contract-info-value">{{item.roomText}}</text>
+        </view>
+        <view class="contract-info-item contract-info-wide">
+          <text class="contract-info-label">合同有效期</text>
+          <text class="contract-info-value">{{item.startDateText}} — {{item.endDateText}}</text>
+        </view>
+        <view class="contract-info-item contract-money-item">
+          <text class="contract-info-label">月租金额</text>
+          <text class="contract-money-value">¥{{item.rentAmountText}}</text>
+        </view>
+        <view class="contract-info-item contract-money-item">
+          <text class="contract-info-label">押金金额</text>
+          <text class="contract-money-value">¥{{item.depositAmountText}}</text>
+        </view>
+      </view>
+      <view wx:if="{{item.attachments.length}}" class="contract-file">
+        <view wx:for="{{item.attachments}}" wx:for-item="attachment" wx:key="attachmentId" class="contract-footer">
+          <view class="contract-file-copy">
+            <view class="contract-file-heading">
+              <view class="contract-file-icon">PDF</view>
+              <view class="contract-file-type">{{attachment.typeText}}</view>
+            </view>
+            <view class="contract-file-status">{{attachment.fileName}}</view>
+            <view class="contract-file-meta">归档时间 · {{attachment.uploadedAt || '物业后台同步'}}</view>
+          </view>
+          <button
+            class="contract-button"
+            size="mini"
+            data-id="{{item.id}}"
+            data-attachment-id="{{attachment.attachmentId}}"
+            data-url="{{attachment.downloadUrl}}"
+            data-filename="{{attachment.fileName}}"
+            loading="{{downloadingContractId === item.id && downloadingAttachmentId === attachment.attachmentId}}"
+            disabled="{{downloadingContractId === item.id}}"
+            catchtap="openElectronicContract"
+          >安全预览</button>
+        </view>
+      </view>
+
+      <view wx:else class="contract-footer">
+        <view class="contract-file-status">{{item.hasContractFile ? '已上传电子合同' : '物业暂未上传电子合同'}}</view>
+        <button
+          wx:if="{{item.hasContractFile}}"
+          class="contract-button"
+          size="mini"
+          data-id="{{item.id}}"
+          data-url="{{item.contractDownloadUrl}}"
+          data-filename="{{item.contractFileName}}"
+          loading="{{downloadingContractId === item.id}}"
+          disabled="{{downloadingContractId === item.id}}"
+          catchtap="openElectronicContract"
+        >
+          查看电子合同
+        </button>
+      </view>
+    </view>
+    <view class="more">{{loadingMore ? '加载中…' : (noMore && total > 0 ? '没有更多数据' : '上拉加载更多')}}</view>
+  </view>
+</view>

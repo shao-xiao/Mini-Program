@@ -4,6 +4,14 @@ import jakarta.validation.constraints.NotBlank;
 
 public record WechatLoginRequest(
         @NotBlank String code,
-        String phoneCode
+        String phoneCode,
+        Boolean restoreBoundIdentity
 ) {
+    public WechatLoginRequest(String code, String phoneCode) {
+        this(code, phoneCode, null);
+    }
+
+    public boolean shouldRestoreBoundIdentity() {
+        return !Boolean.FALSE.equals(restoreBoundIdentity);
+    }
 }

@@ -8,6 +8,8 @@ import com.dehui.property.common.PageResponse;
 import com.dehui.property.modules.asset.application.AssetChargeBasisService;
 import com.dehui.property.modules.customfield.application.CustomFieldProjectionService;
 import com.dehui.property.modules.customfield.application.ModuleFieldSubmissionValidator;
+import com.dehui.property.modules.inspection.application.InspectionInspectorValueResolver;
+import com.dehui.property.modules.inspection.application.InspectionTypeValueResolver;
 import com.dehui.property.modules.mobile.service.MobileCustomFieldValueService;
 import com.dehui.property.modules.mobile.service.MobileStaffFileService;
 import com.dehui.property.modules.visitor.application.VisitorApprovalService;
@@ -132,7 +134,10 @@ public class MobileStaffController {
         if (has(principal, "meeting.staff.view")) {
             modules.put("meeting", jdbcTemplate.queryForMap(
                     """
-                    SELECT COALESCE(SUM(CASE WHEN DATE(start_time) = CURRENT_DATE AND booking_status <> 'CANCELLED' THEN 1 ELSE 0 END), 0) AS todayCount
+                    SELECT COALESCE(SUM(CASE
+                               WHEN DATE(start_time) = CURRENT_DATE
+                                AND booking_status NOT IN ('CANCELLED','REJECTED')
+                               THEN 1 ELSE 0 END), 0) AS todayCount
                     FROM meeting_booking
                     WHERE deleted = 0
                     """
@@ -175,8 +180,23 @@ public class MobileStaffController {
                 SELECT code, name, description
                 FROM inspection_type
                 WHERE status = 'ENABLED' AND deleted = 0
+                  AND CHAR_LENGTH(TRIM(code)) <= 32
                 ORDER BY sort_order, id
                 """
+        ));
+    }
+
+    @GetMapping("/mobile/staff/inspection-options")
+    public ApiResponse<Map<String, Object>> inspectionOptions(
+            @RequestAttribute(AuthInterceptor.PRINCIPAL_ATTRIBUTE) AuthPrincipal principal
+    ) {
+        require(principal, "inspection.staff.view");
+        Long currentStaffUserId = staff(principal);
+        Map<String, Object> currentInspector = resolveInspectionInspector(null, currentStaffUserId);
+        return ApiResponse.success(Map.of(
+                "currentInspectorCode", String.valueOf(currentInspector.get("inspectorCode")),
+                "inspectors", inspectionInspectorOptions(),
+                "areas", inspectionAreaOptions()
         ));
     }
 
@@ -282,10 +302,12 @@ public class MobileStaffController {
         Map<String, Object> detail = new LinkedHashMap<>(
                 projectionService.attach("inspections", rows).getFirst()
         );
-        detail.put("attachments", businessAttachments("INSPECTION", id));
-        detail.put("history", jdbcTemplate.queryForList(
+        List<Map<String, Object>> attachments = inspectionAttachments(id);
+        detail.put("attachments", attachments);
+        detail.put("images", attachments);
+        List<Map<String, Object>> history = jdbcTemplate.queryForList(
                 """
-                SELECT history.action, history.content,
+                SELECT history.id, history.action, history.content,
                        staff.real_name AS operatorName, history.operated_at AS operatedAt
                 FROM inspection_record_history history
                 LEFT JOIN sys_user staff ON staff.id = history.operator_id AND staff.deleted = 0
@@ -293,7 +315,13 @@ public class MobileStaffController {
                 ORDER BY history.operated_at, history.id
                 """,
                 id
+        );
+        Map<Long, List<Map<String, Object>>> resolutionImages = inspectionHistoryAttachments(id);
+        history.forEach(record -> record.put(
+                "resolutionImages",
+                resolutionImages.getOrDefault(JdbcMaps.longVal(record, "id"), List.of())
         ));
+        detail.put("history", history);
         return ApiResponse.success(detail);
     }
 
@@ -310,16 +338,33 @@ public class MobileStaffController {
         alias(canonical, "target", "inspectionObject");
         alias(canonical, "result", "inspectionResult");
         alias(canonical, "actionTaken", "handlingMeasures");
+        if (!canonical.containsKey("inspector")) {
+            String legacyInspectorCode = textValue(canonical, "inspectorCode");
+            String legacyInspectorName = legacyInspectorCode == null
+                    ? staffName(staffUserId)
+                    : JdbcMaps.requiredStr(
+                            resolveInspectionInspector(legacyInspectorCode, staffUserId),
+                            "巡检人档案无效",
+                            "inspectorName"
+                    );
+            canonical.put("inspector", legacyInspectorName);
+        }
         if (moduleFieldSubmissionValidator != null) {
             moduleFieldSubmissionValidator.validateMobileCreate(
                     "inspections", canonical, principal,
                     Set.of("location", "inspectionObject", "inspectionResult", "handlingMeasures",
-                            "attachmentFileIds", "fileIds")
+                            "attachmentFileIds", "fileIds", "inspectorCode")
             );
         }
-        String staffName = staffName(staffUserId);
-        String type = required(canonical, "请选择巡检类型", "inspectionType");
-        requireEnabledInspectionType(type);
+        String inspectorName = InspectionInspectorValueResolver.resolve(
+                required(canonical, "请填写巡检人", "inspector")
+        );
+        Long inspectorUserId = staffUserId;
+        String type = InspectionTypeValueResolver.resolve(
+                jdbcTemplate,
+                required(canonical, "请填写巡检类型", "inspectionType"),
+                null
+        );
         String result = normalizedInspectionResult(canonical);
         String problem = textValue(canonical, "problemDescription");
         if ("ABNORMAL".equals(result) && problem == null) {
@@ -327,6 +372,7 @@ public class MobileStaffController {
         }
         LocalDate inspectionDate = dateValue(canonical, "inspectionDate", LocalDate.now());
         String location = required(canonical, "请填写巡检区域或地点", "area");
+        validateInspectionArea(location);
         String target = required(canonical, "请填写巡检对象", "target");
         String measures = textValue(canonical, "actionTaken");
         String remark = textValue(canonical, "remark");
@@ -346,8 +392,8 @@ public class MobileStaffController {
             );
             statement.setString(1, JdbcMaps.code("INSP"));
             statement.setDate(2, Date.valueOf(inspectionDate));
-            statement.setString(3, staffName);
-            statement.setLong(4, staffUserId);
+            statement.setString(3, inspectorName);
+            statement.setLong(4, inspectorUserId);
             statement.setString(5, type);
             statement.setString(6, location);
             statement.setString(7, target);
@@ -360,7 +406,7 @@ public class MobileStaffController {
             return statement;
         }, keyHolder);
         Long id = keyHolder.getKey().longValue();
-        attachInspectionFiles(id, staffUserId, ids(canonical, "attachmentFileIds", "fileIds"));
+        attachInspectionFiles(id, staffUserId, inspectionFileIds(canonical));
         fileService.claimDraftFiles(
                 principal, customFieldFileIds(canonical.get("customFields")), "INSPECTION", id, "inspections"
         );
@@ -383,13 +429,12 @@ public class MobileStaffController {
                 SELECT result, problem_description AS problemDescription,
                        action_taken AS handlingMeasures, inspection_status AS inspectionStatus
                 FROM inspection_record
-                WHERE id = ? AND inspector_user_id = ? AND deleted = 0
+                WHERE id = ? AND deleted = 0
                 FOR UPDATE
                 """,
-                id,
-                staffUserId
+                id
         );
-        if (currentRows.isEmpty()) throw new BusinessException(404, "巡检记录不存在或不属于当前员工");
+        if (currentRows.isEmpty()) throw new BusinessException(404, "巡检记录不存在");
         Map<String, Object> current = currentRows.getFirst();
         if ("CLOSED".equals(current.get("inspectionStatus"))) {
             throw new BusinessException(409, "已关闭巡检不能继续修改");
@@ -409,25 +454,24 @@ public class MobileStaffController {
                 """
                 UPDATE inspection_record
                 SET result = ?, problem_description = ?, action_taken = ?,
-                    updated_by = ?, remark = COALESCE(?, remark)
-                WHERE id = ? AND inspector_user_id = ? AND deleted = 0
+                    updated_by = ?
+                WHERE id = ? AND deleted = 0
                 """,
                 result,
                 problem,
                 measures,
                 staffUserId,
-                feedback,
-                id,
-                staffUserId
+                id
         );
-        attachInspectionFiles(id, staffUserId, ids(body, "attachmentFileIds", "fileIds"));
+        attachInspectionFiles(id, staffUserId, inspectionFileIds(body));
         if (body.containsKey("customFields")) {
             fileService.claimDraftFiles(
                     principal, customFieldFileIds(body.get("customFields")), "INSPECTION", id, "inspections"
             );
             customFieldValueService.save("inspections", id, body.get("customFields"), staffUserId);
         }
-        inspectionHistory(id, "UPDATE", feedback == null ? measures : feedback, staffUserId);
+        Long historyId = inspectionHistory(id, "UPDATE", feedback == null ? measures : feedback, staffUserId);
+        attachInspectionHistoryFiles(historyId, id, staffUserId, inspectionResolutionFileIds(body));
         return ApiResponse.success();
     }
 
@@ -446,25 +490,29 @@ public class MobileStaffController {
                 SET inspection_status = 'CLOSED',
                     action_taken = COALESCE(?, action_taken),
                     updated_by = ?
-                WHERE id = ? AND inspector_user_id = ? AND deleted = 0
+                WHERE id = ? AND deleted = 0
                   AND inspection_status <> 'CLOSED'
                 """,
-                textValue(body, "handlingMeasures", "feedback"),
+                textValue(body, "handlingMeasures"),
                 staffUserId,
-                id,
-                staffUserId
+                id
         );
         if (updated == 0) {
             Long exists = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM inspection_record WHERE id = ? AND inspector_user_id = ? AND deleted = 0",
+                    "SELECT COUNT(*) FROM inspection_record WHERE id = ? AND deleted = 0",
                     Long.class,
-                    id,
-                    staffUserId
+                    id
             );
-            if (exists == null || exists == 0) throw new BusinessException(404, "巡检记录不存在或不属于当前员工");
+            if (exists == null || exists == 0) throw new BusinessException(404, "巡检记录不存在");
             return ApiResponse.success();
         }
-        inspectionHistory(id, "CLOSE", textValue(body, "feedback", "handlingMeasures"), staffUserId);
+        Long historyId = inspectionHistory(
+                id,
+                "CLOSE",
+                textValue(body, "feedback", "handlingMeasures"),
+                staffUserId
+        );
+        attachInspectionHistoryFiles(historyId, id, staffUserId, inspectionResolutionFileIds(body));
         return ApiResponse.success();
     }
 
@@ -750,7 +798,9 @@ public class MobileStaffController {
                        booking.start_time AS startTime, booking.end_time AS endTime,
                        booking.participant_count AS participantCount,
                        booking.purpose, booking.booking_status AS status,
-                       booking.amount, booking.created_at AS createdAt, booking.remark
+                       booking.amount, booking.created_at AS createdAt, booking.remark,
+                       booking.review_reply AS reviewReply,
+                       booking.reviewed_at AS reviewedAt
                 FROM meeting_booking booking
                 JOIN meeting_room room ON room.id = booking.meeting_room_id AND room.deleted = 0
                 LEFT JOIN tenant ON tenant.id = booking.tenant_id AND tenant.deleted = 0
@@ -788,26 +838,50 @@ public class MobileStaffController {
         Set<String> allowed = switch (target) {
             case "CONFIRMED" -> Set.of("PENDING", "BOOKED");
             case "CANCELLED" -> Set.of("PENDING", "BOOKED", "CONFIRMED");
-            case "COMPLETED" -> Set.of("BOOKED", "CONFIRMED");
+            case "COMPLETED" -> Set.of("CONFIRMED");
             default -> Set.of();
         };
         if (!allowed.contains(current)) {
             throw new BusinessException(409, "当前会议预约状态不能执行该操作");
         }
         Long staffUserId = staff(principal);
-        jdbcTemplate.update(
-                """
-                UPDATE meeting_booking
-                SET booking_status = ?, updated_by = ?,
-                    remark = COALESCE(?, remark)
-                WHERE id = ? AND deleted = 0 AND booking_status = ?
-                """,
-                target,
-                staffUserId,
-                textValue(body, "remark"),
-                id,
-                current
-        );
+        String remark = textValue(body, "remark");
+        if ("CONFIRMED".equals(target)) {
+            String reviewReply = textValue(body, "reviewReply", "remark");
+            if (reviewReply == null) reviewReply = "预约已审核通过";
+            if (reviewReply.length() > 500) {
+                throw new BusinessException(400, "预约回复不能超过500个字符");
+            }
+            jdbcTemplate.update(
+                    """
+                    UPDATE meeting_booking
+                    SET booking_status = ?, updated_by = ?, remark = COALESCE(?, remark),
+                        review_reply = ?, reviewed_by = ?, reviewed_at = NOW()
+                    WHERE id = ? AND deleted = 0 AND booking_status = ?
+                    """,
+                    target,
+                    staffUserId,
+                    remark,
+                    reviewReply,
+                    staffUserId,
+                    id,
+                    current
+            );
+        } else {
+            jdbcTemplate.update(
+                    """
+                    UPDATE meeting_booking
+                    SET booking_status = ?, updated_by = ?,
+                        remark = COALESCE(?, remark)
+                    WHERE id = ? AND deleted = 0 AND booking_status = ?
+                    """,
+                    target,
+                    staffUserId,
+                    remark,
+                    id,
+                    current
+            );
+        }
         if ("CONFIRMED".equals(target)) {
             BigDecimal amount = jdbcTemplate.queryForObject(
                     "SELECT amount FROM meeting_booking WHERE id = ?",
@@ -1214,24 +1288,90 @@ public class MobileStaffController {
         }
     }
 
-    private List<Map<String, Object>> businessAttachments(String bizType, Long bizId) {
+    private List<Map<String, Object>> inspectionAttachments(Long inspectionId) {
         return jdbcTemplate.queryForList(
                 """
                 SELECT file.id, file.original_name AS name,
                        CONCAT('/api/mobile/files/', file.id) AS url,
                        file.mime_type AS mimeType, file.file_size AS fileSize
-                FROM file_upload file
-                WHERE file.biz_type = ? AND file.biz_id = ?
+                FROM inspection_attachment attachment
+                INNER JOIN file_upload file
+                        ON file.id = attachment.file_id
+                       AND file.deleted = 0
+                       AND file.status = 'ENABLED'
+                WHERE attachment.inspection_id = ? AND attachment.deleted = 0
+                  AND file.biz_type = 'INSPECTION' AND file.biz_id = ?
                   AND file.status = 'ENABLED' AND file.deleted = 0
-                ORDER BY file.id
+                ORDER BY attachment.sort_order, attachment.id
                 """,
-                bizType,
-                bizId
+                inspectionId,
+                inspectionId
         );
     }
 
-    private void inspectionHistory(Long id, String action, String content, Long staffUserId) {
-        jdbcTemplate.update(
+    private Map<Long, List<Map<String, Object>>> inspectionHistoryAttachments(Long inspectionId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                """
+                SELECT attachment.inspection_history_id AS historyId,
+                       file.id, file.original_name AS name,
+                       CONCAT('/api/mobile/files/', file.id) AS url,
+                       file.mime_type AS mimeType, file.file_size AS fileSize
+                FROM inspection_history_attachment attachment
+                INNER JOIN inspection_record_history history
+                        ON history.id = attachment.inspection_history_id
+                       AND history.deleted = 0
+                INNER JOIN file_upload file
+                        ON file.id = attachment.file_id
+                       AND file.deleted = 0
+                       AND file.status = 'ENABLED'
+                WHERE history.inspection_id = ? AND attachment.deleted = 0
+                  AND file.biz_type = 'INSPECTION' AND file.biz_id = ?
+                ORDER BY attachment.inspection_history_id, attachment.sort_order, attachment.id
+                """,
+                inspectionId,
+                inspectionId
+        );
+        Map<Long, List<Map<String, Object>>> grouped = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            Long historyId = JdbcMaps.longVal(row, "historyId");
+            Map<String, Object> file = new LinkedHashMap<>(row);
+            file.remove("historyId");
+            grouped.computeIfAbsent(historyId, ignored -> new ArrayList<>()).add(file);
+        }
+        return grouped;
+    }
+
+    private void attachInspectionHistoryFiles(
+            Long historyId,
+            Long inspectionId,
+            Long staffUserId,
+            List<Long> fileIds
+    ) {
+        if (fileIds.isEmpty()) return;
+        fileService.claimDraftFiles(fileIds, "INSPECTION", inspectionId, staffUserId);
+        int order = 0;
+        for (Long fileId : fileIds) {
+            jdbcTemplate.update(
+                    """
+                    INSERT INTO inspection_history_attachment (
+                        inspection_history_id, file_id, sort_order,
+                        created_by, updated_by, deleted
+                    )
+                    VALUES (?, ?, ?, ?, ?, 0)
+                    """,
+                    historyId,
+                    fileId,
+                    order++,
+                    staffUserId,
+                    staffUserId
+            );
+        }
+    }
+
+    private Long inspectionHistory(Long id, String action, String content, Long staffUserId) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement(
                 """
                 INSERT INTO inspection_record_history (
                     inspection_id, action, content, operator_id,
@@ -1239,22 +1379,17 @@ public class MobileStaffController {
                 )
                 VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, 0)
                 """,
-                id,
-                action,
-                content,
-                staffUserId,
-                staffUserId,
-                staffUserId
-        );
-    }
-
-    private void requireEnabledInspectionType(String code) {
-        Long count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM inspection_type WHERE code = ? AND status = 'ENABLED' AND deleted = 0",
-                Long.class,
-                code
-        );
-        if (count == null || count == 0) throw new BusinessException(400, "巡检类型不存在或已停用");
+                    Statement.RETURN_GENERATED_KEYS
+            );
+            statement.setLong(1, id);
+            statement.setString(2, action);
+            statement.setString(3, content);
+            statement.setLong(4, staffUserId);
+            statement.setLong(5, staffUserId);
+            statement.setLong(6, staffUserId);
+            return statement;
+        }, keyHolder);
+        return keyHolder.getKey().longValue();
     }
 
     private String normalizedInspectionResult(Map<String, Object> body) {
@@ -1576,6 +1711,157 @@ public class MobileStaffController {
         return values.getFirst();
     }
 
+    private List<Map<String, Object>> inspectionInspectorOptions() {
+        return jdbcTemplate.queryForList(
+                """
+                SELECT DISTINCT staff.code AS value,
+                       COALESCE(NULLIF(staff.real_name, ''), staff.username) AS label
+                FROM sys_user staff
+                WHERE staff.status IN ('ACTIVE', 'ENABLED')
+                  AND staff.mobile_enabled = 1
+                  AND staff.deleted = 0
+                  AND EXISTS (
+                    SELECT 1
+                    FROM sys_user_role user_role
+                    INNER JOIN sys_role role_record
+                      ON role_record.id = user_role.role_id
+                     AND role_record.deleted = 0
+                     AND role_record.status IN ('ACTIVE', 'ENABLED')
+                    INNER JOIN sys_role_permission role_permission
+                      ON role_permission.role_id = role_record.id
+                     AND role_permission.deleted = 0
+                     AND role_permission.status IN ('ACTIVE', 'ENABLED')
+                    INNER JOIN sys_permission permission_record
+                      ON permission_record.id = role_permission.permission_id
+                     AND permission_record.deleted = 0
+                     AND permission_record.status IN ('ACTIVE', 'ENABLED')
+                    WHERE user_role.user_id = staff.id
+                      AND user_role.deleted = 0
+                      AND user_role.status IN ('ACTIVE', 'ENABLED')
+                      AND permission_record.code IN (
+                        'staff-mobile:inspection:write',
+                        'staff-mobile:inspection:*',
+                        'staff-mobile:*',
+                        '*'
+                      )
+                  )
+                ORDER BY label, value
+                """
+        );
+    }
+
+    private Map<String, Object> resolveInspectionInspector(String inspectorCode, Long currentStaffUserId) {
+        String normalizedCode = text(inspectorCode);
+        String selector = normalizedCode == null ? " staff.id = ?" : " staff.code = ?";
+        Object selectorValue = normalizedCode == null ? currentStaffUserId : normalizedCode;
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                """
+                SELECT staff.id AS sysUserId,
+                       staff.code AS inspectorCode,
+                       COALESCE(NULLIF(staff.real_name, ''), staff.username) AS inspectorName
+                FROM sys_user staff
+                WHERE """ + selector + """
+                  AND staff.status IN ('ACTIVE', 'ENABLED')
+                  AND staff.mobile_enabled = 1
+                  AND staff.deleted = 0
+                  AND EXISTS (
+                    SELECT 1
+                    FROM sys_user_role user_role
+                    INNER JOIN sys_role role_record
+                      ON role_record.id = user_role.role_id
+                     AND role_record.deleted = 0
+                     AND role_record.status IN ('ACTIVE', 'ENABLED')
+                    INNER JOIN sys_role_permission role_permission
+                      ON role_permission.role_id = role_record.id
+                     AND role_permission.deleted = 0
+                     AND role_permission.status IN ('ACTIVE', 'ENABLED')
+                    INNER JOIN sys_permission permission_record
+                      ON permission_record.id = role_permission.permission_id
+                     AND permission_record.deleted = 0
+                     AND permission_record.status IN ('ACTIVE', 'ENABLED')
+                    WHERE user_role.user_id = staff.id
+                      AND user_role.deleted = 0
+                      AND user_role.status IN ('ACTIVE', 'ENABLED')
+                      AND permission_record.code IN (
+                        'staff-mobile:inspection:write',
+                        'staff-mobile:inspection:*',
+                        'staff-mobile:*',
+                        '*'
+                      )
+                  )
+                LIMIT 1
+                """,
+                selectorValue
+        );
+        if (rows.isEmpty()) throw new BusinessException(400, "所选巡检人未启用或无巡检填报权限");
+        return rows.getFirst();
+    }
+
+    private List<Map<String, Object>> inspectionAreaOptions() {
+        return jdbcTemplate.queryForList(
+                """
+                SELECT option_value AS value, option_label AS label, option_scope AS scope
+                FROM (
+                    SELECT building.name AS option_value,
+                           building.name AS option_label,
+                           'BUILDING' AS option_scope,
+                           building.id AS building_sort,
+                           0 AS floor_sort,
+                           '' AS room_sort,
+                           1 AS level_sort
+                    FROM building
+                    WHERE building.deleted = 0
+                      AND building.status IN ('ACTIVE', 'ENABLED')
+
+                    UNION ALL
+
+                    SELECT CONCAT(building.name, ' / ', floor.name) AS option_value,
+                           CONCAT(building.name, ' / ', floor.name) AS option_label,
+                           'FLOOR' AS option_scope,
+                           building.id AS building_sort,
+                           floor.floor_no AS floor_sort,
+                           '' AS room_sort,
+                           2 AS level_sort
+                    FROM building_floor floor
+                    INNER JOIN building
+                      ON building.id = floor.building_id
+                     AND building.deleted = 0
+                     AND building.status IN ('ACTIVE', 'ENABLED')
+                    WHERE floor.deleted = 0
+                      AND floor.status IN ('ACTIVE', 'ENABLED')
+
+                    UNION ALL
+
+                    SELECT CONCAT(building.name, ' / ', floor.name, ' / ', room.room_no) AS option_value,
+                           CONCAT(building.name, ' / ', floor.name, ' / ', room.room_no) AS option_label,
+                           'ROOM' AS option_scope,
+                           building.id AS building_sort,
+                           floor.floor_no AS floor_sort,
+                           room.room_no AS room_sort,
+                           3 AS level_sort
+                    FROM building_room room
+                    INNER JOIN building
+                      ON building.id = room.building_id
+                     AND building.deleted = 0
+                     AND building.status IN ('ACTIVE', 'ENABLED')
+                    INNER JOIN building_floor floor
+                      ON floor.id = room.floor_id
+                     AND floor.deleted = 0
+                     AND floor.status IN ('ACTIVE', 'ENABLED')
+                    WHERE room.deleted = 0
+                      AND room.status IN ('ACTIVE', 'ENABLED')
+                ) options
+                ORDER BY building_sort, floor_sort, level_sort, room_sort
+                """
+        );
+    }
+
+    private void validateInspectionArea(String area) {
+        boolean known = inspectionAreaOptions().stream()
+                .anyMatch(option -> area.equals(String.valueOf(option.get("value"))));
+        if (!known) throw new BusinessException(400, "请选择后台楼宇空间中已启用的巡检区域");
+    }
+
     private void require(AuthPrincipal principal, String capability) {
         MobileApiSupport.requireCapability(principal, capability);
     }
@@ -1694,6 +1980,19 @@ public class MobileStaffController {
     private List<Long> customFieldFileIds(Object value) {
         LinkedHashSet<Long> result = new LinkedHashSet<>();
         collectCustomFieldFileIds(value, false, result);
+        return List.copyOf(result);
+    }
+
+    private List<Long> inspectionFileIds(Map<String, Object> body) {
+        LinkedHashSet<Long> result = new LinkedHashSet<>(ids(body, "attachmentFileIds", "fileIds"));
+        result.addAll(customFieldFileIds(body.get("images")));
+        return List.copyOf(result);
+    }
+
+    private List<Long> inspectionResolutionFileIds(Map<String, Object> body) {
+        if (body == null) return List.of();
+        LinkedHashSet<Long> result = new LinkedHashSet<>(ids(body, "resolutionFileIds"));
+        result.addAll(customFieldFileIds(body.get("resolutionImages")));
         return List.copyOf(result);
     }
 

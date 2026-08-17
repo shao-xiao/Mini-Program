@@ -1,0 +1,125 @@
+<view class="page inspection-detail-page">
+  <view wx:if="{{error}}" class="staff-empty">{{error}}</view>
+  <view wx:if="{{detail && display}}" class="inspection-record">
+    <view class="record-overview">
+      <view class="overview-main">
+        <view class="overview-title">{{display.title}}</view>
+        <view class="overview-meta">{{display.code}} · 创建于 {{display.createdAt}}</view>
+      </view>
+      <view class="overview-badges">
+        <text class="result-badge result-{{display.result}}">{{display.resultLabel}}</text>
+        <text class="status-badge status-{{display.status}}">{{display.statusLabel}}</text>
+      </view>
+    </view>
+
+    <view class="info-table">
+      <view wx:for="{{display.coreRows}}" wx:key="key" class="info-row">
+        <view class="info-cell">
+          <text class="info-label">{{item.left.label}}</text>
+          <text class="info-value">{{item.left.value}}</text>
+        </view>
+        <view class="info-cell">
+          <text class="info-label">{{item.right.label}}</text>
+          <text class="info-value">{{item.right.value}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="narrative-table">
+      <view
+        wx:for="{{display.narrativeFields}}"
+        wx:key="label"
+        class="narrative-cell {{item.wide ? 'wide' : ''}}"
+      >
+        <view class="narrative-label">{{item.label}}</view>
+        <view class="narrative-value">{{item.value}}</view>
+      </view>
+    </view>
+
+    <view class="photo-section">
+      <view class="section-heading photo-heading">
+        <view>
+          <view class="staff-record-title">现场照片</view>
+          <view class="photo-hint">巡检登记与动态字段图片统一归档</view>
+        </view>
+        <view class="photo-count">{{display.photoCount}} 张</view>
+      </view>
+      <view wx:if="{{display.photoCount}}" class="photo-gallery">
+        <field-renderer field="{{display.photoField}}" value="{{display.photoValue}}" />
+      </view>
+      <view wx:else class="photo-empty">暂无现场照片</view>
+    </view>
+
+    <view wx:if="{{display.supplementalFields.length}}" class="supplemental-section">
+      <view class="staff-record-title">补充信息</view>
+      <view class="supplemental-grid">
+        <view wx:for="{{display.supplementalFields}}" wx:key="field.fieldKey" class="supplemental-cell">
+          <view class="supplemental-label">{{item.field.label}}</view>
+          <field-renderer field="{{item.field}}" value="{{item.value}}" />
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{detail && detail.history.length}}" class="staff-record">
+    <view class="section-heading">
+      <view class="staff-record-title">处理历史</view>
+      <view class="history-count">{{detail.history.length}} 条</view>
+    </view>
+    <view wx:for="{{detail.history}}" wx:key="operatedAt" class="history-item">
+      <view class="history-top">
+        <text class="history-action">{{item.actionLabel}}</text>
+        <text class="history-time">{{item.operatedAt}}</text>
+      </view>
+      <view class="staff-record-meta">{{item.operatorName || '系统'}}</view>
+      <view wx:if="{{item.content}}" class="history-content">{{item.content}}</view>
+      <view wx:if="{{item.resolutionPhotoCount}}" class="history-photos">
+        <view class="history-photo-heading">处理后照片 · {{item.resolutionPhotoCount}} 张</view>
+        <field-renderer field="{{resolutionPhotoField}}" value="{{item.resolutionImages}}" />
+      </view>
+    </view>
+  </view>
+  <view wx:if="{{detail && canUpdate && detail.status !== 'CLOSED'}}" class="staff-form feedback-card">
+    <view class="section-heading">
+      <view>
+        <view class="staff-record-title">补充处理反馈</view>
+        <view class="feedback-hint">反馈会追加到处理历史，不覆盖原备注和处理措施</view>
+      </view>
+      <view class="feedback-count">{{feedbackLength}}/500</view>
+    </view>
+    <textarea class="staff-textarea feedback-input" maxlength="500" value="{{feedback}}" placeholder="填写现场处理进展、复查结果或后续安排" bindinput="input" />
+    <view class="resolution-upload">
+      <view class="resolution-upload-heading">
+        <view>
+          <view class="staff-record-title">处理后照片</view>
+          <view class="feedback-hint">用于记录修复、复查或关闭后的现场结果，可选上传</view>
+        </view>
+        <view class="feedback-count">{{resolutionFiles.length}}/6</view>
+      </view>
+      <view wx:if="{{resolutionFiles.length}}" class="resolution-preview">
+        <field-renderer field="{{resolutionPhotoField}}" value="{{resolutionFiles}}" />
+        <view class="resolution-remove-list">
+          <button
+            wx:for="{{resolutionFiles}}"
+            wx:key="fileId"
+            class="resolution-remove"
+            data-index="{{index}}"
+            bindtap="removeResolutionImage"
+            disabled="{{submitting || uploadingResolutionImages}}"
+          >删除第 {{index + 1}} 张</button>
+        </view>
+      </view>
+      <button
+        class="resolution-upload-button"
+        bindtap="chooseResolutionImages"
+        disabled="{{submitting || uploadingResolutionImages || resolutionFiles.length >= 6}}"
+        loading="{{uploadingResolutionImages}}"
+      >{{resolutionFiles.length ? '继续上传' : '上传处理后照片'}}</button>
+    </view>
+    <view class="staff-actions feedback-actions">
+      <button class="staff-button secondary" bindtap="saveFeedback" disabled="{{submitting || uploadingResolutionImages || (!feedbackLength && !resolutionFiles.length)}}" loading="{{submitting}}">保存反馈</button>
+      <button class="staff-button" bindtap="close" disabled="{{submitting || uploadingResolutionImages}}">关闭巡检</button>
+    </view>
+  </view>
+  <view wx:if="{{detail && canUpdate && detail.status === 'CLOSED'}}" class="staff-empty closed-tip">巡检已关闭，处理历史保留只读</view>
+</view>

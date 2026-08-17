@@ -1,0 +1,78 @@
+<view class="page">
+  <view wx:if="{{error}}" class="staff-empty">{{error}}</view>
+  <view wx:if="{{detail}}" class="staff-record">
+    <dynamic-detail schema="{{fieldSchema}}" values="{{detail}}" />
+    <block wx:if="{{false}}">
+    <view class="staff-row"><view class="staff-record-title">{{detail.orderNumber}} · {{detail.title}}</view><view class="staff-status">{{detail.status}}</view></view>
+    <view class="staff-record-meta">{{detail.category}} · {{detail.priority}} · {{detail.location}}</view>
+    <view class="staff-record-meta">{{detail.description}}</view>
+    <view class="staff-record-meta">报修人：{{detail.reporterName}} {{detail.reporterPhone}}</view>
+    <view class="staff-actions"><button wx:for="{{detail.attachments}}" wx:key="id" class="staff-button secondary" data-url="{{item.url}}" bindtap="preview">附件 {{index + 1}}</button></view>
+    </block>
+    <view class="staff-actions">
+      <button wx:if="{{canStart && detail.status === 'ASSIGNED'}}" class="staff-button" bindtap="start" disabled="{{submitting}}" loading="{{submitting}}">开始处理</button>
+      <button wx:if="{{canComplete && detail.status === 'PROCESSING'}}" class="staff-button secondary" bindtap="process">填写完整记录并完成</button>
+    </view>
+    <view wx:if="{{canStart && detail.status === 'ASSIGNED'}}" class="staff-hint">开始处理后可在本页填写现场反馈和上传照片。</view>
+  </view>
+
+  <view wx:if="{{detail && detail.records.length}}" class="staff-record">
+    <view class="section-heading">
+      <view class="staff-record-title">处理历史</view>
+      <view class="history-count">{{detail.records.length}} 条</view>
+    </view>
+    <view wx:for="{{detail.records}}" wx:key="id" class="history-item">
+      <view class="history-top">
+        <text class="history-action">{{item.actionLabel}}</text>
+        <text class="history-time">{{item.createdTime}}</text>
+      </view>
+      <view class="staff-record-meta">{{item.operatorName || '系统'}}</view>
+      <view wx:if="{{item.content}}" class="history-content">{{item.content}}</view>
+      <view wx:if="{{item.attachments && item.attachments.length}}" class="record-images">
+        <button
+          wx:for="{{item.attachments}}"
+          wx:for-item="file"
+          wx:key="id"
+          class="image-button"
+          data-record-id="{{item.id}}"
+          data-url="{{file.url}}"
+          bindtap="previewRecordImage"
+        >查看照片 {{index + 1}}</button>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{detail && canStart && detail.status === 'PROCESSING'}}" class="staff-form feedback-card">
+    <view class="section-heading">
+      <view>
+        <view class="staff-record-title">填写处理反馈</view>
+        <view class="feedback-hint">每次保存都会追加一条处理记录，历史内容不会被覆盖。</view>
+      </view>
+      <view class="feedback-count">{{feedbackLength}}/500</view>
+    </view>
+    <textarea
+      class="staff-textarea feedback-input"
+      maxlength="500"
+      value="{{feedback}}"
+      placeholder="填写现场情况、处理进展或处理结果"
+      bindinput="inputFeedback"
+    />
+    <view class="upload-heading">
+      <view class="staff-label">现场照片</view>
+      <text>{{feedbackFiles.length}}/6</text>
+    </view>
+    <view class="staff-actions image-actions">
+      <button class="staff-button secondary" bindtap="chooseFeedbackImages" disabled="{{submitting || feedbackFiles.length >= 6}}">上传照片</button>
+      <block wx:for="{{feedbackFiles}}" wx:key="fileId">
+        <button class="image-button" data-url="{{item.url}}" bindtap="previewFeedbackImage">预览 {{index + 1}}</button>
+        <button class="image-button danger" data-index="{{index}}" bindtap="removeFeedbackImage" disabled="{{submitting}}">删除</button>
+      </block>
+    </view>
+    <button
+      class="staff-button feedback-submit"
+      bindtap="saveFeedback"
+      loading="{{submitting}}"
+      disabled="{{submitting || !feedbackLength}}"
+    >保存处理反馈</button>
+  </view>
+</view>

@@ -1,0 +1,17 @@
+@import "../../styles/theme.wxss";
+
+.row {
+  display: grid;
+  grid-template-columns: 180rpx 1fr;
+  gap: 20rpx;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid var(--dhic-border-light);
+  color: var(--dhic-text-primary);
+  font-size: var(--dhic-font-body);
+  font-weight: var(--dhic-weight-body);
+}
+
+.label {
+  color: var(--dhic-text-heading);
+  font-weight: var(--dhic-weight-heading);
+}

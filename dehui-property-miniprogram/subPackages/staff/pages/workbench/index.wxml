@@ -1,0 +1,26 @@
+<view class="page">
+  <view class="staff-header">
+    <view class="staff-header-title">物业移动工作台</view>
+    <view class="staff-header-desc">入口和数量均由当前后台权限实时计算；未授权模块不会查询或展示。</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="staff-empty">正在同步移动权限和待办…</view>
+  <view wx:elif="{{error}}" class="staff-record">
+    <view class="staff-record-title">工作台加载失败</view>
+    <view class="staff-record-meta">{{error}}</view>
+    <button class="staff-button secondary" bindtap="load">重试</button>
+  </view>
+  <view wx:elif="{{!modules.length}}" class="staff-record">
+    <view class="staff-record-title">暂无已授权移动功能</view>
+    <view class="staff-record-meta">请联系管理员在角色权限中授予对应模块读写权限。</view>
+  </view>
+  <view wx:else class="staff-grid">
+    <button wx:for="{{modules}}" wx:key="key" class="staff-module" data-key="{{item.key}}" bindtap="open">
+      <view class="staff-module-title">{{item.title}}</view>
+      <view class="staff-module-desc">{{item.description}}</view>
+      <view class="staff-module-desc" wx:if="{{item.summary.pendingCount !== undefined}}">待办 {{item.summary.pendingCount}}</view>
+      <view class="staff-module-desc" wx:if="{{item.summary.todayCount !== undefined}}">今日 {{item.summary.todayCount}}</view>
+      <view class="staff-module-desc" wx:if="{{item.summary.abnormalCount}}">异常 {{item.summary.abnormalCount}}</view>
+    </button>
+  </view>
+</view>

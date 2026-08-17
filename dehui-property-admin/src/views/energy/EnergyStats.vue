@@ -1,5 +1,5 @@
 <template>
-  <div class="page-container">
+  <div class="page-container" :class="{ 'page-container--embedded': props.embedded }">
     <el-card shadow="never">
       <template #header>
         <div class="page-header">
@@ -13,7 +13,7 @@
 
       <el-form :inline="true" :model="queryForm" class="query-form">
         <el-form-item label="能耗类型">
-          <el-select v-model="queryForm.meterType" clearable placeholder="全部" class="query-select">
+          <el-select v-model="queryForm.meterType" clearable placeholder="全部" class="query-select" @change="loadStats">
             <el-option label="电" value="ELECTRIC" />
             <el-option label="水" value="WATER" />
             <el-option label="燃气" value="GAS" />
@@ -27,37 +27,38 @@
             placeholder="选择月份"
             clearable
             class="query-select"
+            @change="loadStats"
           />
         </el-form-item>
-        <el-form-item label="楼宇">
+        <el-form-item v-if="canFilterBuildings" label="楼宇">
           <el-select v-model="queryForm.buildingId" clearable placeholder="全部楼宇" class="query-select" @change="onBuildingChange">
             <el-option v-for="item in buildings" :key="item.id" :label="item.buildingName" :value="item.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="楼层">
+        <el-form-item v-if="canFilterFloors" label="楼层">
           <el-select v-model="queryForm.floorId" clearable placeholder="全部楼层" class="query-select" @change="onFloorChange">
             <el-option v-for="item in floors" :key="item.id" :label="formatFloor(item)" :value="item.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="房间">
-          <el-select v-model="queryForm.roomId" clearable placeholder="全部房间" class="query-select">
+        <el-form-item v-if="canFilterRooms" label="房间">
+          <el-select v-model="queryForm.roomId" clearable placeholder="全部房间" class="query-select" @change="loadStats">
             <el-option v-for="item in rooms" :key="item.id" :label="formatRoom(item)" :value="item.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="租户">
-          <el-select v-model="queryForm.tenantId" clearable filterable placeholder="全部租户" class="query-select">
+        <el-form-item v-if="!props.embedded" label="租户">
+          <el-select v-model="queryForm.tenantId" clearable filterable placeholder="全部租户" class="query-select" @change="loadStats">
             <el-option v-for="item in tenants" :key="item.id" :label="item.tenantName" :value="item.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="账单状态">
-          <el-select v-model="queryForm.billStatus" clearable placeholder="全部" class="query-select">
+          <el-select v-model="queryForm.billStatus" clearable placeholder="全部" class="query-select" @change="loadStats">
             <el-option label="未生成" value="NOT_GENERATED" />
             <el-option label="已生成" value="GENERATED" />
             <el-option label="已入账" value="POSTED" />
           </el-select>
         </el-form-item>
         <el-form-item label="异常">
-          <el-select v-model="queryForm.abnormalFlag" clearable placeholder="全部" class="query-select-small">
+          <el-select v-model="queryForm.abnormalFlag" clearable placeholder="全部" class="query-select-small" @change="loadStats">
             <el-option label="异常" :value="true" />
             <el-option label="正常" :value="false" />
           </el-select>
@@ -67,6 +68,20 @@
           <el-button @click="resetSearch">重置</el-button>
         </el-form-item>
       </el-form>
+
+      <el-alert
+        v-if="errorMessage"
+        class="stats-error"
+        title="能耗统计加载失败"
+        type="error"
+        :closable="false"
+        show-icon
+      >
+        <template #default>
+          <span>{{ errorMessage }}</span>
+          <el-button link type="primary" @click="loadStats">重试</el-button>
+        </template>
+      </el-alert>
 
       <div class="summary-grid">
         <el-card v-for="item in summaryCards" :key="item.label" class="summary-card" shadow="never">
@@ -109,33 +124,25 @@
 
       <el-card shadow="never" class="table-card">
         <template #header>异常用量提示</template>
-        <el-table v-loading="loading" :data="stats.anomalies" border stripe>
-          <el-table-column prop="meterNo" label="表号" min-width="120" />
-          <el-table-column label="类型" width="90">
-            <template #default="{ row }">{{ meterTypeText(row.meterType) }}</template>
-          </el-table-column>
-          <el-table-column prop="periodMonth" label="账期" width="100" />
-          <el-table-column prop="buildingName" label="楼宇" min-width="130" />
-          <el-table-column prop="roomName" label="房间" min-width="120" />
-          <el-table-column label="本期用量" width="120" align="right">
-            <template #default="{ row }">{{ formatNumber(row.usageAmount) }}</template>
-          </el-table-column>
-          <el-table-column label="异常原因" min-width="130">
-            <template #default="{ row }">
-              <el-tag type="danger">{{ abnormalReasonText(row.abnormalReason) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" width="110">
-            <template #default="{ row }">{{ anomalyStatusText(row.abnormalStatus) }}</template>
-          </el-table-column>
-          <el-table-column label="操作" width="210" fixed="right">
-            <template #default="{ row }">
-              <el-button size="small" @click="setAnomalyStatus(row, 'CONFIRMED')">确认</el-button>
-              <el-button size="small" @click="setAnomalyStatus(row, 'IGNORED')">忽略</el-button>
-              <el-button size="small" type="success" @click="setAnomalyStatus(row, 'RESOLVED')">解决</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+        <WorkspaceDataGrid
+          :loading="loading"
+          :rows="stats.anomalies"
+          :columns="energyAnomalyColumns"
+          row-key="id"
+          density="compact"
+          data-mode="client"
+          empty-text="当前筛选暂无异常记录"
+          :operation-column="{ width: 210, fixed: 'right', align: 'left' }"
+          aria-label="能耗异常明细表格"
+        >
+          <template #operations="{ row }">
+            <div class="anomaly-actions">
+              <el-button v-if="hasPermission('energy:reading:update')" size="small" @click="setAnomalyStatus(row, 'CONFIRMED')">确认</el-button>
+              <el-button v-if="hasPermission('energy:reading:update')" size="small" @click="setAnomalyStatus(row, 'IGNORED')">忽略</el-button>
+              <el-button v-if="hasPermission('energy:reading:update')" size="small" type="success" @click="setAnomalyStatus(row, 'RESOLVED')">解决</el-button>
+            </div>
+          </template>
+        </WorkspaceDataGrid>
       </el-card>
     </el-card>
   </div>
@@ -145,12 +152,26 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import request from '../../utils/request'
+import { hasPermission } from '../../utils/permission'
 import { readPage } from '../../utils/pagination'
+import { createLatestRequestGuard } from '../../utils/requestLifecycle'
 import { getEnergyStats, updateAnomalyStatus } from '../../api/energy'
+import WorkspaceDataGrid from '../../components/workspace/WorkspaceDataGrid.vue'
+import { energyAnomalyColumns, energyMeterTypeOptions } from '../../workspaceConfigs/energyWorkspaceConfig'
+
+const props = defineProps({
+  embedded: { type: Boolean, default: false },
+  subjectTenantId: { type: [Number, String], default: null },
+  subjectScope: { type: String, default: '' }
+})
 
 const loading = ref(false)
+const errorMessage = ref('')
 const structureMode = ref('usage')
 const charts = []
+const canFilterBuildings = computed(() => hasPermission('building:view') || hasPermission('building:*'))
+const canFilterFloors = computed(() => canFilterBuildings.value && (hasPermission('floor:view') || hasPermission('floor:*')))
+const canFilterRooms = computed(() => canFilterFloors.value && (hasPermission('room:view') || hasPermission('room:*')))
 
 const trendRef = ref(null)
 const typeRef = ref(null)
@@ -161,6 +182,7 @@ const buildings = ref([])
 const floors = ref([])
 const rooms = ref([])
 const tenants = ref([])
+const statsRequestGuard = createLatestRequestGuard()
 
 const queryForm = reactive({
   meterType: '',
@@ -171,6 +193,12 @@ const queryForm = reactive({
   tenantId: null,
   billStatus: '',
   abnormalFlag: ''
+})
+
+const subjectQueryParams = computed(() => {
+  if (props.subjectScope === 'property') return { tenantScope: 'PROPERTY' }
+  const tenantId = Number(props.subjectTenantId)
+  return Number.isFinite(tenantId) && tenantId > 0 ? { tenantId } : {}
 })
 
 const stats = reactive({
@@ -192,6 +220,7 @@ const structureModeOptions = [
   { label: '用量', value: 'usage' },
   { label: '金额', value: 'amount' }
 ]
+const meterTypeLabelMap = new Map(energyMeterTypeOptions.map(option => [option.value, option.label]))
 
 const summaryCards = computed(() => [
   { label: '记录数', value: stats.recordCount, desc: '当前筛选范围', className: '' },
@@ -211,6 +240,7 @@ const isStructureEmpty = computed(() => {
 })
 
 async function loadStats() {
+  const requestId = statsRequestGuard.start()
   loading.value = true
   try {
     const data = await getEnergyStats({
@@ -221,8 +251,11 @@ async function loadStats() {
       roomId: queryForm.roomId || undefined,
       tenantId: queryForm.tenantId || undefined,
       billStatus: queryForm.billStatus || undefined,
-      abnormalFlag: queryForm.abnormalFlag === '' ? undefined : queryForm.abnormalFlag
-    })
+      abnormalFlag: queryForm.abnormalFlag === '' ? undefined : queryForm.abnormalFlag,
+      ...subjectQueryParams.value
+    }, { silent: true })
+    if (!statsRequestGuard.isCurrent(requestId)) return
+    errorMessage.value = ''
     Object.assign(stats, {
       recordCount: data.recordCount || 0,
       electricUsage: data.electricUsage || 0,
@@ -237,20 +270,41 @@ async function loadStats() {
       buildingRanking: data.buildingRanking || [],
       anomalies: data.anomalies || []
     })
+  } catch (error) {
+    if (!statsRequestGuard.isCurrent(requestId)) return
+    errorMessage.value = '未能读取当前主体的统计数据，请稍后重试。'
+    Object.assign(stats, {
+      recordCount: 0,
+      electricUsage: 0,
+      waterUsage: 0,
+      gasUsage: 0,
+      totalAmount: 0,
+      averageUsage: 0,
+      abnormalCount: 0,
+      trend: [],
+      typeStructure: [],
+      roomRanking: [],
+      buildingRanking: [],
+      anomalies: []
+    })
   } finally {
-    loading.value = false
-    await nextTick()
-    renderCharts()
+    if (statsRequestGuard.isCurrent(requestId)) {
+      loading.value = false
+      await nextTick()
+      renderCharts()
+    }
   }
 }
 
 async function loadBaseData() {
-  const [buildingData, tenantData] = await Promise.all([
-    request.get('/buildings'),
-    request.get('/tenant/list')
+  const [buildingResult, tenantResult] = await Promise.allSettled([
+    canFilterBuildings.value ? request.get('/buildings', { silent: true }) : Promise.resolve([]),
+    !props.embedded && hasPermission('tenant:view')
+      ? request.get('/tenant/list', { silent: true })
+      : Promise.resolve([])
   ])
-  buildings.value = readPage(buildingData).records
-  tenants.value = Array.isArray(tenantData) ? tenantData : []
+  buildings.value = buildingResult.status === 'fulfilled' ? readPage(buildingResult.value).records : []
+  tenants.value = tenantResult.status === 'fulfilled' ? readPage(tenantResult.value).records : []
 }
 
 async function onBuildingChange() {
@@ -260,6 +314,7 @@ async function onBuildingChange() {
     ? readPage(await request.get('/floors', { params: { building_id: queryForm.buildingId } })).records
     : []
   rooms.value = []
+  loadStats()
 }
 
 async function onFloorChange() {
@@ -267,6 +322,7 @@ async function onFloorChange() {
   rooms.value = queryForm.buildingId
     ? readPage(await request.get('/rooms', { params: { building_id: queryForm.buildingId, floor_id: queryForm.floorId || undefined, page: 1, pageSize: 100 } })).records
     : []
+  loadStats()
 }
 
 function resetSearch() {
@@ -369,39 +425,15 @@ function number(value) {
   return Number.isFinite(n) ? n : 0
 }
 
+function meterTypeText(value) {
+  return meterTypeLabelMap.get(value) || String(value || '未知类型')
+}
+
 function formatNumber(value) {
   return number(value).toLocaleString('zh-CN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })
-}
-
-function meterTypeText(type) {
-  return {
-    ELECTRIC: '电',
-    ELECTRICITY: '电',
-    WATER: '水',
-    GAS: '燃气'
-  }[type] || type || '-'
-}
-
-function abnormalReasonText(reason) {
-  return {
-    NEGATIVE_USAGE: '负用量',
-    ZERO_USAGE: '零用量',
-    HIGH_USAGE: '高用量',
-    LOW_USAGE: '低用量',
-    NO_CHANGE: '连续读数无变化'
-  }[reason] || reason || '-'
-}
-
-function anomalyStatusText(status) {
-  return {
-    PENDING: '待处理',
-    CONFIRMED: '已确认',
-    IGNORED: '已忽略',
-    RESOLVED: '已解决'
-  }[status] || status || '-'
 }
 
 function formatFloor(floor) {
@@ -417,6 +449,15 @@ watch(structureMode, async () => {
   renderCharts()
 })
 
+watch(
+  () => [props.subjectScope, props.subjectTenantId],
+  () => {
+    if (!props.embedded) return
+    queryForm.tenantId = null
+    loadStats()
+  }
+)
+
 onMounted(async () => {
   await loadBaseData()
   await loadStats()
@@ -424,6 +465,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  statsRequestGuard.dispose()
   window.removeEventListener('resize', resizeCharts)
   charts.splice(0).forEach(chart => chart.dispose())
 })
@@ -432,6 +474,10 @@ onBeforeUnmount(() => {
 <style scoped>
 .page-container {
   padding: 20px;
+}
+
+.page-container--embedded {
+  padding: 0;
 }
 
 .page-header {
@@ -455,12 +501,23 @@ onBeforeUnmount(() => {
   margin: 18px 0 8px;
 }
 
+.stats-error {
+  margin: 8px 0 12px;
+}
+
 .query-select {
   width: 150px;
 }
 
 .query-select-small {
   width: 110px;
+}
+
+.anomaly-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .summary-grid {

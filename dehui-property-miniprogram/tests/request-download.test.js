@@ -2,6 +2,10 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const path = require('node:path')
 
+function activeDefaultBaseURL() {
+  return require('../config/env').defaultBaseURL
+}
+
 test('download writes invoice to a pdf file path with auth header', async () => {
   let downloadOptions
   global.wx = {
@@ -23,7 +27,7 @@ test('download writes invoice to a pdf file path with auth header', async () => 
   const api = require('../utils/request')
   const filePath = await api.download('/mobile/bills/16/invoice/download', '张昭通讯费-26年04月发票.pdf')
 
-  assert.equal(downloadOptions.url, 'http://localhost:8080/api/mobile/bills/16/invoice/download')
+  assert.equal(downloadOptions.url, `${activeDefaultBaseURL()}/mobile/bills/16/invoice/download`)
   assert.equal(downloadOptions.header.Authorization, 'tenant-token')
   assert.match(downloadOptions.filePath, /invoice-16-[a-z0-9]+\.pdf$/)
   assert.equal(filePath, downloadOptions.filePath)
@@ -50,7 +54,7 @@ test('download writes electronic contract to a contract pdf file path', async ()
   const api = require('../utils/request')
   const filePath = await api.download('/mobile/contracts/21/file/download', '德汇咖啡电子合同.pdf')
 
-  assert.equal(downloadOptions.url, 'http://localhost:8080/api/mobile/contracts/21/file/download')
+  assert.equal(downloadOptions.url, `${activeDefaultBaseURL()}/mobile/contracts/21/file/download`)
   assert.equal(downloadOptions.header.Authorization, 'tenant-token')
   assert.match(downloadOptions.filePath, /contract-21-[a-z0-9]+\.pdf$/)
   assert.equal(filePath, downloadOptions.filePath)
@@ -77,7 +81,7 @@ test('download does not duplicate the api prefix on protected mobile file URLs',
   const api = require('../utils/request')
   const filePath = await api.download('/api/mobile/files/25', 'visitor-qr-14.png')
 
-  assert.equal(downloadOptions.url, 'http://localhost:8080/api/mobile/files/25')
+  assert.equal(downloadOptions.url, `${activeDefaultBaseURL()}/mobile/files/25`)
   assert.equal(downloadOptions.header.Authorization, 'tenant-token')
   assert.match(downloadOptions.filePath, /\.png$/)
   assert.equal(filePath, downloadOptions.filePath)
@@ -108,7 +112,7 @@ test('temporary protected image download keeps auth without creating a persisten
     { temporary: true, silent: true }
   )
 
-  assert.equal(downloadOptions.url, 'http://localhost:8080/api/mobile/files/31')
+  assert.equal(downloadOptions.url, `${activeDefaultBaseURL()}/mobile/files/31`)
   assert.equal(downloadOptions.header.Authorization, 'tenant-token')
   assert.equal(Object.hasOwn(downloadOptions, 'filePath'), false)
   assert.equal(filePath, 'wxfile://tmp/tenant-logo')
@@ -180,7 +184,7 @@ test('download merges an anonymous reservation capability header without requiri
   )
 })
 
-test('upload uses requestURL so stored api base url applies to file uploads', async () => {
+test('upload uses requestURL with the active environment base URL', async () => {
   let uploadOptions
   global.wx = {
     getStorageSync(key) {
@@ -200,7 +204,7 @@ test('upload uses requestURL so stored api base url applies to file uploads', as
   const api = require('../utils/request')
   const result = await api.upload('/mobile/contracts/1/file', 'C:\\tmp\\contract.pdf')
 
-  assert.equal(uploadOptions.url, 'http://localhost:8080/api/mobile/contracts/1/file')
+  assert.equal(uploadOptions.url, `${activeDefaultBaseURL()}/mobile/contracts/1/file`)
   assert.equal(uploadOptions.header.Authorization, 'tenant-token')
   assert.equal(uploadOptions.filePath, 'C:\\tmp\\contract.pdf')
   assert.deepEqual(result, { ok: true })

@@ -1,0 +1,6 @@
+<view class="page">
+  <view class="staff-form">
+    <dynamic-form id="schemaForm" module-key="inspections" schema="{{fieldSchema}}" values="{{form}}" bind:change="onSchemaChange" />
+    <button class="staff-button" bindtap="submit" loading="{{submitting}}" disabled="{{submitting}}">提交巡检</button>
+  </view>
+</view>

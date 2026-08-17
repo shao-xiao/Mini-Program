@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>空间资产</span>
-          <el-button type="primary" @click="openCreateDialog">新增资产</el-button>
+          <el-button v-if="hasPermission('asset:create')" type="primary" @click="openCreateDialog">新增资产</el-button>
         </div>
       </template>
 
@@ -32,6 +32,8 @@
         </el-form-item>
       </el-form>
 
+      <ListSummaryGrid :cards="summaryCards" />
+
       <el-table v-loading="loading" :data="assets" border style="width: 100%">
         <el-table-column prop="assetCode" label="资产编号" min-width="140" />
         <el-table-column prop="assetName" label="资产名称" min-width="150" />
@@ -53,9 +55,9 @@
         <el-table-column prop="nextMaintenanceDate" label="下次维保" width="120" />
         <el-table-column label="操作" width="210" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
-            <el-button size="small" @click="openTransferDialog(row)">转移</el-button>
-            <el-button size="small" type="danger" @click="deleteAsset(row)">删除</el-button>
+            <el-button v-if="hasPermission('asset:update')" size="small" @click="openEditDialog(row)">编辑</el-button>
+            <el-button v-if="hasPermission('asset:update')" size="small" @click="openTransferDialog(row)">转移</el-button>
+            <el-button v-if="hasPermission('asset:delete')" size="small" type="danger" @click="deleteAsset(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -132,7 +134,7 @@
 
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="saveAsset">保存</el-button>
+        <el-button v-if="form.id ? hasPermission('asset:update') : hasPermission('asset:create')" type="primary" :loading="saving" @click="saveAsset">保存</el-button>
       </template>
     </el-dialog>
 
@@ -162,18 +164,21 @@
       </el-form>
       <template #footer>
         <el-button @click="transferVisible = false">取消</el-button>
-        <el-button type="primary" @click="transferAsset">确认转移</el-button>
+        <el-button v-if="hasPermission('asset:update')" type="primary" @click="transferAsset">确认转移</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
+import { hasPermission } from '../../utils/permission'
 import { createPagination, pageParams, readPage, resetToFirstPage } from '../../utils/pagination'
 
+import { buildCountSummaryCards, loadListTotal } from '../../utils/listSummary'
+import ListSummaryGrid from '../../components/ListSummaryGrid.vue'
 const buildings = ref([])
 const queryFloors = ref([])
 const formFloors = ref([])
@@ -186,7 +191,19 @@ const saving = ref(false)
 const dialogVisible = ref(false)
 const transferVisible = ref(false)
 const pagination = reactive(createPagination(20))
+const overallTotal = ref(0)
 
+const summaryCards = computed(() => buildCountSummaryCards({
+  total: overallTotal.value || pagination.total,
+  filtered: pagination.total,
+  current: assets.value.length,
+  unit: '资产',
+  totalDesc: '空间资产档案',
+  extraCards: [
+    { label: '正常资产', value: assets.value.filter(item => ['NORMAL', 'IN_USE', 'ENABLED'].includes(item.status)).length, desc: '可正常使用', tone: 'success' },
+    { label: '需维护', value: assets.value.filter(item => ['MAINTENANCE', 'REPAIRING', 'SCRAPPED', 'DISABLED'].includes(item.status)).length, desc: '需维护/停用/报废', tone: 'warning' }
+  ]
+}))
 const assetStatuses = [
   { label: '使用中', value: 'IN_USE' },
   { label: '闲置', value: 'IDLE' },
@@ -292,6 +309,7 @@ async function loadAssets() {
     const page = readPage(data)
     assets.value = page.records
     pagination.total = page.total
+    overallTotal.value = await loadListTotal('/assets')
   } finally {
     loading.value = false
   }

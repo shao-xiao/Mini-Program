@@ -222,3 +222,8 @@ npm run build
 - 不要把租户联系人、租户邮箱继续塞进 `remark` 字段。
 - 如果小程序端未来展示租户联系人或招商联系人，也应只读取后端返回字段，不在前端绕过校验保存数据。
 - 涉及数据库字段、接口返回、前端表单校验的后续改动，必须同步更新 `CONTEXT_SUMMARY.md` 和相关 docs。
+
+## 2026-07-24 记录更新
+
+- 已修复登录提交适配：dehui-property-admin/src/views/Login.vue 改为提交 JSON Body（username/password），并指定 Content-Type: application/json，避免后端 HttpMessageNotReadableException。
+- 已新增演示数据脚本：dehui-property-management/scripts/seed_demo_building_tenants_energy.sql（1 个楼宇、3 层、3 间房、3 家租户、6 个表具、18 条近三月读数）用于楼宇/租户水电联动演示。

@@ -1,0 +1,41 @@
+@import "../../styles/theme.wxss";
+
+.files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.file-item {
+  min-width: 140rpx;
+  color: var(--dhic-text-secondary);
+  font-size: var(--dhic-font-body);
+  font-weight: var(--dhic-weight-body);
+}
+
+.files image,
+.image-state {
+  width: 140rpx;
+  height: 140rpx;
+  border: 1rpx solid var(--dhic-border-light);
+  border-radius: var(--dhic-radius-card);
+  background: var(--dhic-surface-muted);
+}
+
+.image-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 12rpx;
+  color: var(--dhic-text-tertiary);
+  font-size: var(--dhic-font-meta);
+  font-weight: var(--dhic-weight-medium);
+  text-align: center;
+}
+
+.image-state.error {
+  border-color: rgba(var(--dhic-brand-rgb), 0.18);
+  background: var(--dhic-danger-soft);
+  color: var(--dhic-danger);
+}

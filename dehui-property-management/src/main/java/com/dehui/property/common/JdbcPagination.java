@@ -27,6 +27,27 @@ public final class JdbcPagination {
         return query(jdbcTemplate, recordSql, countSql, args, page, pageSize, new ColumnMapRowMapper());
     }
 
+    public static PageResponse<Map<String, Object>> query(
+            JdbcTemplate jdbcTemplate,
+            String recordSql,
+            String countSql,
+            List<Object> whereArgs,
+            List<Object> recordOnlyArgs,
+            Integer page,
+            Integer pageSize
+    ) {
+        return query(
+                jdbcTemplate,
+                recordSql,
+                countSql,
+                whereArgs,
+                recordOnlyArgs,
+                page,
+                pageSize,
+                new ColumnMapRowMapper()
+        );
+    }
+
     public static <T> PageResponse<T> query(
             JdbcTemplate jdbcTemplate,
             String recordSql,
@@ -36,14 +57,29 @@ public final class JdbcPagination {
             Integer pageSize,
             RowMapper<T> rowMapper
     ) {
-        List<Object> safeArgs = args == null ? List.of() : args;
+        return query(jdbcTemplate, recordSql, countSql, args, List.of(), page, pageSize, rowMapper);
+    }
+
+    public static <T> PageResponse<T> query(
+            JdbcTemplate jdbcTemplate,
+            String recordSql,
+            String countSql,
+            List<Object> whereArgs,
+            List<Object> recordOnlyArgs,
+            Integer page,
+            Integer pageSize,
+            RowMapper<T> rowMapper
+    ) {
+        List<Object> safeWhereArgs = whereArgs == null ? List.of() : whereArgs;
+        List<Object> safeRecordOnlyArgs = recordOnlyArgs == null ? List.of() : recordOnlyArgs;
         int normalizedPage = normalizePage(page);
         int normalizedPageSize = normalizePageSize(pageSize);
         int offset = (normalizedPage - 1) * normalizedPageSize;
 
-        Long total = jdbcTemplate.queryForObject(countSql, Long.class, safeArgs.toArray());
+        Long total = jdbcTemplate.queryForObject(countSql, Long.class, safeWhereArgs.toArray());
 
-        List<Object> recordArgs = new ArrayList<>(safeArgs);
+        List<Object> recordArgs = new ArrayList<>(safeWhereArgs);
+        recordArgs.addAll(safeRecordOnlyArgs);
         recordArgs.add(normalizedPageSize);
         recordArgs.add(offset);
         List<T> records = jdbcTemplate.query(recordSql.stripTrailing() + " LIMIT ? OFFSET ?", rowMapper, recordArgs.toArray());

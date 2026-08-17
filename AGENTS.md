@@ -12,9 +12,19 @@
 
 Windows 开发路径：
 
+# 一、项目位置
+
+本项目可能运行在主仓库或 Codex Git worktree 中。
+
+实际项目根目录以当前 Git 工作区中包含以下文件和目录的位置为准：
+
 ```text
-D:\projects\dehui-property-vscode
-```
+AGENTS.md
+ARCHITECTURE.md
+CONTEXT_SUMMARY.md
+dehui-property-management
+dehui-property-admin
+dehui-property-miniprogram
 
 项目根目录下包含：
 
@@ -137,7 +147,18 @@ Authorization 使用原始 token，不加 Bearer
 禁止 mock 数据
 禁止虚构接口
 ```
+```md
+## 前端
 
+```text
+Vue 3
+Vite
+Element Plus
+JavaScript / Vue SFC 为主
+现有 TypeScript 文件按项目现状维护
+axios 请求封装
+vue-router
+Pinia 已安装，但禁止随意增加全局状态
 ---
 
 # 四、最重要开发原则
@@ -169,18 +190,26 @@ Authorization 使用原始 token，不加 Bearer
 
 ---
 
+
+
 # 五、当前权限模型
 
-角色：
+当前标准后台角色包括：
 
 ```text
+SUPER_ADMIN
 ADMIN
-MANAGER
-FINANCE
+PROPERTY_MANAGER
+INVESTMENT_MANAGER
 STAFF
+FINANCE
+ACCOUNTANT
+CASHIER
+ENGINEER_MANAGER
+ENGINEER
+SECURITY_MANAGER
 SECURITY
-CLEANER
-```
+TENANT
 
 登录返回格式：
 
@@ -193,23 +222,61 @@ CLEANER
 }
 ```
 
-前端角色来源：
+登录信息只用于完成身份认证和初始化。
 
-```js
-localStorage.getItem('roles')
-```
+当前用户的菜单和操作权限必须通过以下接口获取：
 
-其中 `roles` 是 JSON 字符串数组，例如：
+GET /api/system/user/access
+
+该接口返回当前用户最新的：
+
+roles
+menus
+permissions
+
+前端页面初始化和浏览器刷新时，必须重新调用该接口，并覆盖旧权限缓存。
+
+localStorage 只能作为前端缓存，不是权限真实来源。
+
+真实权限来源为：
+
+sys_user_role
+↓
+sys_role_menu
+sys_role_permission
+↓
+GET /api/system/user/access
+
+禁止仅依赖登录时保存的旧角色或旧权限判断菜单和按钮。
+---
+
+## 需要补充的第五处：ADMIN 与 SUPER_ADMIN
+
+建议在权限章节增加：
+
+```md
+## 管理员权限边界
+
+只有 `SUPER_ADMIN` 可以拥有平台全部菜单和操作权限。
+
+`ADMIN` 必须按照数据库中的菜单和 permission code 进行授权，不得在前端、后端拦截器或 Controller 中被当作全权限角色直接放行。
+
+禁止出现：
+
+```java
+role == ADMIN || role == SUPER_ADMIN
+
+## 登录与权限加载
+
+登录接口负责返回身份基础信息，例如：
 
 ```json
-["ADMIN"]
-["FINANCE"]
-["MANAGER"]
-```
-
-不要假设存在 `userStore`。
-
----
+{
+  "token": "...",
+  "userId": 1,
+  "username": "admin",
+  "roles": ["ADMIN"]
+}
 
 # 六、request.js 约定
 
@@ -455,3 +522,86 @@ AI + BI 企业级物业运营平台
 - AI 运营日报
 - 智能工单分析
 - 生产级 MySQL 部署
+
+---
+
+# 十七、RBAC 升级数据保留
+
+`sys_user_role`、`sys_role_menu`、`sys_role_permission` 是管理员保存的真实业务配置，系统升级不得按默认模板重建、覆盖或清空。
+
+从 Flyway V61 开始必须遵守：
+
+- 禁止对上述三张关系表执行 `DELETE`、`TRUNCATE`、`UPDATE`、`REPLACE` 或 `DROP TABLE`。
+- 新模块需要兼容已有角色时，只允许使用 `INSERT IGNORE` 增量增加关系，并以 `NOT EXISTS` 检查全部历史关系；已有启用、停用或删除状态均保持不变。
+- 模块下线只处理菜单或权限目录项，不修改管理员已经保存的角色关系。
+- 用户在后台主动保存角色、菜单或权限属于显式业务操作，不属于系统升级。
+- 后端 `RbacUpgradePreservationPolicyTest` 必须保持通过，禁止删除或绕过该迁移守卫。
+- 详细规则见 `docs/superpowers/specs/2026-07-29-rbac-upgrade-preservation.md`。
+
+# Dehui Property System Development Rules
+
+---
+
+# 十八、资产与财务业务数据升级保留
+
+楼宇、楼层、房间、设备、能耗表具、绑定、抄表、停车位、车位绑定、会议室、
+收费规则、预约、计费依据、账单、明细、收款、发票、统一字段、附件和审计记录
+均为正式业务数据，不是可由系统升级重建的演示或模板数据。
+
+从 Flyway V61 开始必须遵守：
+
+- 禁止迁移对资产和财务受保护表执行 `INSERT`、`UPDATE`、`DELETE`、
+  `REPLACE`、`TRUNCATE` 或 `DROP TABLE`。
+- 禁止通过 `ALTER TABLE ... DROP/TRUNCATE/RENAME/EXCHANGE ...`、`RENAME TABLE`
+  或 `DROP INDEX ... ON ...` 破坏受保护表。
+- 升级只允许兼容性的结构演进；历史业务数据转换必须单独备份、验证、确认，
+  不得混入应用自动升级。
+- 附件保护必须同时校验 `file_upload` 元数据和配置上传目录中的物理文件，不能只
+  比较数据库记录。
+- 后端 `BusinessDataUpgradePreservationPolicyTest` 必须保持通过，禁止删除或
+  绕过该迁移守卫。
+- 完整表清单和验证方式见
+  `docs/superpowers/specs/2026-07-29-energy-finance-upgrade-preservation.md`。
+
+## Frontend Development
+
+For all frontend tasks, always follow:
+
+- frontend-ui-engineering skill
+
+Frontend stack:
+- Vue3
+- TypeScript
+- Vite
+- Pinia
+
+Architecture requirements:
+
+- Use component-based architecture
+- Avoid large monolithic Vue files
+- Keep components reusable
+- Separate data logic and UI rendering
+- Maintain consistent design system
+
+UI requirements:
+
+- Follow Feishu Base style
+- High information density
+- Avoid excessive cards and whitespace
+- Optimize tables for enterprise usage
+
+Important modules:
+
+- DataWorkspace
+- FieldManager
+- CellRenderer
+- PermissionTree
+
+Do not break:
+- API compatibility
+- Import/export functions
+- Existing database structure
+## 2026-07-24 记录更新
+
+- 已修复登录提交适配：dehui-property-admin/src/views/Login.vue 改为提交 JSON Body（username/password），并指定 Content-Type: application/json，避免后端 HttpMessageNotReadableException。
+- 已新增演示数据脚本：dehui-property-management/scripts/seed_demo_building_tenants_energy.sql（1 个楼宇、3 层、3 间房、3 家租户、6 个表具、18 条近三月读数）用于楼宇/租户水电联动演示。

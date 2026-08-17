@@ -3,6 +3,9 @@ spring:
     name: dehui-property-management
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+  sql:
+    init:
+      mode: never
   servlet:
     multipart:
       max-file-size: ${DEHUI_UPLOAD_MAX_FILE_SIZE:20MB}
@@ -20,8 +23,13 @@ server:
 dehui:
   security:
     token-ttl-hours: ${DEHUI_TOKEN_TTL_HOURS:12}
+    trusted-proxies: ${DEHUI_TRUSTED_PROXIES:127.0.0.1,::1,0:0:0:0:0:0:0:1}
   file:
     upload-dir: ${DEHUI_UPLOAD_DIR:uploads}
+  wechat:
+    miniprogram:
+      app-id: ${WECHAT_MINIPROGRAM_APP_ID:}
+      app-secret: ${WECHAT_MINIPROGRAM_APP_SECRET:}
 
 logging:
   level:
