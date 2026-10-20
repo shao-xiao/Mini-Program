@@ -1,3 +1,10 @@
+## Recent Change - 2026-10-20 小屏表格浮动横向滚动
+
+- 为共享WorkspaceDataGrid新增浮动横向滚动条，表格超宽且原滚动条在屏幕下方时固定显示；进入表底、无溢出或不可见时隐藏，无需先下滑到底。
+- 支持拖动、左右按钮及方向/Home/End键，与表头、表体双向同步；按表格可视宽度定位，保留固定列。RAF合并滚动监听，ResizeObserver跟踪宽高，卸载清理。
+- 全部48项组件检查（含大表性能回归）、生产构建、隔离基线构建和diff检查通过；线上1024×768真实表具拖动、按钮、键盘、自动隐藏均通过，同步位移493/1041/1236px，无页面横向溢出及浏览器error/warn。
+- 仅共享表格资源与index.html增量发布，44个公开导出不变，95个旧文件保持不变；备份 /opt/dehui/backups/floating-table-scrollbar-20261020-154203。详见 docs/floating-table-scrollbar-2026-10-20.md。
+
 ## Recent Change - 2026-10-20 巡检编辑保存与原照片回填修复
 
 - 复现400 Invalid attachment file id：后端同步附件时错误地将MySQL布尔deleted标记交给数字ID解析器。仅删除标记增加Boolean兼容，文件ID仍严格验证，保留原照片关系。

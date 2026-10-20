@@ -203,11 +203,13 @@
         </slot>
       </template>
     </el-table>
+    <FloatingTableScrollbar :table="tableRef" :rows="rows" :columns="gridColumns" />
   </div>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, useSlots, watch } from 'vue'
+import FloatingTableScrollbar from './FloatingTableScrollbar.vue'
 import { EditPen, Loading } from '@element-plus/icons-vue'
 import CellEditor from '../CellEditor.vue'
 import CellRenderer from '../CellRenderer.vue'
