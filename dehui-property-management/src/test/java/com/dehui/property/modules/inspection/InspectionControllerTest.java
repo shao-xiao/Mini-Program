@@ -217,6 +217,40 @@ class InspectionControllerTest {
     }
 
     @Test
+    void updatePreservesOrRestoresExistingPhotosWhenMysqlReturnsBooleanDeletionFlags() {
+        for (Object deleted : List.of(false, true, 0, 1, "0", "1")) {
+            JdbcTemplate jdbc = mock(JdbcTemplate.class);
+            when(jdbc.queryForList(anyString(), any(Object[].class)))
+                    .thenReturn(List.of(Map.of("inspection_type", "DAILY", "inspection_status", "OPEN")))
+                    .thenReturn(List.of(Map.of("mimeType", "image/jpeg")))
+                    .thenReturn(List.of(Map.of("id", 84L, "fileId", 116L, "deleted", deleted)));
+            when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
+            ApiResponse<Void> response = new InspectionController(jdbc).update(127L, Map.of(
+                    "inspectionDate", "2026-10-13", "inspector", "陈齐", "area", "B2至F8", "target", "公共设施",
+                    "remark", "已解决", "images", List.of(Map.of("fileId", 116L, "sortOrder", 1))
+            ), new AuthPrincipal(1L, "admin", "ADMIN", null, List.of("ADMIN"), List.of("inspection:update")));
+            assertEquals(200, response.code());
+            ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+            verify(jdbc, org.mockito.Mockito.times(3)).update(sql.capture(), any(Object[].class));
+            assertFalse(sql.getAllValues().stream().anyMatch(value -> value.contains("INSERT INTO inspection_attachment")));
+            boolean wasDeleted = Boolean.TRUE.equals(deleted) || "1".equals(String.valueOf(deleted));
+            assertTrue(sql.getAllValues().get(1).contains(wasDeleted ? "WHERE id = ?" : "WHERE inspection_id = ? AND file_id = ? AND deleted = 0"));
+        }
+    }
+
+    @Test
+    void updateStillRejectsMalformedAttachmentIds() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(Map.of("inspection_type", "DAILY")));
+        when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
+        BusinessException error = assertThrows(BusinessException.class, () -> new InspectionController(jdbc).update(127L, Map.of(
+                "inspectionDate", "2026-10-13", "inspector", "陈齐", "area", "B2", "target", "公共设施",
+                "images", List.of(Map.of("fileId", "invalid-file"))
+        ), new AuthPrincipal(1L, "admin", "ADMIN", null, List.of("ADMIN"), List.of("inspection:update"))));
+        assertEquals(400, error.getCode());
+    }
+
+    @Test
     void deleteSoftDeletesInspectionRecord() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         when(jdbcTemplate.update(anyString(), any(Object[].class))).thenReturn(1);

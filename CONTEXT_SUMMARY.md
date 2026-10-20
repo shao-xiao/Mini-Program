@@ -1,3 +1,10 @@
+## Recent Change - 2026-10-20 巡检编辑保存与原照片回填修复
+
+- 复现400 Invalid attachment file id：后端同步附件时错误地将MySQL布尔deleted标记交给数字ID解析器。仅删除标记增加Boolean兼容，文件ID仍严格验证，保留原照片关系。
+- schema编辑表单只回填固定业务字段，遗漏images/id/createdAt；改为完整详情回填，原照片由attachments兜底，并清理新表单的旧记录键。
+- 后端相关26项、前端2项回归测试及生产构建通过。线上已保存用户待提交备注“B1食堂燃气阀已关闭，已解决”；重开确认编号127、原照片与备注完整，附件84/file116仍deleted0，状态仍OPEN，无浏览器error/warn。
+- 后端仅替换InspectionController.class，其他jar条目不变；前端只增量发布巡检模块，93个旧文件不变；备份 /opt/dehui/backups/inspection-save-20261020-152525。详见 docs/inspection-save-fix-2026-10-20.md。
+
 ## Recent Change - 2026-10-20 运营日报真实业务补齐
 
 - 原接口固定返回 id=0、空指标和空历史，页面因此整页空白。前端改为按模块授权汇总既有真实接口，独立显示来源失败/未授权，不改后端与角色权限。

@@ -958,8 +958,11 @@ public class InspectionController {
             Long fileId = parseLong(row.get("fileId"));
             if (fileId == null) continue;
             Long id = parseLong(row.get("id"));
-            Long deleted = parseLong(row.get("deleted"));
-            if (deleted != null && deleted == 1L) {
+            Object deletedValue = row.get("deleted");
+            boolean deleted = deletedValue instanceof Boolean flag
+                    ? flag
+                    : Long.valueOf(1L).equals(parseLong(deletedValue));
+            if (deleted) {
                 if (id != null) {
                     deletedIdsByFile.put(fileId, id);
                 }

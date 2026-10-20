@@ -313,6 +313,7 @@ import {
 import { workspaceTableOptions } from '../../workspaceConfigs/workspaceConfig'
 import CustomFieldEditor from '../../components/CustomFieldEditor.vue'
 import ModuleSchemaForm from '../../components/schema/ModuleSchemaForm.vue'
+import { inspectionEditValues } from '../../utils/inspectionEditValues'
 import InspectionDetailDialog from '../../components/inspection/InspectionDetailDialog.vue'
 
 const MAX_INSPECTION_ATTACHMENTS = 30
@@ -601,6 +602,7 @@ function nextPhotoLocalId() {
 
 function resetForm() {
   editingId.value = null
+  for (const key of Object.keys(form)) delete form[key]
   Object.assign(form, defaultForm())
   photoUploadMessage.value = ''
   photoAttachments.value = []
@@ -705,18 +707,7 @@ async function loadWorkspaceData() {
 }
 
 function syncDialogFromInspection(record = {}) {
-  Object.assign(form, {
-    inspectionDate: record.inspectionDate || '',
-    inspector: record.inspector || '',
-    inspectionType: record.inspectionType || '',
-    area: record.area || '',
-    target: record.target || '',
-    result: record.result || 'NORMAL',
-    status: record.status || 'OPEN',
-    problemDescription: record.problemDescription || '',
-    actionTaken: record.actionTaken || '',
-    remark: record.remark || ''
-  })
+  Object.assign(form, inspectionEditValues(record))
   photoAttachments.value = normalizePhotoList(record.attachments)
   syncPhotoSortOrder()
 }
