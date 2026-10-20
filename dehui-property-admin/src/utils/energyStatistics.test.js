@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { energyChartTypes, energyTrendWindow, energyTrendSeries, energyRanking, energyReadingMeters, energyReadingValue } from './energyStatistics.js'
+import { energyChartTypes, energyTrendWindow, energyTrendSeries, energyRanking, energyReadingMeters, energyReadingValue, energyOverallTrend } from './energyStatistics.js'
 
 test('uses the latest actual period and leaves missing months empty', () => {
   const months = energyTrendWindow([{ periodMonth: '2026-09', electricUsage: 1479.29, electricRecordCount: 10 }])
@@ -44,4 +44,24 @@ test('keeps cumulative readings separate by physical meter and sorts each period
 test('missing or invalid meter readings remain empty while genuine zero is preserved', () => {
   assert.deepEqual([null, undefined, '', 'bad', '0', 0, '12.30'].map(energyReadingValue), [null, null, null, null, 0, 0, 12.3])
   assert.deepEqual(energyReadingMeters([{ meterId: null }]), [])
+})
+
+
+test('overall usage compares all-meter totals by type and the immediately previous month', () => {
+  const rows = [{ periodMonth:'2026-09',electricUsage:29249.27,electricRecordCount:9,waterUsage:45,waterRecordCount:2 }, { periodMonth:'2026-08',electricUsage:45176.16,electricRecordCount:9,waterUsage:39,waterRecordCount:2 }]
+  const result = energyOverallTrend(rows, energyChartTypes[0])
+  assert.equal(result[1].usage,29249.27)
+  assert.equal(result[1].change,-15926.89)
+  assert.equal(result[1].changeRate.toFixed(1),'-35.3')
+  assert.equal(result[1].recordCount,9)
+  assert.equal(energyOverallTrend(rows,energyChartTypes[1])[1].change,6)
+  assert.equal(rows[0].periodMonth,'2026-09')
+})
+test('overall month comparison does not bridge missing months or invent a percentage from zero', () => {
+  const rows = [{ periodMonth:'2026-08',electricUsage:0,electricRecordCount:1 }, { periodMonth:'2026-09',electricUsage:10,electricRecordCount:1 }, { periodMonth:'2026-11',electricUsage:20,electricRecordCount:1 },{periodMonth:'2026-12',electricUsage:0,electricRecordCount:0}]
+  const result=energyOverallTrend(rows,energyChartTypes[0])
+  assert.equal(result.length,3)
+  assert.equal(result[1].change,10)
+  assert.equal(result[1].changeRate,null)
+  assert.equal(result[2].change,null)
 })

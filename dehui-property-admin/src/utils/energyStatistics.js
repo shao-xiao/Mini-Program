@@ -50,3 +50,19 @@ export function energyReadingMeters(rows, meterType = '') {
 export function energyReadingValue(value) {
   return value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value)
 }
+
+// Compare aggregate actual usage with the immediately preceding calendar month.
+export function energyOverallTrend(rows, type) {
+  const records = rows.filter(row => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(row.periodMonth)) && Number(row[type.countField]) > 0)
+    .map(row => ({ periodMonth: row.periodMonth, usage: Number(row[type.field]) || 0, recordCount: Number(row[type.countField]) }))
+    .sort((a, b) => a.periodMonth.localeCompare(b.periodMonth))
+  const byMonth = new Map(records.map(row => [row.periodMonth, row]))
+  return records.map(row => {
+    const [year, month] = row.periodMonth.split('-').map(Number)
+    const date = new Date(year, month - 2, 1)
+    const previous = byMonth.get(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`)
+    const change = previous ? Math.round((row.usage - previous.usage) * 100) / 100 : null
+    const changeRate = previous && previous.usage > 0 ? change / previous.usage * 100 : previous?.usage === 0 && row.usage === 0 ? 0 : null
+    return { ...row, change, changeRate, previousUsage: previous?.usage ?? null }
+  })
+}

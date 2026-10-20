@@ -98,7 +98,7 @@
       </el-card>
 
       <div v-if="!isTenantView || stats.recordCount > 0" class="analysis-toolbar"><div><strong>用量分析</strong><span>按同一能耗类型比较 · {{ activeChartType.unit }}</span></div><el-segmented v-model="chartMeterType" :options="chartTypeOptions" size="small" /></div>
-      <div v-if="!isTenantView || stats.recordCount > 0" class="chart-grid" :class="{ 'tenant-charts': isTenantView }">
+      <div v-if="!isTenantView" class="chart-grid" :class="{ 'tenant-charts': isTenantView }">
         <el-card class="chart-card wide" shadow="never">
           <template #header><div class="card-header-inline"><div><strong>近 6 个账期用量</strong><small>以最近有记录的账期为终点，缺少记录的月份留空</small></div><span class="chart-meta">{{ activeChartType.label }}</span></div></template>
           <el-empty v-if="isTrendEmpty" :description="stats.recordCount ? '当前筛选暂无该类型的月度记录' : '当前主体与筛选范围暂无抄表记录'" :image-size="80" />
@@ -132,14 +132,20 @@
       <el-card v-if="isTenantView" shadow="never" class="reading-card chart-card">
         <template #header>
           <div class="card-header-inline">
-            <div><strong>表具读数趋势</strong><small>按账期对比上次与本期读数；读数为表盘累计值，用量另按倍率计算</small></div>
-            <el-select v-model="selectedReadingMeterId" filterable placeholder="选择表具" class="reading-meter-select" aria-label="读数趋势表具">
+            <div><strong>{{ isOverallReading ? '整体用量趋势' : '表具读数趋势' }}</strong><small>{{ isOverallReading ? '按账期汇总当前租户全部同类型表具的实际用量，倍率已计入' : '按账期对比上次与本期读数；读数为表盘累计值，用量另按倍率计算' }}</small></div>
+            <el-select v-model="selectedReadingMeterId" filterable placeholder="选择表具" class="reading-meter-select" aria-label="趋势统计范围">
+              <el-option label="全部表具（总体趋势）" value="ALL" />
               <el-option v-for="meter in readingMeters" :key="meter.meterId" :value="meter.meterId" :label="`${meter.meterName || meter.meterNo} · ${meter.meterNo || meter.meterId}`" />
             </el-select>
           </div>
         </template>
-        <el-alert v-if="readingError" :title="readingError" type="error" :closable="false" show-icon />
-        <el-empty v-else-if="!selectedReadingMeter" description="当前类型与月份暂无表具读数" :image-size="64" />
+        <el-alert v-if="readingError && !isOverallReading" :title="readingError" type="error" :closable="false" show-icon />
+        <el-empty v-else-if="isOverallReading ? !overallRows.length : !selectedReadingMeter" description="当前类型与月份暂无表具读数" :image-size="64" />
+        <template v-else-if="isOverallReading">
+          <div class="overall-summary"><div><span>最新账期</span><strong>{{ latestOverall.periodMonth }}</strong></div><div><span>当期总用量 · {{ activeChartType.unit }}</span><strong>{{ formatNumber(latestOverall.usage) }}</strong></div><div><span>较上月变化</span><strong>{{ overallChangeText(latestOverall) }}</strong></div></div>
+          <div ref="readingTrendRef" class="chart reading-chart" role="img" :aria-label="`当前租户全部${meterTypeText(activeChartType.value)}表近六个账期总用量趋势`"></div>
+          <WorkspaceDataGrid :loading="loading" :rows="[...overallRows].reverse()" :columns="overallColumns" row-key="periodMonth" :show-index="false" density="compact" data-mode="client" aria-label="租户整体用量与环比明细" />
+        </template>
         <template v-else>
           <div class="reading-meta"><span>{{ selectedReadingMeter.meterName }}</span><span>{{ selectedReadingMeter.meterNo }}</span><span>{{ meterTypeText(selectedReadingMeter.meterType) }} · {{ selectedReadingMeter.unit }}</span><span>{{ selectedReadingMeter.readings.length }} 条记录</span></div>
           <div ref="readingTrendRef" class="chart reading-chart" role="img" :aria-label="`${selectedReadingMeter.meterName}各账期上次与本期读数趋势`"></div>
@@ -181,7 +187,7 @@ import { hasPermission } from '../../utils/permission'
 import { loadAllWorkspaceRecords } from '../../utils/workspaceExport'
 import { readPage } from '../../utils/pagination'
 import { createLatestRequestGuard } from '../../utils/requestLifecycle'
-import { energyChartTypes, energyTrendWindow, energyRanking, energyTrendSeries, energyReadingMeters, energyReadingValue } from '../../utils/energyStatistics'
+import { energyChartTypes, energyTrendWindow, energyRanking, energyTrendSeries, energyReadingMeters, energyReadingValue, energyOverallTrend } from '../../utils/energyStatistics'
 import { getEnergyStats, updateAnomalyStatus } from '../../api/energy'
 import WorkspaceDataGrid from '../../components/workspace/WorkspaceDataGrid.vue'
 import { energyAnomalyColumns, energyMeterTypeOptions } from '../../workspaceConfigs/energyWorkspaceConfig'
@@ -206,9 +212,23 @@ const canFilterRooms = computed(() => canFilterFloors.value && (hasPermission('r
 const readingTrendRef = ref(null)
 const readingRecords = ref([])
 const readingError = ref('')
-const selectedReadingMeterId = ref('')
+const selectedReadingMeterId = ref('ALL')
 const readingMeters = computed(() => energyReadingMeters(readingRecords.value, activeChartType.value.value))
-const selectedReadingMeter = computed(() => readingMeters.value.find(meter => meter.meterId === selectedReadingMeterId.value) || readingMeters.value[0])
+const isOverallReading = computed(() => selectedReadingMeterId.value === 'ALL')
+const selectedReadingMeter = computed(() => readingMeters.value.find(meter => meter.meterId === selectedReadingMeterId.value))
+const overallRows = computed(() => energyOverallTrend(stats.trend, activeChartType.value))
+const latestOverall = computed(() => overallRows.value.at(-1))
+const overallColumns = computed(() => [
+  { key: 'periodMonth', label: '账期', minWidth: 110 },
+  { key: 'usage', label: `总用量（${activeChartType.value.unit}）`, type: 'number', decimals: 2, minWidth: 150, align: 'right' },
+  { key: 'change', label: '较上月变化', minWidth: 230, valueGetter: overallChangeText },
+  { key: 'recordCount', label: '抄表记录数', type: 'number', decimals: 0, minWidth: 110, align: 'right' }
+])
+function overallChangeText(row) {
+  if (row.change == null) return '暂无可比上月'
+  const prefix = row.change > 0 ? '+' : ''
+  return `${prefix}${formatNumber(row.change)}（${row.changeRate == null ? '上月为 0' : `${row.changeRate > 0 ? '+' : ''}${row.changeRate.toFixed(1)}%`}）`
+}
 const readingDetailRows = computed(() => [...(selectedReadingMeter.value?.readings || [])].reverse())
 const readingColumns = computed(() => [
   { key: 'periodMonth', label: '账期', minWidth: 110 },
@@ -312,7 +332,7 @@ async function loadStats() {
     if (!statsRequestGuard.isCurrent(requestId)) return
     readingRecords.value = readingsResult.status === 'fulfilled' ? readingsResult.value : []
     readingError.value = readingsResult.status === 'rejected' ? '表具读数加载失败，请缩小月份范围或刷新重试。' : ''
-    if (!readingMeters.value.some(meter => meter.meterId === selectedReadingMeterId.value)) selectedReadingMeterId.value = ''
+    if (!readingMeters.value.some(meter => meter.meterId === selectedReadingMeterId.value)) selectedReadingMeterId.value = 'ALL'
     if (statsResult.status === 'rejected') throw statsResult.reason
     const data = statsResult.value
     errorMessage.value = ''
@@ -417,6 +437,14 @@ function renderCharts() {
 
   const reading = createChart(readingTrendRef)
   const meter = selectedReadingMeter.value
+  if (isOverallReading.value) reading?.setOption({
+    animation: false, color: [activeChartType.value.color],
+    tooltip: { trigger: 'axis', valueFormatter: value => value == null ? '无记录' : `${formatNumber(value)} ${activeChartType.value.unit}` },
+    grid: { left: 78, right: 35, top: 28, bottom: 35 },
+    xAxis: { type: 'category', data: trendWindow.value.map(row => row.periodMonth), axisLabel: { color: '#667085', fontSize: 11 }, axisLine: { lineStyle: { color: '#e4e7ec' } } },
+    yAxis: { type: 'value', name: activeChartType.value.unit, axisLabel: { color: '#98a2b3', fontSize: 11 }, splitNumber: 3, splitLine: { lineStyle: { color: '#eef0f3', type: 'dashed' } } },
+    series: [{ name: '全部表具总用量', type: 'line', symbolSize: 8, connectNulls: false, areaStyle: { opacity: 0.06 }, label: { show: true, position: 'top', color: '#475467', formatter: params => params.value == null ? '' : formatNumber(params.value) }, data: energyTrendSeries(trendWindow.value, activeChartType.value) }]
+  })
   if (meter) reading?.setOption({
     animation: false, color: ['#8c96a6', '#d93025'],
     tooltip: { trigger: 'axis', valueFormatter: value => value == null ? '无读数' : `${formatNumber(value)} ${meter.unit || ''}` },
@@ -498,10 +526,10 @@ function formatRoom(room) {
 }
 
 watch(readingMeters, meters => {
-  if (!meters.some(meter => meter.meterId === selectedReadingMeterId.value)) selectedReadingMeterId.value = meters[0]?.meterId || ''
+  if (!meters.some(meter => meter.meterId === selectedReadingMeterId.value)) selectedReadingMeterId.value = 'ALL'
 })
 
-watch([activeChartType, selectedReadingMeter], async () => {
+watch([activeChartType, selectedReadingMeter, isOverallReading], async () => {
   await nextTick()
   renderCharts()
 })
@@ -596,6 +624,9 @@ onBeforeUnmount(() => {
 .type-dot--ELECTRIC { background: #d93025; }
 .type-dot--WATER { background: #6789a7; }
 .type-dot--GAS { background: #c79a60; }
+.overall-summary { display: flex; flex-wrap: wrap; gap: 18px 36px; margin: 4px 0 12px; padding: 12px 14px; background: #fafbfc; border-radius: 5px; }
+.overall-summary span { display: block; color: #8a94a3; font-size: 11px; margin-bottom: 7px; }
+.overall-summary strong { font-size: 16px; font-weight: 600; color: #475467; font-variant-numeric: tabular-nums; }
 .reading-card { margin-top: 16px; }
 .reading-meter-select { width: 300px; max-width: 100%; }
 .reading-meta { display: flex; flex-wrap: wrap; gap: 12px; color: #667085; font-size: 11px; margin: 2px 0 12px; }
