@@ -1338,6 +1338,27 @@ public class EnergyController {
                 READING_SELECT_SQL + query.where() + " AND er.abnormal_flag = 1 ORDER BY er.reading_date DESC, er.id DESC LIMIT 20",
                 query.args().toArray()
         );
+        List<Map<String, Object>> trend = groupedEnergyStats(query, """
+                er.period_month AS periodMonth,
+                COUNT(*) AS recordCount,
+                SUM(CASE WHEN m.meter_type = 'ELECTRIC' THEN 1 ELSE 0 END) AS electricRecordCount,
+                SUM(CASE WHEN m.meter_type = 'WATER' THEN 1 ELSE 0 END) AS waterRecordCount,
+                SUM(CASE WHEN m.meter_type = 'GAS' THEN 1 ELSE 0 END) AS gasRecordCount,
+                SUM(CASE WHEN m.meter_type = 'ELECTRIC' THEN er.usage_amount ELSE 0 END) AS electricUsage,
+                SUM(CASE WHEN m.meter_type = 'WATER' THEN er.usage_amount ELSE 0 END) AS waterUsage,
+                SUM(CASE WHEN m.meter_type = 'GAS' THEN er.usage_amount ELSE 0 END) AS gasUsage,
+                SUM(er.settlement_amount) AS settlementAmount
+                """, "er.period_month", "er.period_month ASC");
+        List<Map<String, Object>> roomRanking = groupedEnergyStats(query, """
+                m.room_id AS roomId, COALESCE(r.room_no, '未关联房间') AS roomName,
+                m.meter_type AS meterType, COUNT(*) AS recordCount,
+                SUM(er.usage_amount) AS usageAmount, SUM(er.settlement_amount) AS settlementAmount
+                """, "m.room_id, r.room_no, m.meter_type", "usageAmount DESC, m.room_id ASC");
+        List<Map<String, Object>> buildingRanking = groupedEnergyStats(query, """
+                m.building_id AS buildingId, COALESCE(b.name, '未关联楼宇') AS buildingName,
+                m.meter_type AS meterType, COUNT(*) AS recordCount,
+                SUM(er.usage_amount) AS usageAmount, SUM(er.settlement_amount) AS settlementAmount
+                """, "m.building_id, b.name, m.meter_type", "usageAmount DESC, m.building_id ASC");
         return ApiResponse.success(Map.ofEntries(
                 Map.entry("recordCount", recordCount),
                 Map.entry("electricUsage", electric),
@@ -1346,16 +1367,34 @@ public class EnergyController {
                 Map.entry("totalAmount", amount),
                 Map.entry("averageUsage", recordCount == 0 ? BigDecimal.ZERO : electric.add(water).add(gas).divide(BigDecimal.valueOf(recordCount), 2, RoundingMode.HALF_UP)),
                 Map.entry("abnormalCount", abnormalCount),
-                Map.entry("trend", List.of()),
+                Map.entry("trend", trend),
                 Map.entry("typeStructure", List.of(
-                        Map.of("meterType", "ELECTRIC", "usageAmount", electric, "settlementAmount", electricAmount),
-                        Map.of("meterType", "WATER", "usageAmount", water, "settlementAmount", waterAmount),
-                        Map.of("meterType", "GAS", "usageAmount", gas, "settlementAmount", gasAmount)
+                        Map.of("meterType", "ELECTRIC", "usageAmount", electric, "settlementAmount", electricAmount, "recordCount", aggregateDecimal(byType, "ELECTRIC", "recordCount")),
+                        Map.of("meterType", "WATER", "usageAmount", water, "settlementAmount", waterAmount, "recordCount", aggregateDecimal(byType, "WATER", "recordCount")),
+                        Map.of("meterType", "GAS", "usageAmount", gas, "settlementAmount", gasAmount, "recordCount", aggregateDecimal(byType, "GAS", "recordCount"))
                 )),
-                Map.entry("roomRanking", List.of()),
-                Map.entry("buildingRanking", List.of()),
+                Map.entry("roomRanking", roomRanking),
+                Map.entry("buildingRanking", buildingRanking),
                 Map.entry("anomalies", anomalies)
         ));
+    }
+
+    private List<Map<String, Object>> groupedEnergyStats(QueryParts query, String columns, String groupBy, String orderBy) {
+        // Grouping fragments are server-owned constants; every user filter stays bound as a parameter.
+        String from = """
+                FROM energy_reading er
+                JOIN energy_meter m ON m.id = er.meter_id AND m.deleted = 0
+                LEFT JOIN building b ON b.id = m.building_id
+                LEFT JOIN building_floor f ON f.id = m.floor_id
+                LEFT JOIN building_room r ON r.id = m.room_id
+                LEFT JOIN tenant t ON t.id = m.tenant_id
+                WHERE er.deleted = 0
+                """;
+        return jdbcTemplate.queryForList(
+                "SELECT " + columns + "\n" + from + query.where()
+                        + "\nGROUP BY " + groupBy + "\nORDER BY " + orderBy,
+                query.args().toArray()
+        );
     }
 
     private String csvValue(Object value) {

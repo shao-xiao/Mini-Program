@@ -1,3 +1,13 @@
+## Recent Change - 2026-10-20 能耗统计真实聚合与展示优化
+
+- 根因：/energy/stats 的 trend、roomRanking、buildingRanking 固定返回空数组，导致有抄表记录但趋势和空间排行始终为空。
+- 后端复用 readingQuery 的全部绑定筛选条件（主体、类型、账期、空间、账单状态、异常），增加真实月度汇总与按能耗类型分组的房间/楼宇汇总。各月附带分类型记录数，区分无记录和真实零用量；typeStructure 增加可选 recordCount。
+- 前端保留现有红黑风格，紧凑筛选与指标带、完整双行图表布局；用量图可切换电 kWh / 水 m³ / 燃气 m³，费用构成只按金额比较。趋势以最近真实账期为终点展示 6 个账期，缺失月份留空。未关联空间单列并提示，不计入实际房间/楼宇数。
+- 当前主体 tenant-9：10 条、2026-09 电量 1479.29 kWh、金额 1937.88 元、房间 802、楼宇德汇创新中心，趋势和两组排行已真实显示。tenant-3 混合水电切换验证通过，未关联历史记录被保留。
+- 验证：后端相关 50 项、前端能耗统计计算 4 项通过，Maven compile 与 npm build 通过；线上刷新、切换主体与水/电类型通过，Console error/warn 为 0，1024px 无页面横向溢出，已恢复默认视口。
+- 增量上线：原 EnergyController 基线源码编译反汇编与生产 class 完全一致；仅替换 app.jar 内 EnergyController.class，其余条目校验不变。前端仅新增版本化能耗页资源与入口 importmap/CSS 引用，其他已有资源不变，保留先前照片及驾驶舱修复。
+- 备份：/opt/dehui/backups/energy-statistics-20261020-142734；验收入口 /assets/energy?tab=statistics&subject=tenant-9&ui=energy-stats-20261020-v2。详见 docs/energy-statistics-2026-10-20.md。
+
 ## Recent Change - 2026-10-20 驾驶舱真实房源统计同步
 
 - 根因：驾驶舱原先从 /ai/daily-report 读取 roomTotal/roomRented/occupancyRate，但该接口返回空占位指标，未读取真实 building_room 台账。

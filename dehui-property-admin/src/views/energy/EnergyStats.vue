@@ -7,7 +7,7 @@
             <div class="page-title">能耗统计</div>
             <div class="page-subtitle">按表具、空间、租户和账单状态分析水电气用量</div>
           </div>
-          <el-button type="primary" :loading="loading" @click="loadStats">刷新</el-button>
+          <div class="header-actions"><span class="updated-at">{{ loading ? '正在更新…' : updatedAt ? `更新于 ${updatedAt}` : '' }}</span><el-button type="primary" :loading="loading" @click="loadStats">刷新</el-button></div>
         </div>
       </template>
 
@@ -83,6 +83,7 @@
         </template>
       </el-alert>
 
+      <div class="scope-summary"><span>{{ queryForm.periodMonth || '全部账期' }}</span><span>{{ stats.recordCount }} 条抄表记录</span><span v-if="stats.trend.length">有记录 {{ stats.trend.length }} 个月</span><span>当前主体与筛选范围</span></div>
       <div class="summary-grid">
         <el-card v-for="item in summaryCards" :key="item.label" class="summary-card" shadow="never">
           <div class="summary-label">{{ item.label }}</div>
@@ -91,33 +92,34 @@
         </el-card>
       </div>
 
+      <div class="analysis-toolbar"><div><strong>用量分析</strong><span>按同一能耗类型比较 · {{ activeChartType.unit }}</span></div><el-segmented v-model="chartMeterType" :options="chartTypeOptions" size="small" /></div>
       <div class="chart-grid">
         <el-card class="chart-card wide" shadow="never">
-          <template #header>近6个月趋势</template>
-          <el-empty v-if="isTrendEmpty" description="暂无趋势数据" :image-size="80" />
-          <div v-else ref="trendRef" class="chart"></div>
+          <template #header><div class="card-header-inline"><div><strong>近 6 个账期用量</strong><small>以最近有记录的账期为终点，缺少记录的月份留空</small></div><span class="chart-meta">{{ activeChartType.label }}</span></div></template>
+          <el-empty v-if="isTrendEmpty" :description="stats.recordCount ? '当前筛选暂无该类型的月度记录' : '当前主体与筛选范围暂无抄表记录'" :image-size="80" />
+          <div v-else ref="trendRef" class="chart" role="img" :aria-label="`${activeChartType.label}近六个账期趋势`"></div>
         </el-card>
 
         <el-card class="chart-card" shadow="never">
           <template #header>
             <div class="card-header-inline">
-              <span>能耗类型结构</span>
-              <el-segmented v-model="structureMode" :options="structureModeOptions" size="small" />
+              <div><strong>结算费用构成</strong><small>以金额比较，水电气用量分别展示</small></div>
+              <span class="chart-meta">人民币 · 元</span>
             </div>
           </template>
-          <el-empty v-if="isStructureEmpty" description="暂无结构数据" :image-size="80" />
-          <div v-else ref="typeRef" class="chart"></div>
+          <el-empty v-if="isStructureEmpty" description="当前范围暂无结算金额" :image-size="80" />
+          <div v-else class="cost-breakdown"><div ref="typeRef" class="chart cost-chart" role="img" aria-label="各能耗类型的结算费用占比"></div><ul class="cost-legend"><li v-for="item in costStructure" :key="item.meterType"><span><i :class="`type-dot type-dot--${item.meterType}`"></i>{{ meterTypeText(item.meterType) }}</span><strong>¥ {{ formatNumber(item.settlementAmount) }}<small>{{ costPercent(item.settlementAmount) }}%</small></strong></li></ul></div>
         </el-card>
 
-        <el-card class="chart-card" shadow="never">
-          <template #header>房间用量排行</template>
-          <el-empty v-if="!stats.roomRanking.length" description="暂无房间排行" :image-size="80" />
+        <el-card class="chart-card rank-card" shadow="never">
+          <template #header><div class="card-header-inline"><div><strong>房间用量排行</strong><small>同类型用量 · 前 10 名<span v-if="roomRankRows.some(item => !item.roomId)"> · 含未关联记录</span></small></div><span class="chart-meta">{{ roomRankRows.filter(item => item.roomId).length }} 个房间 · {{ activeChartType.unit }}</span></div></template>
+          <el-empty v-if="!roomRankRows.length" description="当前范围暂无该类型的房间用量" :image-size="80" />
           <div v-else ref="roomRankRef" class="chart"></div>
         </el-card>
 
-        <el-card class="chart-card" shadow="never">
-          <template #header>楼宇用量排行</template>
-          <el-empty v-if="!stats.buildingRanking.length" description="暂无楼宇排行" :image-size="80" />
+        <el-card class="chart-card rank-card" shadow="never">
+          <template #header><div class="card-header-inline"><div><strong>楼宇用量排行</strong><small>同类型用量 · 前 10 名<span v-if="buildingRankRows.some(item => !item.buildingId)"> · 含未关联记录</span></small></div><span class="chart-meta">{{ buildingRankRows.filter(item => item.buildingId).length }} 栋楼宇 · {{ activeChartType.unit }}</span></div></template>
+          <el-empty v-if="!buildingRankRows.length" description="当前范围暂无该类型的楼宇用量" :image-size="80" />
           <div v-else ref="buildingRankRef" class="chart"></div>
         </el-card>
       </div>
@@ -155,6 +157,7 @@ import request from '../../utils/request'
 import { hasPermission } from '../../utils/permission'
 import { readPage } from '../../utils/pagination'
 import { createLatestRequestGuard } from '../../utils/requestLifecycle'
+import { energyChartTypes, energyTrendWindow, energyRanking, energyTrendSeries } from '../../utils/energyStatistics'
 import { getEnergyStats, updateAnomalyStatus } from '../../api/energy'
 import WorkspaceDataGrid from '../../components/workspace/WorkspaceDataGrid.vue'
 import { energyAnomalyColumns, energyMeterTypeOptions } from '../../workspaceConfigs/energyWorkspaceConfig'
@@ -167,7 +170,9 @@ const props = defineProps({
 
 const loading = ref(false)
 const errorMessage = ref('')
-const structureMode = ref('usage')
+const chartMeterType = ref('ELECTRIC')
+const updatedAt = ref('')
+let resizeObserver
 const charts = []
 const canFilterBuildings = computed(() => hasPermission('building:view') || hasPermission('building:*'))
 const canFilterFloors = computed(() => canFilterBuildings.value && (hasPermission('floor:view') || hasPermission('floor:*')))
@@ -216,10 +221,13 @@ const stats = reactive({
   anomalies: []
 })
 
-const structureModeOptions = [
-  { label: '用量', value: 'usage' },
-  { label: '金额', value: 'amount' }
-]
+const chartTypeOptions = computed(() => energyChartTypes.filter(type => !queryForm.meterType || type.value === queryForm.meterType).map(type => ({ label: type.label, value: type.value })))
+const activeChartType = computed(() => energyChartTypes.find(type => type.value === (queryForm.meterType || chartMeterType.value)) || energyChartTypes[0])
+const trendWindow = computed(() => energyTrendWindow(stats.trend, queryForm.periodMonth))
+const roomRankRows = computed(() => energyRanking(stats.roomRanking, activeChartType.value.value))
+const buildingRankRows = computed(() => energyRanking(stats.buildingRanking, activeChartType.value.value))
+const costStructure = computed(() => stats.typeStructure.filter(item => number(item.settlementAmount) > 0))
+function costPercent(value) { return stats.totalAmount > 0 ? (number(value) / stats.totalAmount * 100).toFixed(1) : '0.0' }
 const meterTypeLabelMap = new Map(energyMeterTypeOptions.map(option => [option.value, option.label]))
 
 const summaryCards = computed(() => [
@@ -231,13 +239,8 @@ const summaryCards = computed(() => [
   { label: '异常记录', value: stats.abnormalCount, desc: '待关注抄表记录', className: 'danger' }
 ])
 
-const isTrendEmpty = computed(() => {
-  return !stats.trend.some(item => number(item.electricUsage) || number(item.waterUsage) || number(item.gasUsage))
-})
-
-const isStructureEmpty = computed(() => {
-  return !stats.typeStructure.some(item => number(item.usageAmount) || number(item.settlementAmount))
-})
+const isTrendEmpty = computed(() => !energyTrendSeries(trendWindow.value, activeChartType.value).some(value => value !== null))
+const isStructureEmpty = computed(() => costStructure.value.length === 0)
 
 async function loadStats() {
   const requestId = statsRequestGuard.start()
@@ -290,6 +293,7 @@ async function loadStats() {
   } finally {
     if (statsRequestGuard.isCurrent(requestId)) {
       loading.value = false
+      updatedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
       await nextTick()
       renderCharts()
     }
@@ -345,7 +349,7 @@ async function setAnomalyStatus(row, status) {
 }
 
 function createChart(elRef) {
-  if (!elRef.value) return null
+  if (!elRef.value || !elRef.value.clientWidth) return null
   const chart = echarts.init(elRef.value)
   charts.push(chart)
   return chart
@@ -359,60 +363,39 @@ function renderCharts() {
   const room = createChart(roomRankRef)
   const building = createChart(buildingRankRef)
 
+  const chartType = activeChartType.value
   trend?.setOption({
-    color: ['#d93025', '#409eff', '#e6a23c'],
-    tooltip: { trigger: 'axis' },
-    legend: { top: 0 },
-    grid: { left: 46, right: 20, top: 44, bottom: 28 },
-    xAxis: { type: 'category', data: stats.trend.map(item => item.periodMonth) },
-    yAxis: { type: 'value' },
-    series: [
-      { name: '电', type: 'line', smooth: true, data: stats.trend.map(item => number(item.electricUsage)) },
-      { name: '水', type: 'line', smooth: true, data: stats.trend.map(item => number(item.waterUsage)) },
-      { name: '燃气', type: 'line', smooth: true, data: stats.trend.map(item => number(item.gasUsage)) }
-    ]
+    animation: false,
+    color: [chartType.color],
+    tooltip: { trigger: 'axis', valueFormatter: value => value == null ? '无记录' : `${formatNumber(value)} ${chartType.unit}` },
+    grid: { left: 65, right: 24, top: 28, bottom: 28 },
+    xAxis: { type: 'category', data: trendWindow.value.map(item => item.periodMonth), axisTick: { show: false }, axisLine: { lineStyle: { color: '#e4e7ec' } }, axisLabel: { color: '#667085', fontSize: 11 } },
+    yAxis: { type: 'value', name: chartType.unit, nameTextStyle: { color: '#98a2b3', fontSize: 11 }, splitNumber: 3, splitLine: { lineStyle: { color: '#eef0f3', type: 'dashed' } }, axisLabel: { color: '#98a2b3', fontSize: 11 } },
+    series: [{ name: chartType.label, type: 'line', symbolSize: 8, connectNulls: false, smooth: false, label: { show: true, position: 'top', formatter: params => params.value == null ? '' : formatNumber(params.value), color: '#475467', fontSize: 11 }, data: energyTrendSeries(trendWindow.value, chartType) }]
   })
 
   type?.setOption({
-    color: ['#d93025', '#409eff', '#e6a23c'],
-    tooltip: { trigger: 'item' },
-    legend: { bottom: 0 },
-    series: [{
-      type: 'pie',
-      radius: ['45%', '68%'],
-      center: ['50%', '45%'],
-      data: stats.typeStructure.map(item => ({
-        name: meterTypeText(item.meterType),
-        value: structureMode.value === 'usage' ? number(item.usageAmount) : number(item.settlementAmount)
-      }))
-    }]
+    animation: false,
+    color: costStructure.value.map(item => energyChartTypes.find(type => type.value === item.meterType)?.color || '#8c96a6'),
+    tooltip: { trigger: 'item', valueFormatter: value => `¥ ${formatNumber(value)}` },
+    title: { text: '结算合计', subtext: `¥ ${formatNumber(stats.totalAmount)}`, left: 'center', top: '35%', textStyle: { fontSize: 11, fontWeight: 400, color: '#98a2b3' }, subtextStyle: { color: '#202124', fontSize: 17, fontWeight: 600 } },
+    series: [{ type: 'pie', radius: ['65%', '83%'], center: ['50%', '50%'], label: { show: false }, stillShowZeroSum: false, itemStyle: { borderColor: '#fff', borderWidth: 2 }, data: costStructure.value.map(item => ({ name: meterTypeText(item.meterType), value: number(item.settlementAmount) })) }]
   })
 
-  room?.setOption(rankBarOption(stats.roomRanking.map(item => ({
-    name: item.roomName || item.name || '未关联房间',
-    value: number(item.usageAmount)
-  }))))
-
-  building?.setOption(rankBarOption(stats.buildingRanking.map(item => ({
-    name: item.buildingName || item.name || '未关联楼宇',
-    value: number(item.usageAmount)
-  }))))
+  room?.setOption(rankBarOption(roomRankRows.value.map(item => ({ name: item.roomName || '未关联房间', value: item.usageAmount }))))
+  building?.setOption(rankBarOption(buildingRankRows.value.map(item => ({ name: item.buildingName || '未关联楼宇', value: item.usageAmount }))))
 }
 
 function rankBarOption(rows) {
-  const sorted = [...rows].sort((a, b) => b.value - a.value).slice(0, 10).reverse()
+  const chartType = activeChartType.value
   return {
-    color: ['#d93025'],
-    tooltip: { trigger: 'axis' },
-    grid: { left: 90, right: 20, top: 18, bottom: 24 },
-    xAxis: { type: 'value' },
-    yAxis: { type: 'category', data: sorted.map(item => item.name) },
-    series: [{
-      type: 'bar',
-      barMaxWidth: 22,
-      label: { show: true, position: 'right' },
-      data: sorted.map(item => Number(item.value.toFixed(2)))
-    }]
+    animation: false,
+    color: [chartType.color],
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: value => `${formatNumber(value)} ${chartType.unit}` },
+    grid: { left: 100, right: 75, top: 18, bottom: 24 },
+    xAxis: { type: 'value', splitNumber: 3, axisLabel: { color: '#98a2b3', fontSize: 11 }, splitLine: { lineStyle: { color: '#eef0f3', type: 'dashed' } } },
+    yAxis: { type: 'category', inverse: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#475467', width: 84, overflow: 'truncate', fontSize: 12 }, data: rows.map(item => item.name) },
+    series: [{ type: 'bar', barMaxWidth: 18, showBackground: true, backgroundStyle: { color: '#f7f8fa', borderRadius: 3 }, itemStyle: { borderRadius: [0, 3, 3, 0] }, label: { show: true, position: 'right', color: '#475467', fontSize: 11, formatter: params => formatNumber(params.value) }, data: rows.map(item => Number(item.value.toFixed(2))) }]
   }
 }
 
@@ -444,7 +427,7 @@ function formatRoom(room) {
   return room.roomName || room.roomNumber || `房间${room.id}`
 }
 
-watch(structureMode, async () => {
+watch(activeChartType, async () => {
   await nextTick()
   renderCharts()
 })
@@ -462,128 +445,98 @@ onMounted(async () => {
   await loadBaseData()
   await loadStats()
   window.addEventListener('resize', resizeCharts)
+  resizeObserver = new ResizeObserver(resizeCharts)
+  if (trendRef.value?.parentElement) resizeObserver.observe(trendRef.value.parentElement)
 })
 
 onBeforeUnmount(() => {
   statsRequestGuard.dispose()
   window.removeEventListener('resize', resizeCharts)
+  resizeObserver?.disconnect()
   charts.splice(0).forEach(chart => chart.dispose())
 })
 </script>
 
 <style scoped>
-.page-container {
-  padding: 20px;
+.page-container { padding: 20px; min-width: 0; }
+.page-container--embedded { padding: 0; }
+.page-container--embedded > :deep(.el-card) { border: 0; box-shadow: none; }
+.page-container--embedded > :deep(.el-card > .el-card__header) { padding: 14px 18px; }
+.page-container--embedded > :deep(.el-card > .el-card__body) { padding: 14px 18px 18px; }
+.page-header { display: flex; justify-content: space-between; align-items: center; gap: 14px; min-height: 44px; }
+.page-title { font-size: 16px; font-weight: 600; }
+.page-subtitle { margin-top: 4px; font-size: 12px; color: #8a94a3; }
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.updated-at { font-size: 11px; color: #98a2b3; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.query-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 14px; padding: 12px; border: 1px solid #eef0f3; border-radius: 6px; background: #fafbfc; }
+.query-form :deep(.el-form-item) { margin: 0; }
+.query-form :deep(.el-form-item__label) { font-size: 12px; padding-right: 8px; }
+.query-select { width: 124px; }
+.query-select-small { width: 100px; }
+.query-form :deep(.el-date-editor) { width: 145px; }
+.stats-error { margin: 8px 0 12px; }
+.scope-summary { display: flex; align-items: center; gap: 0; margin: 0 0 10px; flex-wrap: wrap; font-size: 11px; color: #8a94a3; }
+.scope-summary span + span::before { content: '·'; margin: 0 9px; color: #c5cbd3; }
+.scope-summary span:first-child { color: #475467; font-weight: 500; }
+.summary-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; margin: 0 0 18px; border: 1px solid #e4e7ec; border-radius: 6px; overflow: hidden; }
+.summary-card { min-width: 0; min-height: 102px; border: 0; border-right: 1px solid #eef0f3; border-radius: 0; box-shadow: none; background: #fff; }
+.summary-card:last-child { border-right: 0; }
+.summary-card :deep(.el-card__body) { padding: 16px 14px; }
+.summary-label { color: #667085; font-size: 12px; }
+.summary-value { margin-top: 10px; font-size: clamp(17px, 1.3vw, 24px); font-weight: 600; color: #202124; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.summary-desc { margin-top: 8px; color: #98a2b3; font-size: 11px; }
+.analysis-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.analysis-toolbar strong { font-size: 13px; font-weight: 600; }
+.analysis-toolbar span { margin-left: 10px; color: #8a94a3; font-size: 11px; }
+.chart-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
+.chart-card { grid-column: span 5; min-width: 0; border-color: #e4e7ec; box-shadow: 0 1px 3px rgba(32,33,36,.025); }
+.chart-card.wide { grid-column: span 7; }
+.chart-card.rank-card { grid-column: span 6; }
+.chart-card :deep(.el-card__header) { padding: 12px 16px; }
+.chart-card :deep(.el-card__body) { padding: 10px 14px; }
+.card-header-inline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.card-header-inline strong { font-size: 13px; font-weight: 600; }
+.card-header-inline small { display: block; margin-top: 4px; color: #8a94a3; font-size: 11px; font-weight: 400; }
+.chart-meta { flex-shrink: 0; font-size: 11px; color: #667085; padding: 3px 7px; background: #f6f7f9; border-radius: 4px; }
+.chart { width: 100%; height: 216px; }
+.rank-card .chart { height: 178px; }
+.chart-card :deep(.el-empty) { height: 216px; padding: 0; }
+.chart-card :deep(.el-empty__description p) { font-size: 12px; color: #98a2b3; }
+.rank-card :deep(.el-empty) { height: 178px; }
+.cost-breakdown { display: grid; grid-template-columns: minmax(135px,1fr) minmax(130px,1fr); gap: 10px; align-items: center; height: 216px; }
+.cost-chart { height: 210px; }
+.cost-legend { margin: 0; padding: 0; list-style: none; }
+.cost-legend li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 0; border-bottom: 1px solid #f0f1f3; font-size: 12px; }
+.cost-legend li:last-child { border-bottom: 0; }
+.cost-legend li > span { display: flex; gap: 7px; align-items: center; color: #667085; }
+.cost-legend strong { font-size: 12px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.cost-legend small { display: block; color: #98a2b3; font-weight: 400; margin-top: 4px; font-size: 11px; }
+.type-dot { display: inline-block; height: 7px; width: 7px; border-radius: 2px; }
+.type-dot--ELECTRIC { background: #d93025; }
+.type-dot--WATER { background: #6789a7; }
+.type-dot--GAS { background: #c79a60; }
+.table-card { margin-top: 14px; }
+.anomaly-actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.primary { color: #6789a7; }
+.warning { color: #b77925; }
+.danger { color: #d93025; }
+@media (max-width: 1250px) {
+  .summary-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .summary-card:nth-child(-n+3) { border-bottom: 1px solid #eef0f3; }
+  .summary-card:nth-child(3) { border-right: 0; }
+  .chart-card, .chart-card.wide, .chart-card.rank-card { grid-column: 1 / -1; }
 }
-
-.page-container--embedded {
-  padding: 0;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.page-title {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.page-subtitle {
-  margin-top: 6px;
-  font-size: 13px;
-  color: #909399;
-}
-
-.query-form {
-  margin: 18px 0 8px;
-}
-
-.stats-error {
-  margin: 8px 0 12px;
-}
-
-.query-select {
-  width: 150px;
-}
-
-.query-select-small {
-  width: 110px;
-}
-
-.anomaly-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
-  margin: 18px 0;
-}
-
-.summary-card {
-  min-height: 112px;
-}
-
-.summary-label {
-  color: #909399;
-  font-size: 13px;
-}
-
-.summary-value {
-  margin-top: 12px;
-  font-size: 22px;
-  font-weight: 700;
-  color: #1f1b1b;
-}
-
-.summary-desc {
-  margin-top: 8px;
-  color: #909399;
-  font-size: 13px;
-}
-
-.chart-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.chart-card.wide {
-  grid-column: span 2;
-}
-
-.card-header-inline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.chart {
-  width: 100%;
-  height: 300px;
-}
-
-.table-card {
-  margin-top: 16px;
-}
-
-.primary {
-  color: #409eff;
-}
-
-.warning {
-  color: #e6a23c;
-}
-
-.danger {
-  color: #d93025;
+@media (max-width: 640px) {
+  .page-header, .analysis-toolbar { flex-wrap: wrap; }
+  .header-actions { width: 100%; justify-content: space-between; }
+  .summary-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .summary-card:nth-child(3) { border-right: 1px solid #eef0f3; }
+  .summary-card:nth-child(even) { border-right: 0; }
+  .summary-card:nth-child(4) { border-bottom: 1px solid #eef0f3; }
+  .summary-value { font-size: 18px; }
+  .analysis-toolbar span { display: block; margin: 4px 0 0; }
+  .card-header-inline { flex-wrap: wrap; gap: 6px; }
+  .cost-breakdown { grid-template-columns: minmax(120px,1fr) minmax(100px,1fr); gap: 4px; }
+  .cost-chart { height: 190px; }
 }
 </style>
