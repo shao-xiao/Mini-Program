@@ -30,3 +30,23 @@ export function energyTrendSeries(window, type) {
     ? Number(item.record[type.field]) || 0
     : null)
 }
+
+// Cumulative readings belong to one physical meter and must never be summed.
+export function energyReadingMeters(rows, meterType = '') {
+  const meters = new Map()
+  for (const row of rows) {
+    if (row.meterId == null || (meterType && row.meterType !== meterType)) continue
+    const key = String(row.meterId)
+    if (!meters.has(key)) meters.set(key, { ...row, meterId: key, readings: [] })
+    meters.get(key).readings.push({ ...row })
+  }
+  return [...meters.values()].map(meter => ({
+    ...meter,
+    readings: meter.readings.sort((a, b) => String(a.periodMonth).localeCompare(String(b.periodMonth))
+      || String(a.readingDate).localeCompare(String(b.readingDate)) || Number(a.id) - Number(b.id))
+  })).sort((a, b) => String(a.meterNo || a.meterName).localeCompare(String(b.meterNo || b.meterName), 'zh-CN', { numeric: true }))
+}
+
+export function energyReadingValue(value) {
+  return value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value)
+}

@@ -129,6 +129,24 @@
         </el-card>
       </div>
 
+      <el-card v-if="isTenantView" shadow="never" class="reading-card chart-card">
+        <template #header>
+          <div class="card-header-inline">
+            <div><strong>表具读数趋势</strong><small>按账期对比上次与本期读数；读数为表盘累计值，用量另按倍率计算</small></div>
+            <el-select v-model="selectedReadingMeterId" filterable placeholder="选择表具" class="reading-meter-select" aria-label="读数趋势表具">
+              <el-option v-for="meter in readingMeters" :key="meter.meterId" :value="meter.meterId" :label="`${meter.meterName || meter.meterNo} · ${meter.meterNo || meter.meterId}`" />
+            </el-select>
+          </div>
+        </template>
+        <el-alert v-if="readingError" :title="readingError" type="error" :closable="false" show-icon />
+        <el-empty v-else-if="!selectedReadingMeter" description="当前类型与月份暂无表具读数" :image-size="64" />
+        <template v-else>
+          <div class="reading-meta"><span>{{ selectedReadingMeter.meterName }}</span><span>{{ selectedReadingMeter.meterNo }}</span><span>{{ meterTypeText(selectedReadingMeter.meterType) }} · {{ selectedReadingMeter.unit }}</span><span>{{ selectedReadingMeter.readings.length }} 条记录</span></div>
+          <div ref="readingTrendRef" class="chart reading-chart" role="img" :aria-label="`${selectedReadingMeter.meterName}各账期上次与本期读数趋势`"></div>
+          <WorkspaceDataGrid :loading="loading" :rows="readingDetailRows" :columns="readingColumns" row-key="id" :show-index="false" density="compact" data-mode="client" aria-label="表具各账期读数明细" />
+        </template>
+      </el-card>
+
       <el-card v-if="!isTenantView || stats.anomalies.length" shadow="never" class="table-card">
         <template #header>异常用量提示</template>
         <WorkspaceDataGrid
@@ -160,9 +178,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import * as echarts from 'echarts'
 import request from '../../utils/request'
 import { hasPermission } from '../../utils/permission'
+import { loadAllWorkspaceRecords } from '../../utils/workspaceExport'
 import { readPage } from '../../utils/pagination'
 import { createLatestRequestGuard } from '../../utils/requestLifecycle'
-import { energyChartTypes, energyTrendWindow, energyRanking, energyTrendSeries } from '../../utils/energyStatistics'
+import { energyChartTypes, energyTrendWindow, energyRanking, energyTrendSeries, energyReadingMeters, energyReadingValue } from '../../utils/energyStatistics'
 import { getEnergyStats, updateAnomalyStatus } from '../../api/energy'
 import WorkspaceDataGrid from '../../components/workspace/WorkspaceDataGrid.vue'
 import { energyAnomalyColumns, energyMeterTypeOptions } from '../../workspaceConfigs/energyWorkspaceConfig'
@@ -184,6 +203,19 @@ const canFilterBuildings = computed(() => !isTenantView.value && (hasPermission(
 const canFilterFloors = computed(() => canFilterBuildings.value && (hasPermission('floor:view') || hasPermission('floor:*')))
 const canFilterRooms = computed(() => canFilterFloors.value && (hasPermission('room:view') || hasPermission('room:*')))
 
+const readingTrendRef = ref(null)
+const readingRecords = ref([])
+const readingError = ref('')
+const selectedReadingMeterId = ref('')
+const readingMeters = computed(() => energyReadingMeters(readingRecords.value, activeChartType.value.value))
+const selectedReadingMeter = computed(() => readingMeters.value.find(meter => meter.meterId === selectedReadingMeterId.value) || readingMeters.value[0])
+const readingDetailRows = computed(() => [...(selectedReadingMeter.value?.readings || [])].reverse())
+const readingColumns = computed(() => [
+  { key: 'periodMonth', label: '账期', minWidth: 110 },
+  { key: 'readingDate', label: '抄表日期', minWidth: 120 },
+  ...['previousReading', 'currentReading'].map((key, index) => ({ key, label: `${index ? '本期' : '上次'}读数（${selectedReadingMeter.value?.unit || ''}）`, type: 'number', decimals: 2, minWidth: 170, align: 'right', valueGetter: row => energyReadingValue(row[key]) })),
+  { key: 'multiplier', label: '倍率', type: 'number', decimals: 2, minWidth: 90, align: 'right' }
+])
 const trendRef = ref(null)
 const typeRef = ref(null)
 const roomRankRef = ref(null)
@@ -262,7 +294,7 @@ async function loadStats() {
   const requestId = statsRequestGuard.start()
   loading.value = true
   try {
-    const data = await getEnergyStats({
+    const params = {
       meterType: queryForm.meterType || undefined,
       periodMonth: queryForm.periodMonth || undefined,
       buildingId: queryForm.buildingId || undefined,
@@ -272,8 +304,17 @@ async function loadStats() {
       billStatus: queryForm.billStatus || undefined,
       abnormalFlag: queryForm.abnormalFlag === '' ? undefined : queryForm.abnormalFlag,
       ...subjectQueryParams.value
-    }, { silent: true })
+    }
+    const [statsResult, readingsResult] = await Promise.allSettled([
+      getEnergyStats(params, { silent: true }),
+      isTenantView.value ? loadAllWorkspaceRecords(page => request.get('/energy/readings', { params: { ...params, ...page }, silent: true })) : Promise.resolve([])
+    ])
     if (!statsRequestGuard.isCurrent(requestId)) return
+    readingRecords.value = readingsResult.status === 'fulfilled' ? readingsResult.value : []
+    readingError.value = readingsResult.status === 'rejected' ? '表具读数加载失败，请缩小月份范围或刷新重试。' : ''
+    if (!readingMeters.value.some(meter => meter.meterId === selectedReadingMeterId.value)) selectedReadingMeterId.value = ''
+    if (statsResult.status === 'rejected') throw statsResult.reason
+    const data = statsResult.value
     errorMessage.value = ''
     Object.assign(stats, {
       recordCount: data.recordCount || 0,
@@ -374,6 +415,19 @@ function createChart(elRef) {
 function renderCharts() {
   charts.splice(0).forEach(chart => chart.dispose())
 
+  const reading = createChart(readingTrendRef)
+  const meter = selectedReadingMeter.value
+  if (meter) reading?.setOption({
+    animation: false, color: ['#8c96a6', '#d93025'],
+    tooltip: { trigger: 'axis', valueFormatter: value => value == null ? '无读数' : `${formatNumber(value)} ${meter.unit || ''}` },
+    legend: { top: 0, right: 12, textStyle: { color: '#667085', fontSize: 11 } },
+    grid: { left: 78, right: 35, top: 45, bottom: 65 },
+    xAxis: { type: 'category', data: meter.readings.map(row => row.periodMonth), axisLabel: { color: '#667085', fontSize: 11 }, axisLine: { lineStyle: { color: '#e4e7ec' } } },
+    yAxis: { type: 'value', name: meter.unit, axisLabel: { color: '#98a2b3', fontSize: 11 }, splitLine: { lineStyle: { color: '#eef0f3', type: 'dashed' } } },
+    dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 12, startValue: Math.max(0, meter.readings.length - 12), endValue: meter.readings.length - 1 }],
+    series: ['previousReading', 'currentReading'].map((key, index) => ({ name: index ? '本期读数' : '上次读数', type: 'line', symbolSize: 7, connectNulls: false, data: meter.readings.map(row => energyReadingValue(row[key])) }))
+  })
+
   const trend = createChart(trendRef)
   const type = createChart(typeRef)
   const room = createChart(roomRankRef)
@@ -443,7 +497,11 @@ function formatRoom(room) {
   return room.roomName || room.roomNumber || `房间${room.id}`
 }
 
-watch(activeChartType, async () => {
+watch(readingMeters, meters => {
+  if (!meters.some(meter => meter.meterId === selectedReadingMeterId.value)) selectedReadingMeterId.value = meters[0]?.meterId || ''
+})
+
+watch([activeChartType, selectedReadingMeter], async () => {
   await nextTick()
   renderCharts()
 })
@@ -538,6 +596,11 @@ onBeforeUnmount(() => {
 .type-dot--ELECTRIC { background: #d93025; }
 .type-dot--WATER { background: #6789a7; }
 .type-dot--GAS { background: #c79a60; }
+.reading-card { margin-top: 16px; }
+.reading-meter-select { width: 300px; max-width: 100%; }
+.reading-meta { display: flex; flex-wrap: wrap; gap: 12px; color: #667085; font-size: 11px; margin: 2px 0 12px; }
+.reading-chart { height: 260px; }
+.reading-card :deep(.el-table) { font-size: 12px; font-variant-numeric: tabular-nums; }
 .table-card { margin-top: 14px; }
 .monthly-card { margin: 0 0 18px; box-shadow: none; border-color: #e4e7ec; }
 .monthly-card :deep(.el-card__header) { padding: 12px 16px; }

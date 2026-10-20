@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { energyChartTypes, energyTrendWindow, energyTrendSeries, energyRanking } from './energyStatistics.js'
+import { energyChartTypes, energyTrendWindow, energyTrendSeries, energyRanking, energyReadingMeters, energyReadingValue } from './energyStatistics.js'
 
 test('uses the latest actual period and leaves missing months empty', () => {
   const months = energyTrendWindow([{ periodMonth: '2026-09', electricUsage: 1479.29, electricRecordCount: 10 }])
@@ -23,4 +23,25 @@ test('rankings never compare kWh and cubic metres', () => {
   const rows = [{ meterType:'WATER', usageAmount:9999 }, { meterType:'ELECTRIC', usageAmount:10 }, { meterType:'ELECTRIC', usageAmount:42 }]
   assert.deepEqual(energyRanking(rows, 'ELECTRIC').map(row => row.usageAmount), [42,10])
   assert.equal(rows[0].usageAmount,9999)
+})
+
+
+test('keeps cumulative readings separate by physical meter and sorts each period', () => {
+  const rows = [
+    { id: 2, meterId: 1, meterName: 'same', meterType: 'ELECTRIC', periodMonth: '2026-09', previousReading: 53733.84, currentReading: 62842.05 },
+    { id: 3, meterId: 2, meterName: 'same', meterType: 'ELECTRIC', periodMonth: '2026-09', previousReading: 135.33, currentReading: 174.60, multiplier: 30 },
+    { id: 1, meterId: 1, meterName: 'same', meterType: 'ELECTRIC', periodMonth: '2026-08', previousReading: 33262.02, currentReading: 53733.84 },
+    { id: 4, meterId: 3, meterType: 'WATER', periodMonth: '2026-09', previousReading: 0, currentReading: 36 }
+  ]
+  const meters = energyReadingMeters(rows, 'ELECTRIC')
+  assert.equal(meters.length, 2)
+  assert.deepEqual(meters.find(row => row.meterId === '1').readings.map(row => row.currentReading), [53733.84, 62842.05])
+  assert.equal(meters.find(row => row.meterId === '2').readings[0].currentReading, 174.60)
+  assert.equal(rows[0].id, 2)
+  assert.equal(energyReadingMeters(rows, 'WATER')[0].readings[0].previousReading, 0)
+})
+
+test('missing or invalid meter readings remain empty while genuine zero is preserved', () => {
+  assert.deepEqual([null, undefined, '', 'bad', '0', 0, '12.30'].map(energyReadingValue), [null, null, null, null, 0, 0, 12.3])
+  assert.deepEqual(energyReadingMeters([{ meterId: null }]), [])
 })
