@@ -1,3 +1,12 @@
+## Recent Change - 2026-10-20 驾驶舱信息密度与可读性优化
+
+- 保留红黑品牌色、后台导航、真实接口及财务计算口径。将六项 KPI 合并为紧凑指标带，增加本月/累计/风险标签、收缴率进度和更新时间。
+- 图表改为完整双行栅格：应收实收趋势与来源结构、房源状态与账单到期风险，移除原第二行右侧留白。来源结构同时显示金额/占比，风险条按逾期/临期/正常区分颜色；无房源统计明确显示缺省状态，零值不再绘制误导性的等分饼图。
+- 抽出 DashboardPanel 复用面板标题、统计提示和内容样式；表格统一紧凑行高、金额右对齐，押金/已作废显示中文；原接口、角色权限、数据库和后端服务保持不变。
+- 验证：npm run build 通过；access、permissionRules、requestLifecycle、pagination 相关 Node 检查 22 项通过。线上 1734 / 1024 / 618px 视口检查通过，窄屏无页面横向溢出，刷新正常，浏览器 error/warn 为 0；已恢复默认视口。
+- 生产采用仅驾驶舱资源的增量发布：新增版本化 JS/CSS，通过 index.html 的 importmap 指向新版驾驶舱，现有其他页面资源逐文件 SHA256 保持不变。备份位于 `/opt/dehui/backups/dashboard-ui-20261020-140157/`。
+- 旧浏览器存在入口 HTML 缓存时，使用 `/dashboard?ui=20261020` 直接查看新版。部署和回滚细节见 `docs/dashboard-ui-2026-10-20.md`。
+
 ## Recent Change - 2026-10-20 巡检详情照片跨账号访问修复
 
 - 问题：巡检 127 的照片 116 已关联 `inspection_attachment`，但文件仍是 `CUSTOM_FIELD_IMAGE`、workspace 为 `inspections`、biz_id 为空；文件服务将其当作上传者私有草稿，导致其他已授权账号无法读取。

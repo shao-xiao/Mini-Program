@@ -1,65 +1,70 @@
 <template>
-  <div class="dashboard-page">
+  <div class="dashboard-page" :aria-busy="loading">
     <div class="page-header">
       <div>
         <h2>首页驾驶舱</h2>
         <p>德汇创新中心运营 BI 总览</p>
       </div>
-      <el-button type="primary" :loading="loading" @click="loadDashboard">
-        刷新数据
-      </el-button>
+      <div class="header-actions">
+        <span class="update-time" aria-live="polite">{{ loading ? '正在更新数据…' : updatedAt ? `更新于 ${updatedAt}` : '等待加载' }}</span>
+        <el-button type="primary" :loading="loading" @click="loadDashboard">刷新数据</el-button>
+      </div>
     </div>
 
-    <div class="kpi-grid">
-      <el-card v-for="item in kpiCards" :key="item.label" class="kpi-card">
-        <div class="card-title">{{ item.label }}</div>
+    <div v-if="failedSections.length" class="data-notice" role="status">{{ failedSections.join('、') }}暂时无法加载，请稍后刷新。</div>
+    <div class="kpi-grid" aria-label="核心运营指标">
+      <div v-for="item in kpiCards" :key="item.label" class="kpi-card" :class="item.className">
+        <div class="card-title"><span>{{ item.label }}</span><span class="card-scope">{{ item.scope }}</span></div>
         <div class="card-value" :class="item.className">{{ item.value }}</div>
         <div class="card-desc">{{ item.desc }}</div>
-      </el-card>
+        <progress v-if="item.progress !== undefined" class="metric-track" :value="Math.max(0, Math.min(100, item.progress))" max="100" aria-hidden="true"></progress>
+      </div>
     </div>
 
     <div class="chart-grid">
-      <el-card class="chart-card wide">
-        <template #header>
-          <span>近6个月应收 / 实收趋势</span>
-        </template>
-        <div ref="revenueTrendRef" class="chart"></div>
-      </el-card>
+      <DashboardPanel class="trend-panel" title="应收 / 实收趋势" subtitle="近 6 个月 · 按账期统计" :meta="`${monthlyTrend[0]?.month || ''} — ${monthlyTrend.at(-1)?.month || ''}`">
+        <div ref="revenueTrendRef" class="chart trend-chart" role="img" aria-label="近六个月应收与实收金额趋势"></div>
+      </DashboardPanel>
 
-      <el-card class="chart-card">
-        <template #header>
-          <span>账单来源结构</span>
-        </template>
-        <div ref="billSourceRef" class="chart"></div>
-      </el-card>
+      <DashboardPanel class="source-panel" title="账单来源结构" subtitle="按账单金额占比" :meta="`${billSourceData.length} 类来源`">
+        <div v-if="sourceTotal > 0" class="source-breakdown">
+          <div ref="billSourceRef" class="chart source-chart" role="img" aria-label="账单来源金额占比环形图"></div>
+          <ul class="source-legend">
+            <li v-for="(item, index) in billSourceData" :key="item.name">
+              <span class="legend-name"><i :class="`source-color-${index % sourceColors.length}`"></i>{{ item.name }}</span>
+              <strong>{{ formatShortMoney(item.value) }}<small>{{ sourcePercent(item.value) }}%</small></strong>
+            </li>
+          </ul>
+        </div>
+        <div v-else class="chart-empty">暂无账单来源数据</div>
+      </DashboardPanel>
 
-      <el-card class="chart-card">
-        <template #header>
-          <span>房源出租状态</span>
-        </template>
-        <div ref="roomStatusRef" class="chart"></div>
-      </el-card>
+      <DashboardPanel class="room-panel" title="房源出租状态" subtitle="房源数量与出租占比" :meta="hasRoomStats ? `共 ${report.roomCount || roomTotal} 间` : '暂无房源统计'">
+        <div class="room-breakdown">
+          <div v-show="hasRoomStats" ref="roomStatusRef" class="chart room-chart" role="img" aria-label="已出租及未出租房源数量"></div>
+          <div v-if="!hasRoomStats" class="room-empty"><span>—</span><p>暂无房源统计数据</p></div>
+          <div class="room-counts">
+            <div><span><i class="dot rented"></i>已出租</span><strong>{{ hasRoomStats ? report.rentedRoomCount || 0 : '—' }}<small> 间</small></strong></div>
+            <div><span><i class="dot vacant"></i>未出租</span><strong>{{ hasRoomStats ? report.availableRoomCount || 0 : '—' }}<small> 间</small></strong></div>
+            <p>出租率 <b>{{ hasRoomStats ? `${roomRentRate}%` : '—' }}</b></p>
+          </div>
+        </div>
+      </DashboardPanel>
 
-      <el-card class="chart-card">
-        <template #header>
-          <span>逾期风险分布</span>
-        </template>
-        <div ref="overdueRiskRef" class="chart"></div>
-      </el-card>
+      <DashboardPanel class="risk-panel" title="账单到期风险" subtitle="未支付账单 · 按到期日分布" :meta="`${finance.overdueBillCount} 笔已逾期`" :alert="finance.overdueBillCount > 0">
+        <div ref="overdueRiskRef" class="chart risk-chart" role="img" :aria-label="overdueRiskData.map(item => `${item.name}${item.value}笔`).join('，')"></div>
+      </DashboardPanel>
     </div>
 
-    <el-row :gutter="16">
-      <el-col :span="14">
-        <el-card class="summary-card">
-          <template #header>
-            <span>最近账单</span>
-          </template>
+    <div class="detail-grid">
+      <div class="detail-grid__bills">
+        <DashboardPanel class="summary-card" title="最近账单" subtitle="最近创建的 8 笔账单" :meta="`${recentBills.length} 笔`">
 
-          <el-table :data="recentBills" border style="width: 100%">
+          <el-table :data="recentBills" size="small" max-height="330" empty-text="暂无账单记录" style="width: 100%">
             <el-table-column prop="billNumber" label="账单编号" min-width="160" />
             <el-table-column prop="sourceName" label="来源" width="80" />
             <el-table-column prop="tenantId" label="租户ID" width="85" />
-            <el-table-column label="金额" width="110">
+            <el-table-column label="金额" min-width="120" align="right">
               <template #default="{ row }">¥ {{ formatMoney(row.amount) }}</template>
             </el-table-column>
             <el-table-column prop="dueDate" label="到期日" width="115" />
@@ -68,49 +73,43 @@
                 <el-tag v-if="row.status === 'PAID'" type="success">已支付</el-tag>
                 <el-tag v-else-if="isOverdue(row)" type="danger">已逾期</el-tag>
                 <el-tag v-else-if="row.status === 'UNPAID'" type="warning">未支付</el-tag>
-                <el-tag v-else type="info">{{ row.status }}</el-tag>
+                <el-tag v-else type="info">{{ statusText(row.status) }}</el-tag>
               </template>
             </el-table-column>
           </el-table>
-        </el-card>
-      </el-col>
+        </DashboardPanel>
+      </div>
 
-      <el-col :span="10">
-        <el-card class="summary-card">
-          <template #header>
-            <span>合同到期预警</span>
-          </template>
+      <div class="detail-grid__contracts">
+        <DashboardPanel class="summary-card" title="合同到期预警" subtitle="未来 30 天内到期的生效合同" :meta="`${expiringContracts.length} 份`" :alert="expiringContracts.length > 0">
 
-          <el-table :data="expiringContracts" border style="width: 100%">
+          <el-table :data="expiringContracts" size="small" max-height="330" empty-text="未来 30 天暂无到期合同" style="width: 100%">
             <el-table-column prop="contractNo" label="合同编号" min-width="140" />
             <el-table-column prop="tenantId" label="租户ID" width="85" />
             <el-table-column prop="endDate" label="结束日期" width="115" />
             <el-table-column label="状态" width="90">
               <template #default="{ row }">
                 <el-tag v-if="row.status === 'ACTIVE'" type="success">生效</el-tag>
-                <el-tag v-else type="info">{{ row.status }}</el-tag>
+                <el-tag v-else type="info">{{ statusText(row.status) }}</el-tag>
               </template>
             </el-table-column>
           </el-table>
-        </el-card>
-      </el-col>
-    </el-row>
+        </DashboardPanel>
+      </div>
+    </div>
 
-    <el-card class="summary-card">
-      <template #header>
-        <span>租户财务排行</span>
-      </template>
+    <DashboardPanel class="summary-card" title="租户财务排行" subtitle="按未收金额从高到低排列" :meta="`${tenantFinanceList.length} 家租户`">
 
-      <el-table :data="tenantFinanceList" border style="width: 100%">
+      <el-table :data="tenantFinanceList" size="small" max-height="330" style="width: 100%">
         <el-table-column prop="tenantId" label="租户ID" width="100" />
         <el-table-column prop="billCount" label="账单数" width="100" />
-        <el-table-column label="应收总额" width="140">
+        <el-table-column label="应收总额" min-width="140" align="right">
           <template #default="{ row }">¥ {{ formatMoney(row.totalAmount) }}</template>
         </el-table-column>
-        <el-table-column label="已收总额" width="140">
+        <el-table-column label="已收总额" min-width="140" align="right">
           <template #default="{ row }">¥ {{ formatMoney(row.paidAmount) }}</template>
         </el-table-column>
-        <el-table-column label="未收金额" width="140">
+        <el-table-column label="未收金额" min-width="140" align="right">
           <template #default="{ row }">
             <span :class="{ danger: row.unpaidAmount > 0 }">
               ¥ {{ formatMoney(row.unpaidAmount) }}
@@ -126,14 +125,11 @@
           </template>
         </el-table-column>
       </el-table>
-    </el-card>
+    </DashboardPanel>
 
-    <el-card class="summary-card">
-      <template #header>
-        <span>AI运营摘要</span>
-      </template>
+    <DashboardPanel class="summary-card" title="AI 运营摘要" subtitle="运营信息参考">
       <p class="ai-summary">{{ report.summaryText || report.summary || '暂无数据' }}</p>
-    </el-card>
+    </DashboardPanel>
   </div>
 </template>
 
@@ -141,6 +137,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import request from '../../utils/request'
+import DashboardPanel from '../../components/dashboard/DashboardPanel.vue'
 import { readPage } from '../../utils/pagination'
 
   const loading = ref(false)
@@ -154,6 +151,17 @@ const roomStatusRef = ref(null)
 const overdueRiskRef = ref(null)
 
 const charts = []
+let resizeObserver
+const updatedAt = ref('')
+const failedSections = ref([])
+const sourceColors = ['#d93025', '#475467', '#b67b68', '#8c96a6', '#d5a164', '#b8bfc9', '#8f4540', '#6a7976']
+const sourceTotal = computed(() => billSourceData.value.reduce((sum, item) => sum + item.value, 0))
+const roomTotal = computed(() => money(report.value.rentedRoomCount) + money(report.value.availableRoomCount))
+const hasRoomStats = computed(() => money(report.value.roomCount) > 0 || roomTotal.value > 0)
+function sourcePercent(value) { return sourceTotal.value > 0 ? (money(value) / sourceTotal.value * 100).toFixed(1) : '0.0' }
+function statusText(status) {
+  return { CANCELLED: '已作废', DRAFT: '草稿', PARTIAL: '部分支付', PENDING: '待处理', EXPIRED: '已到期', TERMINATED: '已终止' }[status] || status || '—'
+}
 
 function todayText() {
   const date = new Date()
@@ -170,6 +178,7 @@ function localDateText(date) {
 
   function formatBillType(type) {
     return {
+      DEPOSIT: '押金',
       RENT: '租金',
       PROPERTY: '物业费',
       MEETING: '会议',
@@ -326,38 +335,46 @@ const finance = computed(() => {
 const kpiCards = computed(() => [
   {
     label: '本月应收',
+    scope: '本月',
     value: `¥ ${formatShortMoney(finance.value.monthReceivable)}`,
     desc: `本月账单 ${finance.value.monthBillCount} 笔`,
     className: ''
   },
   {
     label: '本月实收',
+    scope: '本月',
     value: `¥ ${formatShortMoney(finance.value.monthReceived)}`,
     desc: `已支付 ${finance.value.paidBillCount} 笔`,
     className: 'success'
   },
   {
     label: '未收款金额',
+    scope: '累计',
     value: `¥ ${formatShortMoney(finance.value.unpaidAmount)}`,
-    desc: `未支付 ${finance.value.unpaidBillCount} 笔`,
+    desc: '各账期未收金额合计',
     className: 'danger'
   },
   {
     label: '本月收缴率',
+    scope: '本月',
+    progress: finance.value.collectionRate,
     value: `${finance.value.collectionRate}%`,
     desc: '按本月账期统计',
     className: finance.value.collectionRate >= 80 ? 'success' : 'warning'
   },
   {
     label: '房间出租率',
-    value: `${roomRentRate.value}%`,
-    desc: `${report.value.rentedRoomCount || 0}/${report.value.roomCount || 0} 间`,
+    scope: '房源',
+    progress: hasRoomStats.value ? roomRentRate.value : undefined,
+    value: hasRoomStats.value ? `${roomRentRate.value}%` : '—',
+    desc: hasRoomStats.value ? `已租 ${report.value.rentedRoomCount || 0} / 共 ${report.value.roomCount || roomTotal.value} 间` : '暂无房源统计数据',
     className: ''
   },
   {
     label: '逾期账单数',
+    scope: '风险',
     value: finance.value.overdueBillCount,
-    desc: '租赁与停车合并',
+    desc: '未支付且已过到期日',
     className: 'danger'
   }
 ])
@@ -416,7 +433,7 @@ const billSourceData = computed(() => {
     map.set(key, (map.get(key) || 0) + money(item.amount))
   })
 
-  return Array.from(map.entries()).map(([name, value]) => ({ name, value }))
+  return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
 })
 
 const overdueRiskData = computed(() => {
@@ -462,22 +479,25 @@ function renderCharts() {
   charts.splice(0).forEach(chart => chart.dispose())
 
   const revenueTrend = createChart(revenueTrendRef)
-  const billSource = createChart(billSourceRef)
-  const roomStatus = createChart(roomStatusRef)
+  const billSource = sourceTotal.value > 0 ? createChart(billSourceRef) : null
+  const roomStatus = hasRoomStats.value ? createChart(roomStatusRef) : null
   const overdueRisk = createChart(overdueRiskRef)
 
   revenueTrend?.setOption({
     animation: false,
-    color: ['#d93025', '#555555'],
+    color: ['#d93025', '#475467'],
+    textStyle: { fontFamily: 'sans-serif', color: '#667085', fontSize: 11 },
     tooltip: {
       trigger: 'axis',
       valueFormatter: value => `¥ ${formatMoney(value)}`
     },
-    legend: { top: 0, data: ['应收金额', '实收金额'] },
-    grid: { left: 58, right: 24, top: 44, bottom: 28 },
-    xAxis: { type: 'category', data: monthlyTrend.value.map(item => item.month) },
+    legend: { top: 0, right: 0, itemWidth: 12, itemHeight: 8, textStyle: { color: '#667085', fontSize: 11 }, data: ['应收金额', '实收金额'] },
+    grid: { left: 58, right: 20, top: 40, bottom: 26 },
+    xAxis: { type: 'category', axisTick: { show: false }, axisLine: { lineStyle: { color: '#e4e7ec' } }, axisLabel: { color: '#667085', fontSize: 11, formatter: value => `${value.slice(2, 4)}年${value.slice(5)}月` }, data: monthlyTrend.value.map(item => item.month) },
     yAxis: {
       type: 'value',
+      splitNumber: 3,
+      splitLine: { lineStyle: { color: '#eef0f3', type: 'dashed' } },
       axisLabel: {
         formatter: value => formatShortMoney(value)
       }
@@ -487,7 +507,8 @@ function renderCharts() {
         name: '应收金额',
         type: 'bar',
         data: monthlyTrend.value.map(item => item.receivable),
-        barMaxWidth: 28,
+        barMaxWidth: 26,
+        itemStyle: { borderRadius: [3, 3, 0, 0] },
         label: {
           show: true,
           position: 'top',
@@ -498,7 +519,8 @@ function renderCharts() {
         name: '实收金额',
         type: 'line',
         smooth: true,
-        symbolSize: 8,
+        symbolSize: 6,
+        lineStyle: { width: 2 },
         label: {
           show: true,
           formatter: params => (money(params.value) > 0 ? formatShortMoney(params.value) : '')
@@ -510,50 +532,33 @@ function renderCharts() {
 
   billSource?.setOption({
     animation: false,
-    color: ['#d93025', '#4a4a4a'],
-    tooltip: { trigger: 'item' },
-    legend: { bottom: 0 },
-    series: [
-      {
-        type: 'pie',
-        radius: ['48%', '70%'],
-        center: ['50%', '45%'],
-        data: billSourceData.value.length ? billSourceData.value : [{ name: '暂无数据', value: 0 }]
-      }
-    ]
+    color: sourceColors,
+    tooltip: { trigger: 'item', valueFormatter: value => `¥ ${formatMoney(value)}` },
+    title: { text: '账单总额', subtext: formatShortMoney(sourceTotal.value), left: 'center', top: '35%', textStyle: { fontSize: 11, color: '#667085', fontWeight: 400 }, subtextStyle: { fontSize: 18, fontWeight: 600, color: '#202124' }, itemGap: 6 },
+    series: [{ type: 'pie', radius: ['64%', '82%'], center: ['50%', '48%'], label: { show: false }, itemStyle: { borderColor: '#fff', borderWidth: 2 }, stillShowZeroSum: false, data: billSourceData.value }]
   })
 
   roomStatus?.setOption({
     animation: false,
-    color: ['#d93025', '#9ca3af'],
-    tooltip: { trigger: 'item' },
-    series: [
-      {
-        type: 'pie',
-        radius: '68%',
-        data: [
-          { name: '已出租', value: money(report.value.rentedRoomCount) },
-          { name: '未出租', value: money(report.value.availableRoomCount) }
-        ]
-      }
-    ]
+    color: ['#d93025', '#e4e7ec'],
+    tooltip: { trigger: 'item', valueFormatter: value => `${value} 间` },
+    title: { text: `${roomRentRate.value}%`, subtext: '出租率', left: 'center', top: '32%', textStyle: { color: '#202124', fontSize: 24, fontWeight: 600 }, subtextStyle: { color: '#667085', fontSize: 11 } },
+    series: [{ type: 'pie', radius: ['67%', '84%'], center: ['50%', '50%'], label: { show: false }, stillShowZeroSum: false, data: [
+      { name: '已出租', value: money(report.value.rentedRoomCount) },
+      { name: '未出租', value: money(report.value.availableRoomCount) }
+    ] }]
   })
 
   overdueRisk?.setOption({
     animation: false,
-    color: ['#d93025', '#e6a23c', '#67c23a'],
-    tooltip: { trigger: 'axis' },
-    grid: { left: 80, right: 20, top: 18, bottom: 24 },
-    xAxis: { type: 'value', minInterval: 1 },
-    yAxis: { type: 'category', data: overdueRiskData.value.map(item => item.name) },
-    series: [
-      {
-        type: 'bar',
-        data: overdueRiskData.value.map(item => item.value),
-        barMaxWidth: 24,
-        label: { show: true, position: 'right' }
-      }
-    ]
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: value => `${value} 笔` },
+    grid: { left: 82, right: 42, top: 10, bottom: 22 },
+    xAxis: { type: 'value', minInterval: 1, splitNumber: 4, axisLabel: { color: '#98a2b3', fontSize: 11 }, splitLine: { lineStyle: { color: '#eef0f3', type: 'dashed' } } },
+    yAxis: { type: 'category', inverse: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#475467', fontSize: 12 }, data: overdueRiskData.value.map(item => item.name) },
+    series: [{ type: 'bar', showBackground: true, backgroundStyle: { color: '#f7f8fa', borderRadius: 3 },
+      data: overdueRiskData.value.map(item => ({ value: item.value, itemStyle: { color: { '已逾期': '#d93025', '7天内到期': '#d5a164', '正常未收': '#8c96a6' }[item.name], borderRadius: [0, 3, 3, 0] } })),
+      barMaxWidth: 16, label: { show: true, position: 'right', color: '#475467', fontWeight: 600, formatter: '{c} 笔' }
+    }]
   })
 }
 
@@ -577,6 +582,7 @@ async function loadReport() {
       todayPaidAmount: metrics.todayIncomeAmount ?? data?.todayPaidAmount
     }
   } catch {
+    failedSections.value.push('运营摘要与房源统计')
     report.value = {}
   }
 }
@@ -586,6 +592,7 @@ async function loadBills() {
     const data = await request.get('/bills', { params: { page: 1, pageSize: 100 }, silent: true })
     bills.value = readPage(data).records
   } catch {
+    failedSections.value.push('账单数据')
     bills.value = []
   }
 }
@@ -595,12 +602,15 @@ async function loadContracts() {
     const data = await request.get('/contracts', { silent: true })
     contracts.value = Array.isArray(data) ? data : []
   } catch {
+    failedSections.value.push('合同数据')
     contracts.value = []
   }
 }
 
 async function loadDashboard() {
+  if (loading.value) return
   loading.value = true
+  failedSections.value = []
 
   try {
     await Promise.allSettled([
@@ -610,6 +620,7 @@ async function loadDashboard() {
     ])
   } finally {
     loading.value = false
+    updatedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
     await nextTick()
     renderCharts()
   }
@@ -623,139 +634,116 @@ watch([allBills, report], async () => {
 onMounted(() => {
   loadDashboard()
   window.addEventListener('resize', resizeCharts)
+  resizeObserver = new ResizeObserver(resizeCharts)
+  if (revenueTrendRef.value?.parentElement) resizeObserver.observe(revenueTrendRef.value.parentElement)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeCharts)
+  resizeObserver?.disconnect()
   charts.splice(0).forEach(chart => chart.dispose())
 })
 </script>
 
 <style scoped>
-.dashboard-page {
-  min-width: 0;
+.dashboard-page { min-width: 0; color: var(--dhic-text-primary); }
+.page-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
+.page-header h2 { margin: 0; font-size: 20px; font-weight: 600; line-height: 28px; }
+.page-header p { margin: 4px 0 0; color: var(--dhic-text-secondary); font-size: 12px; }
+.header-actions { display: flex; align-items: center; gap: 14px; }
+.update-time { color: #8a94a3; font-size: 12px; font-variant-numeric: tabular-nums; }
+.data-notice { padding: 10px 14px; margin-bottom: 12px; border: 1px solid #f4d9bd; background: #fffbf5; border-radius: 6px; color: #9a4d00; font-size: 12px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; margin-bottom: 16px; border: 1px solid var(--dhic-border-color); border-radius: var(--dhic-radius-large); background: #fff; box-shadow: 0 1px 3px rgba(32,33,36,.035); overflow: hidden; }
+.kpi-card { min-width: 0; position: relative; padding: 18px 18px 16px; border-right: 1px solid #eef0f3; }
+.kpi-card:last-child { border-right: 0; }
+.card-title { display: flex; align-items: center; justify-content: space-between; gap: 4px; color: #667085; font-size: 12px; }
+.card-scope { padding: 1px 4px; border-radius: 3px; background: #f6f7f9; color: #8a94a3; font-size: 10px; white-space: nowrap; }
+.card-value { margin-top: 12px; color: var(--dhic-text-primary); font-size: clamp(22px, 1.75vw, 30px); font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.2; letter-spacing: -.7px; white-space: nowrap; }
+.card-desc { margin-top: 9px; color: #8a94a3; font-size: 11px; line-height: 16px; }
+.metric-track { display: block; width: 100%; border: 0; appearance: none; height: 3px; margin-top: 10px; border-radius: 3px; background: #f0f1f3; overflow: hidden; }
+.metric-track::-webkit-progress-bar { background: #f0f1f3; border-radius: 3px; }
+.metric-track::-webkit-progress-value { background: #d5a164; border-radius: 3px; }
+.metric-track::-moz-progress-bar { background: #d5a164; border-radius: 3px; }
+.success .metric-track::-webkit-progress-value { background: #18a058; }
+.success .metric-track::-moz-progress-bar { background: #18a058; }
+.chart-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+.trend-panel, .risk-panel { grid-column: span 7; }
+.source-panel, .room-panel { grid-column: span 5; }
+.risk-panel { grid-column: 6 / 13; }
+.room-panel { grid-column: 1 / 6; }
+.chart { width: 100%; min-width: 0; }
+.trend-chart, .source-breakdown, .chart-empty { height: 226px; }
+.source-breakdown { display: grid; grid-template-columns: minmax(140px, .9fr) minmax(130px, 1fr); align-items: center; gap: 10px; }
+.source-chart { height: 208px; }
+.source-legend { list-style: none; margin: 0; padding: 0; max-height: 218px; overflow-y: auto; }
+.source-legend li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid #f2f3f5; font-size: 12px; }
+.source-legend li:last-child { border-bottom: 0; }
+.legend-name { display: inline-flex; align-items: center; gap: 7px; color: #667085; white-space: nowrap; }
+.legend-name i, .dot { display: inline-block; width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+.source-color-0 { background: #d93025; }
+.source-color-1 { background: #475467; }
+.source-color-2 { background: #b67b68; }
+.source-color-3 { background: #8c96a6; }
+.source-color-4 { background: #d5a164; }
+.source-color-5 { background: #b8bfc9; }
+.source-color-6 { background: #8f4540; }
+.source-color-7 { background: #6a7976; }
+.source-legend strong { text-align: right; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.source-legend small { display: inline-block; min-width: 46px; margin-left: 7px; font-size: 11px; color: #8a94a3; font-weight: 400; }
+.room-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center; height: 148px; }
+.room-chart { height: 148px; }
+.room-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 124px; border-radius: 6px; background: #f8f9fb; color: #98a2b3; }
+.room-empty span { font-size: 30px; font-weight: 500; }
+.room-empty p { margin: 7px 0 0; font-size: 12px; }
+.room-counts > div { display: flex; justify-content: space-between; padding: 9px 0; font-size: 12px; }
+.room-counts > div > span { display: inline-flex; align-items: center; gap: 8px; color: #667085; }
+.room-counts strong { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.room-counts small { font-size: 11px; font-weight: 400; color: #98a2b3; }
+.room-counts p { margin: 8px 0 0; padding-top: 10px; border-top: 1px solid #eef0f3; font-size: 12px; color: #667085; }
+.room-counts b { float: right; font-weight: 600; color: #344054; }
+.rented { background: #d93025; }
+.vacant { background: #c5cbd3; }
+.risk-chart { height: 148px; }
+.chart-empty { display: flex; align-items: center; justify-content: center; color: #98a2b3; font-size: 12px; }
+.detail-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; gap: 14px; }
+.detail-grid > div { min-width: 0; }
+.summary-card { margin-bottom: 14px; }
+.summary-card :deep(.el-table) { font-size: 12px; font-variant-numeric: tabular-nums; }
+.summary-card :deep(.el-table th.el-table__cell) { height: 34px; padding: 5px 0; font-size: 11px; }
+.summary-card :deep(.el-table td.el-table__cell) { height: 36px; padding: 5px 0; }
+.summary-card :deep(.el-tag) { font-size: 11px; height: 22px; }
+.summary-card :deep(.el-table__empty-block) { min-height: 96px; }
+.success { color: var(--dhic-success); }
+.danger { color: var(--dhic-danger); }
+.warning { color: var(--dhic-warning); }
+.ai-summary { margin: 0; color: var(--dhic-text-primary); font-size: 13px; line-height: 1.8; }
+@media (max-width: 1280px) {
+  .kpi-card { padding: 16px 12px; }
+  .card-scope { display: none; }
+  .source-breakdown { grid-template-columns: minmax(110px, .8fr) 1fr; gap: 6px; }
+  .source-legend small { display: block; margin-left: 0; min-width: 0; }
+  .detail-grid { grid-template-columns: 1fr; }
 }
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 16px;
+@media (max-width: 1050px) {
+  .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpi-card:nth-child(-n+3) { border-bottom: 1px solid #eef0f3; }
+  .kpi-card:nth-child(3) { border-right: 0; }
+  .card-scope { display: inline; }
+  .card-value { font-size: 26px; }
+  .trend-panel, .source-panel, .room-panel, .risk-panel { grid-column: 1 / -1; }
+  .source-breakdown { grid-template-columns: minmax(120px, 1fr) 1.2fr; }
+  .source-legend small { display: inline-block; min-width: 50px; margin-left: 10px; }
+  .room-breakdown { grid-template-columns: minmax(120px, 1fr) 1.2fr; }
 }
-
-.page-header h2 {
-  margin: 0;
-  color: var(--dhic-text-primary);
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 28px;
-}
-
-.page-header p {
-  margin: 4px 0 0;
-  color: var(--dhic-text-secondary);
-  font-size: 13px;
-}
-
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.kpi-card {
-  min-height: 124px;
-}
-
-.card-title {
-  color: var(--dhic-text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.card-value {
-  margin-top: 9px;
-  color: var(--dhic-text-primary);
-  font-size: 26px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.15;
-}
-
-.card-desc {
-  margin-top: 10px;
-  color: var(--dhic-text-secondary);
-  font-size: 12px;
-}
-
-.chart-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.chart-card.wide {
-  grid-column: span 2;
-}
-
-.chart {
-  height: 288px;
-  width: 100%;
-}
-
-.summary-card {
-  margin-bottom: 16px;
-}
-
-.success {
-  color: var(--dhic-success);
-}
-
-.danger {
-  color: var(--dhic-danger);
-}
-
-.warning {
-  color: var(--dhic-warning);
-}
-
-.ai-summary {
-  margin: 0;
-  color: var(--dhic-text-primary);
-  line-height: 1.7;
-}
-
-@media (max-width: 1500px) {
-  .kpi-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 1180px) {
-  .chart-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .chart-card.wide {
-    grid-column: 1 / -1;
-  }
-}
-
-@media (max-width: 820px) {
-  .page-header {
-    flex-wrap: wrap;
-  }
-
-  .kpi-grid,
-  .chart-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .chart-card.wide {
-    grid-column: auto;
-  }
+@media (max-width: 640px) {
+  .page-header { flex-wrap: wrap; gap: 10px; }
+  .header-actions { width: 100%; justify-content: space-between; }
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi-card:nth-child(3) { border-right: 1px solid #eef0f3; }
+  .kpi-card:nth-child(even) { border-right: 0; }
+  .kpi-card:nth-child(4) { border-bottom: 1px solid #eef0f3; }
+  .card-value { font-size: 24px; }
+  .source-legend small { display: block; margin: 0; }
+  .room-breakdown { gap: 14px; }
 }
 </style>
