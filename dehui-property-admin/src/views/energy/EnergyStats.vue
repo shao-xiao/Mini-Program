@@ -5,7 +5,7 @@
         <div class="page-header">
           <div>
             <div class="page-title">能耗统计</div>
-            <div class="page-subtitle">按表具、空间、租户和账单状态分析水电气用量</div>
+            <div class="page-subtitle">{{ isTenantView ? '按月查看当前租户的水电气用量与结算费用' : '按表具、空间、租户和账单状态分析水电气用量' }}</div>
           </div>
           <div class="header-actions"><span class="updated-at">{{ loading ? '正在更新…' : updatedAt ? `更新于 ${updatedAt}` : '' }}</span><el-button type="primary" :loading="loading" @click="loadStats">刷新</el-button></div>
         </div>
@@ -50,14 +50,14 @@
             <el-option v-for="item in tenants" :key="item.id" :label="item.tenantName" :value="item.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="账单状态">
+        <el-form-item v-if="!isTenantView" label="账单状态">
           <el-select v-model="queryForm.billStatus" clearable placeholder="全部" class="query-select" @change="loadStats">
             <el-option label="未生成" value="NOT_GENERATED" />
             <el-option label="已生成" value="GENERATED" />
             <el-option label="已入账" value="POSTED" />
           </el-select>
         </el-form-item>
-        <el-form-item label="异常">
+        <el-form-item v-if="!isTenantView" label="异常">
           <el-select v-model="queryForm.abnormalFlag" clearable placeholder="全部" class="query-select-small" @change="loadStats">
             <el-option label="异常" :value="true" />
             <el-option label="正常" :value="false" />
@@ -84,7 +84,7 @@
       </el-alert>
 
       <div class="scope-summary"><span>{{ queryForm.periodMonth || '全部账期' }}</span><span>{{ stats.recordCount }} 条抄表记录</span><span v-if="stats.trend.length">有记录 {{ stats.trend.length }} 个月</span><span>当前主体与筛选范围</span></div>
-      <div class="summary-grid">
+      <div class="summary-grid" :class="{ 'tenant-summary': isTenantView }">
         <el-card v-for="item in summaryCards" :key="item.label" class="summary-card" shadow="never">
           <div class="summary-label">{{ item.label }}</div>
           <div class="summary-value" :class="item.className">{{ item.value }}</div>
@@ -92,15 +92,20 @@
         </el-card>
       </div>
 
-      <div class="analysis-toolbar"><div><strong>用量分析</strong><span>按同一能耗类型比较 · {{ activeChartType.unit }}</span></div><el-segmented v-model="chartMeterType" :options="chartTypeOptions" size="small" /></div>
-      <div class="chart-grid">
+      <el-card v-if="isTenantView" shadow="never" class="monthly-card">
+        <template #header><div class="card-header-inline"><div><strong>每月用量与费用</strong><small>按账期汇总，选择月份可查看当月数据</small></div><span class="chart-meta">{{ monthlyRows.length }} 个账期</span></div></template>
+        <WorkspaceDataGrid :loading="loading" :rows="monthlyRows" :columns="monthlyColumns" row-key="periodMonth" :show-index="false" density="compact" data-mode="client" empty-text="所选月份暂无抄表记录" aria-label="租户每月能耗明细" />
+      </el-card>
+
+      <div v-if="!isTenantView || stats.recordCount > 0" class="analysis-toolbar"><div><strong>用量分析</strong><span>按同一能耗类型比较 · {{ activeChartType.unit }}</span></div><el-segmented v-model="chartMeterType" :options="chartTypeOptions" size="small" /></div>
+      <div v-if="!isTenantView || stats.recordCount > 0" class="chart-grid" :class="{ 'tenant-charts': isTenantView }">
         <el-card class="chart-card wide" shadow="never">
           <template #header><div class="card-header-inline"><div><strong>近 6 个账期用量</strong><small>以最近有记录的账期为终点，缺少记录的月份留空</small></div><span class="chart-meta">{{ activeChartType.label }}</span></div></template>
           <el-empty v-if="isTrendEmpty" :description="stats.recordCount ? '当前筛选暂无该类型的月度记录' : '当前主体与筛选范围暂无抄表记录'" :image-size="80" />
           <div v-else ref="trendRef" class="chart" role="img" :aria-label="`${activeChartType.label}近六个账期趋势`"></div>
         </el-card>
 
-        <el-card class="chart-card" shadow="never">
+        <el-card v-if="!isTenantView" class="chart-card" shadow="never">
           <template #header>
             <div class="card-header-inline">
               <div><strong>结算费用构成</strong><small>以金额比较，水电气用量分别展示</small></div>
@@ -111,20 +116,20 @@
           <div v-else class="cost-breakdown"><div ref="typeRef" class="chart cost-chart" role="img" aria-label="各能耗类型的结算费用占比"></div><ul class="cost-legend"><li v-for="item in costStructure" :key="item.meterType"><span><i :class="`type-dot type-dot--${item.meterType}`"></i>{{ meterTypeText(item.meterType) }}</span><strong>¥ {{ formatNumber(item.settlementAmount) }}<small>{{ costPercent(item.settlementAmount) }}%</small></strong></li></ul></div>
         </el-card>
 
-        <el-card class="chart-card rank-card" shadow="never">
+        <el-card v-if="!isTenantView" class="chart-card rank-card" shadow="never">
           <template #header><div class="card-header-inline"><div><strong>房间用量排行</strong><small>同类型用量 · 前 10 名<span v-if="roomRankRows.some(item => !item.roomId)"> · 含未关联记录</span></small></div><span class="chart-meta">{{ roomRankRows.filter(item => item.roomId).length }} 个房间 · {{ activeChartType.unit }}</span></div></template>
           <el-empty v-if="!roomRankRows.length" description="当前范围暂无该类型的房间用量" :image-size="80" />
           <div v-else ref="roomRankRef" class="chart"></div>
         </el-card>
 
-        <el-card class="chart-card rank-card" shadow="never">
+        <el-card v-if="!isTenantView" class="chart-card rank-card" shadow="never">
           <template #header><div class="card-header-inline"><div><strong>楼宇用量排行</strong><small>同类型用量 · 前 10 名<span v-if="buildingRankRows.some(item => !item.buildingId)"> · 含未关联记录</span></small></div><span class="chart-meta">{{ buildingRankRows.filter(item => item.buildingId).length }} 栋楼宇 · {{ activeChartType.unit }}</span></div></template>
           <el-empty v-if="!buildingRankRows.length" description="当前范围暂无该类型的楼宇用量" :image-size="80" />
           <div v-else ref="buildingRankRef" class="chart"></div>
         </el-card>
       </div>
 
-      <el-card shadow="never" class="table-card">
+      <el-card v-if="!isTenantView || stats.anomalies.length" shadow="never" class="table-card">
         <template #header>异常用量提示</template>
         <WorkspaceDataGrid
           :loading="loading"
@@ -174,7 +179,8 @@ const chartMeterType = ref('ELECTRIC')
 const updatedAt = ref('')
 let resizeObserver
 const charts = []
-const canFilterBuildings = computed(() => hasPermission('building:view') || hasPermission('building:*'))
+const isTenantView = computed(() => props.embedded && props.subjectScope !== 'property' && Number(props.subjectTenantId) > 0)
+const canFilterBuildings = computed(() => !isTenantView.value && (hasPermission('building:view') || hasPermission('building:*')))
 const canFilterFloors = computed(() => canFilterBuildings.value && (hasPermission('floor:view') || hasPermission('floor:*')))
 const canFilterRooms = computed(() => canFilterFloors.value && (hasPermission('room:view') || hasPermission('room:*')))
 
@@ -221,9 +227,19 @@ const stats = reactive({
   anomalies: []
 })
 
-const chartTypeOptions = computed(() => energyChartTypes.filter(type => !queryForm.meterType || type.value === queryForm.meterType).map(type => ({ label: type.label, value: type.value })))
-const activeChartType = computed(() => energyChartTypes.find(type => type.value === (queryForm.meterType || chartMeterType.value)) || energyChartTypes[0])
+const availableChartTypes = computed(() => energyChartTypes.filter(type => queryForm.meterType
+  ? type.value === queryForm.meterType
+  : !isTenantView.value || stats.typeStructure.some(row => row.meterType === type.value && number(row.recordCount) > 0)))
+const chartTypeOptions = computed(() => availableChartTypes.value.map(type => ({ label: type.label, value: type.value })))
+const activeChartType = computed(() => energyChartTypes.find(type => type.value === (queryForm.meterType || (availableChartTypes.value.some(type => type.value === chartMeterType.value) ? chartMeterType.value : availableChartTypes.value[0]?.value))) || energyChartTypes[0])
 const trendWindow = computed(() => energyTrendWindow(stats.trend, queryForm.periodMonth))
+const monthlyRows = computed(() => [...stats.trend].sort((a, b) => String(b.periodMonth).localeCompare(String(a.periodMonth))))
+const monthlyColumns = computed(() => [
+  { key: 'periodMonth', label: '账期', minWidth: 110 },
+  ...availableChartTypes.value.map(type => ({ key: type.field, label: type.label, type: 'number', decimals: 2, minWidth: 160, align: 'right', valueGetter: row => number(row[type.countField]) > 0 ? row[type.field] : null })),
+  { key: 'settlementAmount', label: '结算费用（元）', type: 'money', decimals: 2, minWidth: 170, align: 'right' },
+  { key: 'recordCount', label: '抄表记录数', type: 'number', decimals: 0, minWidth: 110, align: 'right' }
+])
 const roomRankRows = computed(() => energyRanking(stats.roomRanking, activeChartType.value.value))
 const buildingRankRows = computed(() => energyRanking(stats.buildingRanking, activeChartType.value.value))
 const costStructure = computed(() => stats.typeStructure.filter(item => number(item.settlementAmount) > 0))
@@ -232,12 +248,12 @@ const meterTypeLabelMap = new Map(energyMeterTypeOptions.map(option => [option.v
 
 const summaryCards = computed(() => [
   { label: '记录数', value: stats.recordCount, desc: '当前筛选范围', className: '' },
-  { label: '电用量', value: `${formatNumber(stats.electricUsage)} kWh`, desc: '电表用量', className: 'warning' },
-  { label: '水用量', value: `${formatNumber(stats.waterUsage)} m³`, desc: '水表用量', className: 'primary' },
-  { label: '燃气用量', value: `${formatNumber(stats.gasUsage)} m³`, desc: '燃气表用量', className: 'danger' },
+  { meterType: 'ELECTRIC', label: '电用量', value: `${formatNumber(stats.electricUsage)} kWh`, desc: '电表用量', className: 'warning' },
+  { meterType: 'WATER', label: '水用量', value: `${formatNumber(stats.waterUsage)} m³`, desc: '水表用量', className: 'primary' },
+  { meterType: 'GAS', label: '燃气用量', value: `${formatNumber(stats.gasUsage)} m³`, desc: '燃气表用量', className: 'danger' },
   { label: '结算金额', value: `¥ ${formatNumber(stats.totalAmount)}`, desc: '当前筛选范围', className: '' },
   { label: '异常记录', value: stats.abnormalCount, desc: '待关注抄表记录', className: 'danger' }
-])
+].filter(item => !isTenantView.value || (item.meterType ? availableChartTypes.value.some(type => type.value === item.meterType) : item.label !== '异常记录' || stats.abnormalCount > 0)))
 
 const isTrendEmpty = computed(() => !energyTrendSeries(trendWindow.value, activeChartType.value).some(value => value !== null))
 const isStructureEmpty = computed(() => costStructure.value.length === 0)
@@ -437,6 +453,13 @@ watch(
   () => {
     if (!props.embedded) return
     queryForm.tenantId = null
+    if (isTenantView.value) {
+      queryForm.buildingId = null
+      queryForm.floorId = null
+      queryForm.roomId = null
+      queryForm.billStatus = ''
+      queryForm.abnormalFlag = ''
+    }
     loadStats()
   }
 )
@@ -516,6 +539,14 @@ onBeforeUnmount(() => {
 .type-dot--WATER { background: #6789a7; }
 .type-dot--GAS { background: #c79a60; }
 .table-card { margin-top: 14px; }
+.monthly-card { margin: 0 0 18px; box-shadow: none; border-color: #e4e7ec; }
+.monthly-card :deep(.el-card__header) { padding: 12px 16px; }
+.monthly-card :deep(.el-card__body) { padding: 0 14px 8px; }
+.monthly-card :deep(.el-table) { font-variant-numeric: tabular-nums; font-size: 12px; }
+.tenant-summary { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.tenant-charts .chart-card.wide { grid-column: 1 / -1; }
+.tenant-summary .summary-card { border-bottom: 0; }
+.tenant-summary .summary-card:not(:last-child) { border-right: 1px solid #eef0f3; }
 .anomaly-actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .primary { color: #6789a7; }
 .warning { color: #b77925; }

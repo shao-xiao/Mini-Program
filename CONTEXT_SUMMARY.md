@@ -1,3 +1,13 @@
+## Recent Change - 2026-10-20 个体租户能耗统计改为月度视图
+
+- 按用户反馈精简个体租户页面：只保留月份与能耗类型筛选，移除租户视图中的楼宇/楼层/房间、账单状态和异常筛选。
+- 增加复用 WorkspaceDataGrid 的“每月用量与费用”明细，按账期倒序展示实际有记录的用量类型、结算费用与抄表记录数；保留月度趋势。
+- 个体租户隐藏房间/楼宇排行、费用饼图、无数据类型指标，以及没有异常时的异常模块；物业/独立统计页保留综合分析。
+- 切换到租户时清除隐藏条件，防止仍被不可见的空间、状态或异常筛选限制。
+- 验证：npm build、energyStatistics.test.js 4 项及 git diff --check 通过；tenant-9 单月电量与 tenant-3 水电两个月明细、2026-08 月份筛选均已线上验证，浏览器无 error/warn。
+- 仅前端增量发布，后端和数据未修改。备份 /opt/dehui/backups/energy-tenant-monthly-20261020-143747，资源 AssetEnergyView-monthly-20261020-v1.js/.css。
+- 详见 docs/energy-tenant-monthly-2026-10-20.md。
+
 ## Recent Change - 2026-10-20 能耗统计真实聚合与展示优化
 
 - 根因：/energy/stats 的 trend、roomRanking、buildingRanking 固定返回空数组，导致有抄表记录但趋势和空间排行始终为空。
