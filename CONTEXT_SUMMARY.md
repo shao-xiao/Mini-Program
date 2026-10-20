@@ -1,3 +1,12 @@
+## Recent Change - 2026-10-20 巡检详情照片跨账号访问修复
+
+- 问题：巡检 127 的照片 116 已关联 `inspection_attachment`，但文件仍是 `CUSTOM_FIELD_IMAGE`、workspace 为 `inspections`、biz_id 为空；文件服务将其当作上传者私有草稿，导致其他已授权账号无法读取。
+- 修复：SYSTEM 身份读取上述类型文件时，先校验照片与未删除巡检的有效附件关系；已保存照片按 `inspection:view`（含既有通配权限）读取，未保存照片仍限上传者。其他模块权限不变，不修改数据库、角色配置或照片文件。
+- 验证：后端 `mvn -q -DskipTests compile` 通过；InspectionFileScopeTest、WorkOrderFileScopeTest、MobileTenantLogoFileAccessTest、RbacUpgradePreservationPolicyTest、BusinessDataUpgradePreservationPolicyTest 共 27 项通过；管理后台 `npm ci --ignore-scripts` / `npm run build` 通过。
+- 上线：从 feature/prod-architecture-20260522 的 25036e4 取对应源码；原始 MobileStaffFileService 编译反汇编与生产 class 完全一致。使用生产依赖编译修复，仅替换 app.jar 内 MobileStaffFileService.class，验证其他条目字节不变，重启 dehui-backend（8080）。
+- 线上验收：已有 ENGINEER_MANAGER 会话打开 INSP-9EB950863C6A，现场照片缩略图与大图预览均正常。
+- 备份：服务器 `/opt/dehui/backups/inspection-photo-permission-20261020-134546/app.jar`；详细记录见 `docs/inspection-photo-permission-fix-2026-10-20.md`。
+
 # DHIC 项目当前交接摘要
 
 - 最后核验日期：2026-08-05

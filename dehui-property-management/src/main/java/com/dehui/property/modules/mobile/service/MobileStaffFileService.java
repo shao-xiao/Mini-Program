@@ -289,6 +289,11 @@ public class MobileStaffFileService {
         if ("SYSTEM".equals(principal.userType())) {
             if (principal.roles() != null && principal.roles().contains("SUPER_ADMIN")) return true;
             if ("CUSTOM_FIELD_IMAGE".equals(bizType) || "CUSTOM_FIELD_ATTACHMENT".equals(bizType)) {
+                // Legacy inspection uploads retain their draft type after being saved.
+                // Only an active attachment relation makes them part of a shared record.
+                if ("inspections".equals(file.get("workspaceKey")) && isSavedInspectionFile(file)) {
+                    return hasPermission(principal, "inspection:view");
+                }
                 return principal.userId() != null
                         && principal.userId().equals(longValue(file.get("ownerSysUserId")));
             }
@@ -392,6 +397,23 @@ public class MobileStaffFileService {
                 tenantId,
                 companyScope ? 1 : 0,
                 principal.userId()
+        );
+        return count != null && count > 0;
+    }
+
+    private boolean isSavedInspectionFile(Map<String, Object> file) {
+        Long fileId = longValue(file.get("id"));
+        if (fileId == null) return false;
+        Long count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM inspection_attachment attachment
+                INNER JOIN inspection_record inspection
+                        ON inspection.id = attachment.inspection_id AND inspection.deleted = 0
+                WHERE attachment.file_id = ? AND attachment.deleted = 0
+                """,
+                Long.class,
+                fileId
         );
         return count != null && count > 0;
     }
