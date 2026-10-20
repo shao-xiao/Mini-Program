@@ -1,3 +1,12 @@
+## Recent Change - 2026-10-20 驾驶舱真实房源统计同步
+
+- 根因：驾驶舱原先从 /ai/daily-report 读取 roomTotal/roomRented/occupancyRate，但该接口返回空占位指标，未读取真实 building_room 台账。
+- 修复：使用现有 GET /rooms 的服务端 total，分别查询全部房源与 status=RENTED 房源（page=1/pageSize=1），不拉取全部房间、不依赖首分页记录数量。未出租=总数-已出租，出租率保留一位小数。
+- 顶部 KPI 与房源图表统一依赖独立 roomStats；AI 摘要加载不再覆盖房源统计。无权限/失败保持缺省提示，不显示虚假 0%。
+- 生产只读核对：building_room 未删除房源共 39 间，RENTED=11、VACANT=28；线上两处均显示 28.2%，刷新后保持同步，浏览器 error/warn 为 0。
+- 验证：dashboardRoomStatistics.test.js 5 项通过（跨分页总数、39/11、一致零值、权限/网络失败、异常计数），npm run build 与 git diff --check 通过。
+- 已增量上线，未修改后端、数据库及 RBAC。备份 /opt/dehui/backups/dashboard-room-stats-20261020-141335；新版入口 /dashboard?ui=20261020-rooms2。详见 docs/dashboard-room-statistics-2026-10-20.md。
+
 ## Recent Change - 2026-10-20 驾驶舱信息密度与可读性优化
 
 - 保留红黑品牌色、后台导航、真实接口及财务计算口径。将六项 KPI 合并为紧凑指标带，增加本月/累计/风险标签、收缴率进度和更新时间。

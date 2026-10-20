@@ -39,14 +39,14 @@
         <div v-else class="chart-empty">暂无账单来源数据</div>
       </DashboardPanel>
 
-      <DashboardPanel class="room-panel" title="房源出租状态" subtitle="房源数量与出租占比" :meta="hasRoomStats ? `共 ${report.roomCount || roomTotal} 间` : '暂无房源统计'">
+      <DashboardPanel class="room-panel" title="房源出租状态" subtitle="房源数量与出租占比" :meta="roomStats ? `共 ${roomTotal} 间` : roomStatsHint">
         <div class="room-breakdown">
           <div v-show="hasRoomStats" ref="roomStatusRef" class="chart room-chart" role="img" aria-label="已出租及未出租房源数量"></div>
-          <div v-if="!hasRoomStats" class="room-empty"><span>—</span><p>暂无房源统计数据</p></div>
+          <div v-if="!hasRoomStats" class="room-empty"><span>—</span><p>{{ roomStatsHint }}</p></div>
           <div class="room-counts">
-            <div><span><i class="dot rented"></i>已出租</span><strong>{{ hasRoomStats ? report.rentedRoomCount || 0 : '—' }}<small> 间</small></strong></div>
-            <div><span><i class="dot vacant"></i>未出租</span><strong>{{ hasRoomStats ? report.availableRoomCount || 0 : '—' }}<small> 间</small></strong></div>
-            <p>出租率 <b>{{ hasRoomStats ? `${roomRentRate}%` : '—' }}</b></p>
+            <div><span><i class="dot rented"></i>已出租</span><strong>{{ roomStats ? roomStats.rentedRoomCount : '—' }}<small> 间</small></strong></div>
+            <div><span><i class="dot vacant"></i>未出租</span><strong>{{ roomStats ? roomStats.availableRoomCount : '—' }}<small> 间</small></strong></div>
+            <p>出租率 <b>{{ roomStats ? `${roomRentRate}%` : '—' }}</b></p>
           </div>
         </div>
       </DashboardPanel>
@@ -139,6 +139,7 @@ import * as echarts from 'echarts'
 import request from '../../utils/request'
 import DashboardPanel from '../../components/dashboard/DashboardPanel.vue'
 import { readPage } from '../../utils/pagination'
+import { loadDashboardRoomStatistics } from '../../utils/dashboardRoomStatistics'
 
   const loading = ref(false)
   const report = ref({})
@@ -154,10 +155,12 @@ const charts = []
 let resizeObserver
 const updatedAt = ref('')
 const failedSections = ref([])
+const roomStats = ref(null)
+const roomStatsHint = ref('正在加载房源统计')
 const sourceColors = ['#d93025', '#475467', '#b67b68', '#8c96a6', '#d5a164', '#b8bfc9', '#8f4540', '#6a7976']
 const sourceTotal = computed(() => billSourceData.value.reduce((sum, item) => sum + item.value, 0))
-const roomTotal = computed(() => money(report.value.rentedRoomCount) + money(report.value.availableRoomCount))
-const hasRoomStats = computed(() => money(report.value.roomCount) > 0 || roomTotal.value > 0)
+const roomTotal = computed(() => roomStats.value?.roomCount ?? 0)
+const hasRoomStats = computed(() => roomStats.value !== null && roomTotal.value > 0)
 function sourcePercent(value) { return sourceTotal.value > 0 ? (money(value) / sourceTotal.value * 100).toFixed(1) : '0.0' }
 function statusText(status) {
   return { CANCELLED: '已作废', DRAFT: '草稿', PARTIAL: '部分支付', PENDING: '待处理', EXPIRED: '已到期', TERMINATED: '已终止' }[status] || status || '—'
@@ -365,9 +368,9 @@ const kpiCards = computed(() => [
   {
     label: '房间出租率',
     scope: '房源',
-    progress: hasRoomStats.value ? roomRentRate.value : undefined,
-    value: hasRoomStats.value ? `${roomRentRate.value}%` : '—',
-    desc: hasRoomStats.value ? `已租 ${report.value.rentedRoomCount || 0} / 共 ${report.value.roomCount || roomTotal.value} 间` : '暂无房源统计数据',
+    progress: roomStats.value ? roomRentRate.value : undefined,
+    value: roomStats.value ? `${roomRentRate.value}%` : '—',
+    desc: roomStats.value ? `已租 ${roomStats.value.rentedRoomCount} / 共 ${roomTotal.value} 间` : roomStatsHint.value,
     className: ''
   },
   {
@@ -379,14 +382,7 @@ const kpiCards = computed(() => [
   }
 ])
 
-const roomRentRate = computed(() => {
-  if (report.value.rentalRate !== undefined && report.value.rentalRate !== null) {
-    return Number(report.value.rentalRate || 0)
-  }
-  const roomCount = money(report.value.roomCount)
-  const rentedRoomCount = money(report.value.rentedRoomCount)
-  return roomCount > 0 ? Math.round((rentedRoomCount / roomCount) * 100) : 0
-})
+const roomRentRate = computed(() => roomStats.value?.rentalRate ?? 0)
 
 const monthlyTrend = computed(() => {
   const endMonth = latestTrendMonth.value
@@ -544,8 +540,8 @@ function renderCharts() {
     tooltip: { trigger: 'item', valueFormatter: value => `${value} 间` },
     title: { text: `${roomRentRate.value}%`, subtext: '出租率', left: 'center', top: '32%', textStyle: { color: '#202124', fontSize: 24, fontWeight: 600 }, subtextStyle: { color: '#667085', fontSize: 11 } },
     series: [{ type: 'pie', radius: ['67%', '84%'], center: ['50%', '50%'], label: { show: false }, stillShowZeroSum: false, data: [
-      { name: '已出租', value: money(report.value.rentedRoomCount) },
-      { name: '未出租', value: money(report.value.availableRoomCount) }
+      { name: '已出租', value: roomStats.value.rentedRoomCount },
+      { name: '未出租', value: roomStats.value.availableRoomCount }
     ] }]
   })
 
@@ -573,17 +569,24 @@ async function loadReport() {
     report.value = {
       ...(data || {}),
       summary: data?.summaryText || data?.summary,
-      roomCount: metrics.roomTotal ?? data?.roomCount,
-      rentedRoomCount: metrics.roomRented ?? data?.rentedRoomCount,
-      availableRoomCount: metrics.roomAvailable ?? data?.availableRoomCount,
-      rentalRate: metrics.occupancyRate ?? data?.rentalRate,
       unpaidBillCount: metrics.unpaidBillCount ?? data?.unpaidBillCount,
       paidBillCount: metrics.paidBillCount ?? data?.paidBillCount,
       todayPaidAmount: metrics.todayIncomeAmount ?? data?.todayPaidAmount
     }
   } catch {
-    failedSections.value.push('运营摘要与房源统计')
+    failedSections.value.push('运营摘要')
     report.value = {}
+  }
+}
+
+async function loadRooms() {
+  try {
+    roomStats.value = await loadDashboardRoomStatistics((url, config) => request.get(url, config))
+    roomStatsHint.value = roomStats.value.roomCount === 0 ? '暂无房源记录' : ''
+  } catch (error) {
+    roomStats.value = null
+    roomStatsHint.value = error?.response?.status === 403 ? '暂无权限查看房源统计' : '房源统计加载失败，请刷新'
+    failedSections.value.push('房源统计')
   }
 }
 
@@ -615,6 +618,7 @@ async function loadDashboard() {
   try {
     await Promise.allSettled([
       loadReport(),
+      loadRooms(),
       loadBills(),
       loadContracts()
     ])
@@ -626,7 +630,7 @@ async function loadDashboard() {
   }
 }
 
-watch([allBills, report], async () => {
+watch([allBills, report, roomStats], async () => {
   await nextTick()
   renderCharts()
 })
