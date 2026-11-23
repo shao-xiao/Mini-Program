@@ -10,6 +10,7 @@
         :filter-items="activeFilterItems"
         :query-notices="queryNotices"
         :selected-count="selectedRows.length"
+        :show-metrics="!folderMode"
         :metric-data="equipmentMetricData"
         :metric-states="equipmentMetricStates"
         @change-view="switchEquipmentView"
@@ -23,6 +24,10 @@
         @clear-selection="clearEquipmentSelection"
       >
         <template #header-actions>
+          <div class="equipment-layout-switch" role="group" aria-label="台账显示方式">
+            <button type="button" :aria-pressed="folderMode" @click="changeLayout(true)"><el-icon><Folder /></el-icon>文件夹</button>
+            <button type="button" :aria-pressed="!folderMode" @click="changeLayout(false)"><el-icon><List /></el-icon>表格</button>
+          </div>
           <el-button v-if="hasPermission(equipmentPermissions.create)" type="primary" :icon="Plus" @click="openDialog()">
             {{ equipmentWorkspaceConfig.primaryAction.label }}
           </el-button>
@@ -31,6 +36,7 @@
         <template #toolbar>
           <DhicDataToolbar
             :workspace-config="equipmentWorkspaceConfig"
+            :show-table-tools="!folderMode"
             allow-custom-fields
             allow-column-layout
             field-config-saveable
@@ -88,13 +94,26 @@
               <el-tooltip content="清除快速查询" placement="bottom">
                 <el-button text circle :icon="RefreshLeft" aria-label="清除快速查询" @click="resetQuery" />
               </el-tooltip>
-              <span class="view-hint">当前页 {{ resultScope.loadedRecords }} 条</span>
+              <span v-if="!folderMode" class="view-hint">当前页 {{ resultScope.loadedRecords }} 条</span>
             </template>
           </DhicDataToolbar>
         </template>
 
         <template #grid>
+          <EquipmentFolderBrowser
+            v-if="folderMode"
+            :folders="folders"
+            :active-folder="activeFolder"
+            :rows="folderPageRows"
+            :loading="loading"
+            :error-text="listErrorText"
+            @open-folder="navigateFolder($event.key)"
+            @back="navigateFolder(null)"
+            @open-record="openFolderRecord"
+            @retry="load"
+          />
           <WorkspaceDataGrid
+            v-else
             ref="equipmentTableRef"
             :loading="loading"
             :error-text="listErrorText"
@@ -166,8 +185,19 @@
           </WorkspaceDataGrid>
         </template>
 
-        <template #footer>
-          <div class="pagination-wrapper">
+        <template v-if="!folderMode || activeFolder?.count > 20" #footer>
+          <div v-if="folderMode" class="pagination-wrapper folder-pagination">
+            <el-pagination
+              v-model:current-page="folderPagination.currentPage"
+              v-model:page-size="folderPagination.pageSize"
+              :total="activeFolder.count"
+              :pager-count="5"
+              :page-sizes="[20, 50, 100]"
+              layout="total, prev, pager, next, sizes"
+              @size-change="resetToFirstPage(folderPagination)"
+            />
+          </div>
+          <div v-else class="pagination-wrapper">
             <el-pagination
               v-model:current-page="pagination.currentPage"
               v-model:page-size="pagination.pageSize"
@@ -330,14 +360,16 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MoreFilled, Plus, RefreshLeft, Search } from '@element-plus/icons-vue'
+import { Folder, List, MoreFilled, Plus, RefreshLeft, Search } from '@element-plus/icons-vue'
 import request from '../../utils/request'
 import { hasPermission } from '../../utils/permission'
 import { createPagination, pageParams, readPage, resetToFirstPage } from '../../utils/pagination'
 import { downloadBlob } from '../../utils/downloadBlob'
 import { buildCsvText } from '../../utils/csvExport'
 import { loadAllWorkspaceRecords } from '../../utils/workspaceExport'
+import { groupEquipmentRecords, loadEquipmentFolderRecords } from '../../utils/equipmentFolders'
 import { buildEquipmentImportRows } from '../../utils/equipmentImportMapping'
 import { buildEquipmentUpdatePayload } from '../../utils/equipmentEdit'
 import {
@@ -358,9 +390,16 @@ import DataWorkspace from '../../components/DataWorkspace.vue'
 import DhicDataToolbar from '../../components/DhicDataToolbar.vue'
 import WorkspaceDataGrid from '../../components/workspace/WorkspaceDataGrid.vue'
 import EquipmentRecordDrawer from './EquipmentRecordDrawer.vue'
+import EquipmentFolderBrowser from './EquipmentFolderBrowser.vue'
 import { createEquipmentWorkspaceConfig, equipmentTypeOptions } from '../../workspaceConfigs/equipment'
 import { workspaceTableOptions } from '../../workspaceConfigs/workspaceConfig'
 let jsZipLoadPromise = null
+const route = useRoute()
+const router = useRouter()
+const folderMode = computed(() => route.query.layout !== 'table')
+const folderKey = computed(() => typeof route.query.folder === 'string' ? route.query.folder : null)
+const folderPagination = reactive(createPagination(20))
+let folderRequest
 
 const query = reactive({
   keyword: '',
@@ -467,6 +506,7 @@ const {
   orderedColumns,
   visibleOrderedColumns,
   tableRows,
+  visibleRecords,
   tableEmptyText,
   selectedRows,
   selectedRowKeys,
@@ -543,7 +583,47 @@ const {
   }
 }))
 
-const equipmentDetailRows = computed(() => tableRows.value.filter(selectableEquipmentRow))
+const folders = computed(() => groupEquipmentRecords(visibleRecords.value))
+const activeFolder = computed(() => {
+  if (folderKey.value === null) return null
+  return folders.value.find(folder => folder.key === folderKey.value)
+    ?? { key: folderKey.value, label: folderKey.value ? equipmentTypeText(folderKey.value) : '未分类', count: 0, rows: [] }
+})
+const folderPageRows = computed(() => {
+  const start = (folderPagination.currentPage - 1) * folderPagination.pageSize
+  return activeFolder.value?.rows.slice(start, start + folderPagination.pageSize) ?? []
+})
+const equipmentDetailRows = computed(() => folderMode.value ? folderPageRows.value : tableRows.value.filter(selectableEquipmentRow))
+
+function changeLayout(showFolders) {
+  if (folderMode.value === showFolders) return
+  const query = { ...route.query }
+  delete query.folder
+  if (showFolders) delete query.layout
+  else query.layout = 'table'
+  router.push({ path: route.path, query })
+}
+
+function navigateFolder(key) {
+  const query = { ...route.query }
+  if (key === null) delete query.folder
+  else query.folder = key
+  router.push({ path: route.path, query })
+}
+
+function openFolderRecord(row, trigger) {
+  equipmentDrawer.value?.open(row.id, trigger)
+}
+
+watch(folderKey, () => resetToFirstPage(folderPagination))
+watch(folderMode, () => {
+  clearEquipmentSelection()
+  load()
+})
+watch(() => activeFolder.value?.count, count => {
+  const lastPage = Math.max(1, Math.ceil((count || 0) / folderPagination.pageSize))
+  folderPagination.currentPage = Math.min(folderPagination.currentPage, lastPage)
+})
 
 function equipmentTypeText(value) {
   return equipmentTypeOptions.find(item => item.value === value)?.label || value || '-'
@@ -722,9 +802,28 @@ function resetQuery() {
 }
 
 async function load() {
+  folderRequest?.abort()
+  folderRequest = null
   const requestId = listRequestGuard.start()
-  const params = buildQueryParams()
-  const requestContext = equipmentListState.begin({ viewId: activeViewId.value, params })
+  const params = buildQueryParams(folderMode.value ? { page: 1, pageSize: 100 } : {})
+  const requestContext = equipmentListState.begin({ viewId: activeViewId.value, folders: folderMode.value, params })
+  if (folderMode.value) {
+    resetToFirstPage(folderPagination)
+    const controller = new AbortController()
+    folderRequest = controller
+    try {
+      const records = await loadEquipmentFolderRecords(
+        paging => request.get('/equipments', { params: { ...params, ...paging }, signal: controller.signal, silent: true }),
+        controller.signal
+      )
+      if (!equipmentListState.isCurrent(requestContext)) return
+      list.value = records
+      equipmentListState.succeed(requestContext)
+    } catch {
+      if (!controller.signal.aborted) equipmentListState.fail(requestContext, '设备目录加载失败，请重试')
+    }
+    return
+  }
   const metricRevision = equipmentMetrics.begin()
   const listPromise = request.get('/equipments', { params, silent: true }).then(data => {
     const page = readPage(data)
@@ -1333,6 +1432,7 @@ async function deleteEquipment(row) {
 onMounted(load)
 
 onBeforeUnmount(() => {
+  folderRequest?.abort()
   disposeQueryLifecycle()
 })
 </script>
@@ -1351,6 +1451,22 @@ onBeforeUnmount(() => {
 .workspace-quick-search {
   width: 250px;
 }
+
+.equipment-layout-switch {
+  display: inline-flex; gap: 2px; padding: 2px;
+  border: 1px solid var(--dhic-border-color); border-radius: 7px;
+  background: var(--el-fill-color-light);
+}
+.equipment-layout-switch button {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 28px;
+  padding: 3px 9px; border: 0; border-radius: 4px; font: inherit; font-size: 13px;
+  color: var(--dhic-text-secondary); background: transparent; cursor: pointer;
+}
+.equipment-layout-switch button[aria-pressed="true"] {
+  background: var(--dhic-card-bg); color: var(--dhic-text-primary); box-shadow: 0 1px 3px #0002;
+}
+.equipment-layout-switch button:focus-visible { outline: 2px solid var(--dhic-focus-ring); }
+.folder-pagination :deep(.el-pagination) { flex-wrap: wrap; row-gap: 6px; }
 
 .hidden-file-input {
   display: none;
@@ -1377,6 +1493,7 @@ onBeforeUnmount(() => {
 
 @media (pointer: coarse) {
   .equipment-view-button { min-width: 44px; min-height: 44px; }
+  .equipment-layout-switch button { min-height: 44px; }
 }
 
 @media (max-width: 720px) {

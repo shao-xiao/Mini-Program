@@ -4,11 +4,13 @@
       <slot name="primary-action" />
       <FilterBuilderPopover />
       <SortBuilderPopover />
-      <GroupBuilderPopover />
-      <FieldManager />
-      <RowDensityMenu />
+      <template v-if="showTableTools">
+        <GroupBuilderPopover />
+        <FieldManager />
+        <RowDensityMenu />
+      </template>
 
-      <span v-if="workspaceConfig?.importExport?.length || $slots['data-actions']" class="toolbar-data-actions">
+      <span v-if="showTableTools && (workspaceConfig?.importExport?.length || $slots['data-actions'])" class="toolbar-data-actions">
         <ImportExportManager
           :workspace-config="workspaceConfig"
           :loading-action-ids="importExportLoadingActionIds"
@@ -42,6 +44,7 @@ defineOptions({ name: 'DhicDataToolbar' })
 
 const props = defineProps({
   workspaceConfig: { type: Object, default: null },
+  showTableTools: { type: Boolean, default: true },
   importExportLoadingActionIds: { type: Array, default: () => [] },
   importExportDisabledActionIds: { type: Array, default: () => [] },
   viewName: { type: String, default: '默认视图' },

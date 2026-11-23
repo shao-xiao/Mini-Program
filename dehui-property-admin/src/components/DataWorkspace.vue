@@ -46,7 +46,7 @@
       <span v-for="notice in queryNotices" :key="notice">{{ notice }}</span>
     </div>
 
-    <div v-if="$slots.metrics || resolvedMetrics.length" class="workspace-metrics">
+    <div v-if="showMetrics && ($slots.metrics || resolvedMetrics.length)" class="workspace-metrics">
       <slot name="metrics" :definitions="resolvedMetrics" :data="metricData">
         <MetricPanel :definitions="resolvedMetrics" :data="metricData" :states="metricStates" />
       </slot>
@@ -100,6 +100,7 @@ const props = defineProps({
   queryNotices: { type: Array, default: () => [] },
   selectedCount: { type: Number, default: 0 },
   metricData: { type: Object, default: () => ({}) },
+  showMetrics: { type: Boolean, default: true },
   metricStates: { type: Object, default: () => ({}) },
   batchLoadingActionIds: { type: Array, default: () => [] },
   batchDisabledActionIds: { type: Array, default: () => [] }
