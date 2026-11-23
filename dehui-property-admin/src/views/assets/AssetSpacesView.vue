@@ -3,23 +3,32 @@
     <header class="asset-page__header">
       <div>
         <h1>楼宇空间管理</h1>
-        <p>按楼宇、楼层逐级定位房间，房间数据继续使用统一数据工作台。</p>
+        <p>按楼宇和楼层查看房间、入住状态与合同阶段。</p>
       </div>
       <div class="asset-page__header-actions">
+        <div v-if="canBrowseDirectory" class="layout-switch" aria-label="空间显示方式">
+          <button :aria-pressed="directoryMode" @click="changeLayout(true)">空间目录</button>
+          <button :aria-pressed="!directoryMode" @click="changeLayout(false)">表格</button>
+        </div>
         <el-button
-          v-if="canViewBuildings"
+          v-if="canViewBuildings && !directoryMode"
           text
           @click="navigationCollapsed = !navigationCollapsed"
         >
           {{ navigationCollapsed ? '展开空间导航' : '收起空间导航' }}
         </el-button>
-        <el-button :icon="Refresh" :loading="loadingBuildings || loadingFloors" @click="refreshAll">
+        <el-button :icon="Refresh" :loading="loadingBuildings || loadingFloors || loadingRooms" @click="refreshAll">
           刷新
         </el-button>
       </div>
     </header>
 
-    <section class="space-explorer" :class="spaceExplorerClass">
+    <RoomDirectory v-if="directoryMode"
+      :buildings="buildings" :floors="floors" :rooms="directoryRooms"
+      :building="selectedBuilding" :floor="floors.find(item => Number(item.id) === selectedFloorId) || null"
+      :loading="loadingBuildings || loadingFloors || loadingRooms" :error="buildingError || floorError || roomsError"
+      @building="selectBuilding" @floor="selectFloor" @retry="refreshAll" />
+    <section v-else class="space-explorer" :class="spaceExplorerClass">
       <aside v-if="canViewBuildings && !navigationCollapsed" class="space-column" aria-label="楼宇列表">
         <div class="space-column__header">
           <div>
@@ -270,12 +279,13 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MoreFilled, Plus, Refresh, Search } from '@element-plus/icons-vue'
+import RoomDirectory from './RoomDirectory.vue'
 import RoomList from '../building/RoomList.vue'
 import request from '../../utils/request'
 import { hasPermission } from '../../utils/permission'
 import { readPage } from '../../utils/pagination'
 import { createLatestRequestGuard } from '../../utils/requestLifecycle'
-import { loadAllWorkspaceRecords } from '../../utils/workspaceExport'
+import { loadAllRecordPages } from '../../utils/loadAllRecordPages.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -287,6 +297,12 @@ const selectedBuildingId = ref(null)
 const selectedFloorId = ref(null)
 const buildingKeyword = ref('')
 const floorKeyword = ref('')
+const directoryRooms = ref([])
+const loadingRooms = ref(false)
+const buildingError = ref('')
+const floorError = ref('')
+const roomsError = ref('')
+let roomController
 const loadingBuildings = ref(false)
 const loadingFloors = ref(false)
 const savingBuilding = ref(false)
@@ -309,6 +325,17 @@ const canViewBuildings = computed(() => hasPermission('building:view') || hasPer
 const canViewFloors = computed(() => hasPermission('floor:view') || hasPermission('floor:*'))
 const canViewRooms = computed(() => hasPermission('room:view') || hasPermission('room:*'))
 const showFloorNavigation = computed(() => canViewBuildings.value && canViewFloors.value)
+const canBrowseDirectory = computed(() => showFloorNavigation.value && canViewRooms.value)
+const directoryMode = computed(() => canBrowseDirectory.value && route.query.layout !== 'table')
+async function changeLayout(directory) {
+  if (directoryMode.value === directory) return
+  const query = { ...route.query }
+  if (directory) delete query.layout
+  else query.layout = 'table'
+  await router.replace({ path: route.path, query })
+  if (directory) await loadRoomCounts()
+}
+
 const visibleNavigationColumns = computed(() => navigationCollapsed.value
   ? 0
   : Number(canViewBuildings.value) + Number(showFloorNavigation.value))
@@ -409,6 +436,7 @@ async function loadBuildings() {
   if (!canViewBuildings.value) return
   const requestId = buildingRequest.start()
   loadingBuildings.value = true
+  buildingError.value = ''
   try {
     const data = await request.get('/buildings', { silent: true })
     if (!pageActive || !buildingRequest.isCurrent(requestId)) return
@@ -416,7 +444,8 @@ async function loadBuildings() {
   } catch (error) {
     if (!pageActive || !buildingRequest.isCurrent(requestId)) return
     buildings.value = []
-    ElMessage.error(error?.response?.data?.message || '楼宇列表加载失败')
+    buildingError.value = error?.response?.data?.message || '楼宇列表加载失败'
+    ElMessage.error(buildingError.value)
   } finally {
     if (pageActive && buildingRequest.isCurrent(requestId)) loadingBuildings.value = false
   }
@@ -424,8 +453,10 @@ async function loadBuildings() {
 
 async function loadFloors(buildingId) {
   floors.value = []
-  if (!canViewFloors.value || !buildingId) return
   const requestId = floorRequest.start()
+  floorError.value = ''
+  loadingFloors.value = false
+  if (!canViewFloors.value || !buildingId) return
   loadingFloors.value = true
   try {
     const data = await request.get('/floors', { params: { building_id: buildingId }, silent: true })
@@ -434,7 +465,8 @@ async function loadFloors(buildingId) {
   } catch (error) {
     if (!pageActive || !floorRequest.isCurrent(requestId)) return
     floors.value = []
-    ElMessage.error(error?.response?.data?.message || '楼层列表加载失败')
+    floorError.value = error?.response?.data?.message || '楼层列表加载失败'
+    ElMessage.error(floorError.value)
   } finally {
     if (pageActive && floorRequest.isCurrent(requestId)) loadingFloors.value = false
   }
@@ -442,12 +474,16 @@ async function loadFloors(buildingId) {
 
 async function loadRoomCounts() {
   if (!canViewRooms.value) return
+  roomController?.abort()
+  const controller = new AbortController()
+  roomController = controller
+  loadingRooms.value = true
+  roomsError.value = ''
   try {
-    const rooms = await loadAllWorkspaceRecords(({ page, pageSize }) => request.get('/rooms', {
-      params: { page, pageSize },
-      silent: true
-    }), { pageSize: 100, maxRecords: 10000 })
-    if (!pageActive) return
+    const rooms = await loadAllRecordPages((params, signal) =>
+      request.get('/rooms', { params, signal, silent: true }), controller.signal)
+    if (!pageActive || controller.signal.aborted) return
+    directoryRooms.value = rooms
     const buildingsMap = new Map()
     const floorsMap = new Map()
     rooms.forEach(room => {
@@ -459,8 +495,13 @@ async function loadRoomCounts() {
     roomCountByBuilding.value = buildingsMap
     roomCountByFloor.value = floorsMap
   } catch (error) {
+    if (!pageActive || controller.signal.aborted) return
+    roomsError.value = error?.response?.data?.message || '房间目录加载失败'
+    directoryRooms.value = []
     roomCountByBuilding.value = new Map()
     roomCountByFloor.value = new Map()
+  } finally {
+    if (pageActive && !controller.signal.aborted) loadingRooms.value = false
   }
 }
 
@@ -468,6 +509,7 @@ async function selectBuilding(id, preferredFloorId = null) {
   selectedBuildingId.value = queryId(id)
   selectedFloorId.value = null
   await loadFloors(selectedBuildingId.value)
+  if (!pageActive || selectedBuildingId.value !== queryId(id)) return
   const requestedFloorId = queryId(preferredFloorId)
   if (requestedFloorId && floors.value.some(item => Number(item.id) === requestedFloorId)) {
     selectedFloorId.value = requestedFloorId
@@ -483,10 +525,10 @@ async function selectFloor(id) {
 async function refreshAll() {
   const currentBuildingId = selectedBuildingId.value
   const currentFloorId = selectedFloorId.value
-  await Promise.all([loadBuildings(), loadRoomCounts()])
+  await Promise.allSettled([loadBuildings(), loadRoomCounts()])
   if (currentBuildingId && buildings.value.some(item => Number(item.id) === Number(currentBuildingId))) {
     await selectBuilding(currentBuildingId, currentFloorId)
-  } else if (buildings.value.length) {
+  } else if (buildings.value.length && (currentBuildingId || !directoryMode.value)) {
     await selectBuilding(buildings.value[0].id)
   }
 }
@@ -611,15 +653,16 @@ function showDetail(type, record) {
 }
 
 onMounted(async () => {
-  await Promise.all([loadBuildings(), loadRoomCounts()])
+  await Promise.allSettled([loadBuildings(), loadRoomCounts()])
   const requestedBuildingId = queryId(route.query.buildingId)
   const initialBuildingId = requestedBuildingId && buildings.value.some(item => Number(item.id) === requestedBuildingId)
     ? requestedBuildingId
-    : buildings.value[0]?.id || null
+    : (buildings.value.length === 1 || !directoryMode.value ? buildings.value[0]?.id : null)
   if (initialBuildingId) await selectBuilding(initialBuildingId, route.query.floorId)
 })
 
 onBeforeUnmount(() => {
+  roomController?.abort()
   pageActive = false
   buildingRequest.dispose()
   floorRequest.dispose()
@@ -627,6 +670,10 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.layout-switch { display:inline-flex; padding:2px; background:var(--dhic-surface); border:1px solid var(--dhic-border-color); border-radius:6px; }
+.layout-switch button {padding:5px 10px; background:transparent; border:0; border-radius:4px; color:var(--dhic-text-regular); font:inherit; font-size:13px; cursor:pointer;}
+.layout-switch button[aria-pressed=true] { background:var(--dhic-row-selected); color:var(--dhic-text-primary); font-weight:600; }
+
 .asset-page {
   min-width: 0;
   color: var(--dhic-text-primary);
