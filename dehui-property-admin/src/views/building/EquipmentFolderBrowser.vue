@@ -8,7 +8,9 @@
         </template>
         <h2 ref="heading" tabindex="-1">{{ activeFolder?.label ?? '设备类型' }}</h2>
       </nav>
-      <span v-if="!loading && !errorText" class="count">{{ activeFolder ? `${activeFolder.count} 台设备` : `${folders.length} 个类型` }}</span>
+      <span v-if="!loading && !errorText" class="count">
+        {{ activeFolder ? `${activeFolder.count} 台设备` : `${folders.length} 个类型 · 共 ${totalDevices} 台设备` }}
+      </span>
     </header>
 
     <div v-if="errorText" class="browser-state" role="alert">
@@ -44,7 +46,7 @@
 </template>
 
 <script setup>
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { ArrowRight } from '@element-plus/icons-vue'
 import EquipmentTypeIcon from './EquipmentTypeIcon.vue'
 
@@ -56,6 +58,7 @@ const props = defineProps({
   errorText: { type: String, default: '' }
 })
 const emit = defineEmits(['open-folder', 'back', 'open-record', 'retry'])
+const totalDevices = computed(() => props.folders.reduce((sum, folder) => sum + folder.count, 0))
 const browser = ref(null)
 const heading = ref(null)
 let focusAfterNavigation = false
