@@ -5,7 +5,8 @@
   max-width: 1480px;
   margin: 0 auto 24px;
   width: 100%;
-  --dhic-section-gap: 12px;
+  --dhic-section-gap: 20px;
+  --overview-gutter: 22px;
   --overview-rule: #c6c9cc;
   --overview-fine-rule: #dcdee0;
 }
@@ -54,7 +55,7 @@
   .dashboard-page { width: calc(100% - 12px); }
 }
 @media (max-width: 640px) {
-  .dashboard-page { margin-top: 0; --dhic-section-gap: 13px; }
+  .dashboard-page { margin-top: 0; --dhic-section-gap: 12px; }
   .dashboard-page > .dhic-page-header { flex-wrap: nowrap; }
   .dashboard-page > .dhic-page-header .dhic-page-header__actions { width: auto; }
   .dashboard-page .update-time { display: none; }
@@ -81,12 +82,13 @@
 .overview-body, .activity-grid {
   display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
 }
+.activity-grid { padding-top: 4px; }
 .activity-grid, .dashboard-page .more-section { border-top: 1px solid var(--overview-rule); }
-.overview-body > .primary-trend, .activity-grid > .activity-bills { min-width: 0; padding-right: 16px; }
+.overview-body > .primary-trend, .activity-grid > .activity-bills { min-width: 0; padding-right: var(--overview-gutter); }
 .overview-body > .source-panel, .activity-grid > .activity-side {
-  min-width: 0; padding-left: 16px; border-left: 1px solid var(--overview-rule);
+  min-width: 0; padding-left: var(--overview-gutter); border-left: 1px solid var(--overview-rule);
 }
-.activity-side { display: flex; flex-direction: column; gap: 9px; }
+.activity-side { display: flex; flex-direction: column; gap: 16px; }
 .dashboard-page .dashboard-panel {
   border: 0; border-radius: 0; box-shadow: none; background: #fff;
 }
@@ -120,7 +122,7 @@
   .overview-body, .activity-grid { grid-template-columns: minmax(0, 1fr); }
   .overview-body > .primary-trend, .activity-grid > .activity-bills { padding-right: 0; }
   .overview-body > .source-panel, .activity-grid > .activity-side {
-    padding-left: 0; border-left: 0; border-top: 1px solid var(--overview-rule); margin-top: 10px;
+    padding-left: 0; border-left: 0; border-top: 1px solid var(--overview-rule); margin-top: 12px;
   }
   .overview-measures > div { margin-block: 8px; padding-inline: 8px; }
   .overview-measures dd { font-size: 18px; }
