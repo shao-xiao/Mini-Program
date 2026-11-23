@@ -36,8 +36,8 @@ import request from '../utils/request'
  * @property {string} syncStatus
  */
 
-export function listParkingSpaces(params = {}) {
-  return request.get('/parking/spaces', { params })
+export function listParkingSpaces(params = {}, signal) {
+  return request.get('/parking/spaces', { params, signal })
 }
 
 export function createParkingSpace(data) {

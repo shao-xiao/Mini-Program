@@ -10,6 +10,7 @@
       :filter-items="activeFilterItems"
       :query-notices="queryNotices"
       :metric-data="summary"
+      :show-metrics="!areaMode"
       @change-view="switchParkingView"
       @create-view="createTableView"
       @duplicate-view="duplicateTableView"
@@ -19,6 +20,10 @@
       @remove-filter="removeViewFilter"
     >
       <template #header-actions>
+        <div class="parking-layout" aria-label="车位显示方式">
+          <button type="button" :aria-pressed="areaMode" @click="changeLayout(true)">区域目录</button>
+          <button type="button" :aria-pressed="!areaMode" @click="changeLayout(false)">表格</button>
+        </div>
         <el-button v-if="hasPermission('parking:create')" type="primary" :icon="Plus" @click="openDialog()">
           {{ parkingSpaceWorkspaceConfig.primaryAction.label }}
         </el-button>
@@ -27,6 +32,7 @@
       <template #toolbar>
         <DhicDataToolbar
           :workspace-config="parkingSpaceWorkspaceConfig"
+          :show-table-tools="!areaMode"
           allow-column-layout
           allow-custom-fields
           field-config-saveable
@@ -69,13 +75,15 @@
         >
           <template #right>
             <el-button :icon="Refresh" @click="loadWorkspaceData">刷新</el-button>
-            <span class="view-hint">当前页 {{ resultScope.loadedRecords }} 条 / 共 {{ resultScope.serverTotal }} 条</span>
+            <span v-if="!areaMode" class="view-hint">当前页 {{ resultScope.loadedRecords }} 条 / 共 {{ resultScope.serverTotal }} 条</span>
           </template>
         </DhicDataToolbar>
       </template>
 
       <template #grid>
-        <WorkspaceDataGrid
+        <ParkingAreaBrowser v-if="areaMode" :rows="visibleRecords" :area="selectedArea" :loading="loading"
+          :error="loadError" :custom-sort="sortCount > 0" @navigate="navigateArea" @retry="loadWorkspaceData" />
+        <WorkspaceDataGrid v-else
           :loading="loading"
           :error-text="loadError"
           retryable
@@ -128,7 +136,7 @@
         </WorkspaceDataGrid>
       </template>
 
-      <template #footer>
+      <template v-if="!areaMode" #footer>
         <div class="pagination-wrapper">
           <el-pagination
             v-model:current-page="pagination.currentPage"
@@ -283,8 +291,8 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import {
@@ -308,6 +316,9 @@ import { useDhicTableView } from '../../composables/useDhicTableView'
 import CustomFieldEditor from '../../components/CustomFieldEditor.vue'
 import DataWorkspace from '../../components/DataWorkspace.vue'
 import DhicDataToolbar from '../../components/DhicDataToolbar.vue'
+import ParkingAreaBrowser from './ParkingAreaBrowser.vue'
+import { parkingAreas } from './parkingDirectory.js'
+import { loadAllRecordPages } from '../../utils/loadAllRecordPages.js'
 import WorkspaceDataGrid from '../../components/workspace/WorkspaceDataGrid.vue'
 import {
   parkingSpaceStatusOptions,
@@ -322,6 +333,27 @@ const props = defineProps({
 })
 
 const router = useRouter()
+const route = useRoute()
+const areaMode = computed(() => route.query.layout !== 'table')
+const selectedArea = computed(() => typeof route.query.area === 'string' ? route.query.area : '')
+let folderRequest
+
+function changeLayout(showAreas) {
+  if (areaMode.value === showAreas) return
+  const query = { ...route.query }
+  delete query.area
+  if (showAreas) delete query.layout
+  else query.layout = 'table'
+  router.push({ path: route.path, query })
+}
+
+function navigateArea(area) {
+  const query = { ...route.query }
+  if (area) query.area = area
+  else delete query.area
+  router.push({ path: route.path, query })
+}
+
 const list = ref([])
 const tenants = ref([])
 const tenantContacts = ref([])
@@ -343,7 +375,7 @@ const currentSpace = ref(null)
 const pagination = reactive(createPagination(20))
 const summary = reactive(emptySummary())
 const summaryRequestGuard = createLatestRequestGuard()
-const areaOptions = ['A', 'B', 'C', 'D']
+const areaOptions = parkingAreas
 const locationOptions = ['B1', 'B2', '地面']
 const defaultSpaceTypeOptions = parkingWorkspaceTypeOptions
 const spaceTypeOptions = ref([...defaultSpaceTypeOptions])
@@ -408,6 +440,7 @@ const {
   orderedColumns,
   visibleOrderedColumns,
   tableRows,
+  visibleRecords,
   tableEmptyText,
   sortOptions,
   groupOptions,
@@ -507,7 +540,20 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    const data = await listParkingSpaces({ ...serverQueryParams.value, ...pageParams(pagination) })
+    folderRequest?.abort()
+    folderRequest = null
+    const params = { ...serverQueryParams.value }
+    if (areaMode.value) {
+      const controller = new AbortController()
+      folderRequest = controller
+      const rows = await loadAllRecordPages((page, signal) => listParkingSpaces({ ...params, ...page }, signal), controller.signal)
+      if (listRequestGuard.isCurrent(requestId)) {
+        list.value = rows
+        pagination.total = rows.length
+      }
+      return
+    }
+    const data = await listParkingSpaces({ ...params, ...pageParams(pagination) })
     if (!listRequestGuard.isCurrent(requestId)) return
     const page = readPage(data)
     if (!listRequestGuard.isCurrent(requestId)) return
@@ -537,7 +583,7 @@ async function loadSummary() {
 }
 
 async function loadWorkspaceData() {
-  await Promise.all([load(), loadSummary()])
+  await Promise.allSettled(areaMode.value ? [load()] : [load(), loadSummary()])
 }
 
 async function handleSizeChange() {
@@ -752,12 +798,17 @@ function spaceRowClassName({ row }) {
   return ''
 }
 
+watch(areaMode, () => {
+  resetToFirstPage(pagination)
+  loadWorkspaceData()
+})
+
 onMounted(async () => {
-  await loadSpaceTypes()
-  await Promise.all([loadWorkspaceData(), loadTenants()])
+  await Promise.allSettled([loadWorkspaceData(), loadSpaceTypes(), loadTenants()])
 })
 
 onBeforeUnmount(() => {
+  folderRequest?.abort()
   listRequestGuard.dispose()
   summaryRequestGuard.dispose()
   disposeQueryLifecycle()
@@ -765,6 +816,10 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.parking-layout { display:inline-flex; padding:2px; gap:2px; border:1px solid var(--dhic-border-color); border-radius:6px; }
+.parking-layout button { cursor:pointer; border:0; border-radius:4px; background:transparent; padding:5px 10px; font:inherit; font-size:13px; color:var(--dhic-text-secondary); }
+.parking-layout button[aria-pressed=true] { background:var(--dhic-row-selected); color:var(--dhic-text-primary); font-weight:600; }
+
 .page-container {
   padding: 20px;
 }
