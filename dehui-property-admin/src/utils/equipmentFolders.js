@@ -38,6 +38,7 @@ export function getEquipmentCategory(row) {
   if (raw && original?.value !== 'OTHER' && !/^(未分类|其它)$/.test(raw)) {
     return { key: original?.value ?? raw.toLowerCase(), label: original?.label ?? raw, source: '台账设备类型' }
   }
+  if (name === '特来电') return category('充电设施', '物业确认该设备为充电桩')
   const match = filingRules.find(([, pattern]) => pattern.test(name))
   if (match) return category(match[0], '设备名称')
   return category('待确认', '现有信息不足以判定设备类型')

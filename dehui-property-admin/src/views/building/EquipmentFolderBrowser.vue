@@ -31,30 +31,34 @@
       <span>{{ errorText }}</span><el-button @click="emit('retry')">重新加载</el-button>
     </div>
     <p v-else-if="loading" role="status" class="browser-state">正在加载…</p>
-    <ul v-else-if="activeFolder ? rows.length : folders.length" class="icon-grid" :aria-label="activeFolder ? '设备' : '设备类型文件夹'">
-      <template v-if="!activeFolder">
-        <li v-for="folder in folders" :key="folder.key">
-          <button type="button" class="tile" :data-folder-key="folder.key" :aria-label="`打开${folder.label}文件夹，${folder.count} 台设备`" @click="enter(folder)">
-            <span class="folder-art" aria-hidden="true">
-              <span class="folder-sheet"></span>
-              <span class="folder-front"><EquipmentIllustration v-if="coverName(folder)" :name="coverName(folder)" /><EquipmentTypeIcon v-else :folder="folder" /></span>
-            </span>
-            <span class="tile-name">{{ folder.label }}</span>
-            <span class="tile-meta">{{ folder.count }} 台</span>
-          </button>
-        </li>
-      </template>
-      <template v-else>
-        <li v-for="row in rows" :key="row.id">
-          <button type="button" class="tile" aria-haspopup="dialog" :aria-label="`查看设备：${row.equipmentName || row.equipmentCode || row.id}`"
-            @click="emit('open-record', row, $event.currentTarget)">
-            <EquipmentThumbnail class="record-art" :value="row.imageFileIds"><EquipmentIllustration :name="row.equipmentName" /></EquipmentThumbnail>
-            <span class="tile-name">{{ row.equipmentName || row.equipmentCode || '未命名设备' }}</span>
-            <span class="tile-meta">{{ row.equipmentCode || row.location || `ID ${row.id}` }}</span>
-          </button>
-        </li>
-      </template>
-    </ul>
+    <div v-else-if="sections.length" class="browser-sections">
+      <section v-for="section in sections" :key="section.label" class="equipment-section" :aria-label="section.label">
+        <header class="section-heading">
+          <h3>{{ section.label }}</h3>
+          <span class="section-rule" aria-hidden="true"></span>
+          <span class="section-caption">{{ section.description }}</span>
+          <span class="section-count">{{ activeFolder ? section.total + ' 台' : section.items.length + ' 类' }}</span>
+        </header>
+        <ul class="icon-grid" :aria-label="section.label">
+          <li v-for="item in section.items" :key="activeFolder ? item.id : item.key">
+            <button v-if="!activeFolder" type="button" class="tile" :data-folder-key="item.key" :aria-label="`打开${item.label}文件夹，${item.count} 台设备`" @click="enter(item)">
+              <span class="folder-art" aria-hidden="true">
+                <span class="folder-sheet"></span>
+                <span class="folder-front"><EquipmentIllustration v-if="coverName(item)" :name="coverName(item)" /><EquipmentTypeIcon v-else :folder="item" /></span>
+              </span>
+              <span class="tile-name">{{ item.label }}</span>
+              <span class="tile-meta">{{ item.count }} 台</span>
+            </button>
+            <button v-else type="button" class="tile" aria-haspopup="dialog" :aria-label="`查看设备：${item.equipmentName || item.equipmentCode || item.id}`"
+              @click="emit('open-record', item, $event.currentTarget)">
+              <EquipmentThumbnail class="record-art" :value="item.imageFileIds"><EquipmentIllustration :name="item.equipmentName" /></EquipmentThumbnail>
+              <span class="tile-name">{{ item.equipmentName || item.equipmentCode || '未命名设备' }}</span>
+              <span class="tile-meta">{{ item.equipmentCode || item.location || `ID ${item.id}` }}</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+    </div>
     <p v-else class="browser-state" role="status">{{ activeFolder ? '此类型下没有符合条件的设备' : '没有符合条件的设备' }}</p>
   </section>
 </template>
@@ -70,7 +74,7 @@ import EquipmentTypeIcon from './EquipmentTypeIcon.vue'
 const props = defineProps({
   folders: { type: Array, required: true },
   activeFolder: { type: Object, default: null },
-  rows: { type: Array, default: () => [] },
+  sections: { type: Array, required: true },
   ledgerTotal: { type: Number, default: null },
   totalError: Boolean,
   filtered: Boolean,
@@ -131,6 +135,14 @@ watch(() => props.activeFolder?.key ?? null, async (key, previous) => {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(min(116px, 100%), 1fr));
   align-items: start; gap: 10px 8px; margin: 0; padding: 14px 0 4px; list-style: none;
 }
+.browser-sections { padding-block: 14px 4px; }
+.equipment-section + .equipment-section { margin-top: 14px; }
+.section-heading { display: flex; align-items: baseline; gap: 8px; }
+.section-heading h3 { margin: 0; font-size: 13px; line-height: 1.5; font-weight: 600; }
+.section-rule { align-self: center; flex: 1; min-width: 10px; border-top: 1px solid var(--dhic-border-color-light); }
+.section-caption, .section-count { font-size: 12px; color: var(--dhic-text-secondary); }
+.section-count { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.section-heading + .icon-grid { padding-block: 4px 0; }
 .icon-grid li { min-width: 0; }
 .tile {
   width: 100%; min-height: 116px; padding: 9px 6px; border-radius: 8px;

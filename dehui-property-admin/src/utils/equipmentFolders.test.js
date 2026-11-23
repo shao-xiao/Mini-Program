@@ -93,11 +93,11 @@ test('forwards cancellation and never returns partial data or starts another bat
 test('files imported devices by object, keeps insufficient evidence visible and conserves the total', () => {
   const rows = [
     ['其他', '万能蒸烤箱用工作台'], ['OTHER', '电十盘万能蒸烤箱'], ['其他', '保温饭桶'],
-    ['其他', '特来电'], ['ELEVATOR', '低噪音新风风机'], ['消防', '消防排烟风机']
+    ['其他', '待核实项目'], ['其他', '特来电'], ['ELEVATOR', '低噪音新风风机'], ['消防', '消防排烟风机']
   ].map(([equipmentType, equipmentName], id) => ({ id, equipmentType, equipmentName }))
   const folders = groupEquipmentRecords(rows)
   const byId = new Map(folders.flatMap(folder => folder.rows.map(row => [row.id, folder.label])))
-  assert.deepEqual(rows.map(row => byId.get(row.id)), ['工作台与储物', '热厨与蒸烤', '备餐与保温', '待确认', '通风与净化', '消防'])
+  assert.deepEqual(rows.map(row => byId.get(row.id)), ['工作台与储物', '热厨与蒸烤', '备餐与保温', '待确认', '充电设施', '通风与净化', '消防'])
   assert.equal(folders.reduce((sum, folder) => sum + folder.count, 0), rows.length)
   assert.equal(rows[0].equipmentType, '其他')
 })

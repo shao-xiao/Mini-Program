@@ -104,7 +104,7 @@
             v-if="folderMode"
             :folders="folders"
             :active-folder="activeFolder"
-            :rows="folderPageRows"
+            :sections="folderModeSections"
             :loading="loading"
             :error-text="listErrorText"
             :ledger-total="equipmentMetricStates.total.value"
@@ -393,6 +393,7 @@ import DataWorkspace from '../../components/DataWorkspace.vue'
 import DhicDataToolbar from '../../components/DhicDataToolbar.vue'
 import WorkspaceDataGrid from '../../components/workspace/WorkspaceDataGrid.vue'
 import EquipmentRecordDrawer from './EquipmentRecordDrawer.vue'
+import { sectionFolders, sectionRecords, pageSections } from './equipmentSections.js'
 import EquipmentFolderBrowser from './EquipmentFolderBrowser.vue'
 import { createEquipmentWorkspaceConfig, equipmentTypeOptions } from '../../workspaceConfigs/equipment'
 import { workspaceTableOptions } from '../../workspaceConfigs/workspaceConfig'
@@ -592,10 +593,11 @@ const activeFolder = computed(() => {
   return folders.value.find(folder => folder.key === folderKey.value)
     ?? { key: folderKey.value, label: folderKey.value ? equipmentTypeText(folderKey.value) : '未分类', count: 0, rows: [] }
 })
-const folderPageRows = computed(() => {
-  const start = (folderPagination.currentPage - 1) * folderPagination.pageSize
-  return activeFolder.value?.rows.slice(start, start + folderPagination.pageSize) ?? []
-})
+const recordSections = computed(() => sectionRecords(activeFolder.value?.rows ?? [], sortCount.value > 0))
+const folderModeSections = computed(() => activeFolder.value
+  ? pageSections(recordSections.value, folderPagination.currentPage, folderPagination.pageSize)
+  : sectionFolders(folders.value))
+const folderPageRows = computed(() => folderModeSections.value.flatMap(section => section.items))
 const equipmentDetailRows = computed(() => folderMode.value ? folderPageRows.value : tableRows.value.filter(selectableEquipmentRow))
 
 function changeLayout(showFolders) {

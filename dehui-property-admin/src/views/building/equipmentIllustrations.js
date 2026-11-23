@@ -1,6 +1,6 @@
 // Match the object before its accessories, location, or power source.
 const shapes = [
-  ['worktable', /工作台|操作台|打荷台|理鱼台/],
+  ['worktable', /工作台|操作台|打荷台|理鱼台|洁碟台/],
   ['hood', /烟罩|集气罩/],
   ['fan', /排气扇|排风|新风机|新风风机|送风|排烟|补风|风幕机/],
   ['pump', /泵|稳压成套|污水提升/],
@@ -23,11 +23,11 @@ const shapes = [
   ['plate', /补角板/], ['bin', /垃圾桶/], ['separator', /油水分离/],
   ['hydrant', /消火栓/], ['fire-unit', /灭火系统|气体灭火装置/],
   ['bollard', /升降[墩柱]/], ['elevator', /电梯|客梯|货梯/],
-  ['revolving-door', /旋转门/], ['ev-charger', /充电桩/],
+  ['revolving-door', /旋转门/], ['ev-charger', /充电桩|^特来电$/],
   ['solar', /光伏组件/], ['inverter', /逆变器/], ['transformer', /变压器/],
   ['light', /泛光照明/], ['ac', /空调/], ['display', /显示屏|拼接屏/],
   ['camera', /摄像机|摄像头|枪机|球机/], ['network-rack', /机柜/],
-  ['network-switch', /交换机/], ['worktable', /洁碟台/]
+  ['network-switch', /交换机/]
 ]
 
 export function equipmentIllustrationKind(name) {
