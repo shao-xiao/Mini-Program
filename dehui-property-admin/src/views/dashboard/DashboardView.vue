@@ -29,10 +29,27 @@
         </header>
         <div v-if="bills?.length" class="trend-body">
           <div id="dashboard-revenue-trend" ref="revenueTrendRef" class="chart trend-chart" role="img"
-            aria-label="近六个月应收与实收金额趋势"></div>
+            aria-label="近六个月应收与实收金额趋势，可在下方选择账期查看金额和账单"></div>
           <div v-if="!visibleSeries['应收金额'] && !visibleSeries['实收金额']" class="trend-no-series chart-empty">请选择要查看的金额系列</div>
         </div>
         <div v-else class="chart-empty">{{ billHint || '暂无账单记录' }}</div>
+        <div v-if="bills?.length" class="trend-explorer">
+          <select v-model="selectedMonth" aria-label="按账期查看趋势金额和最近账单" aria-controls="dashboard-recent-bills">
+            <option value="">全部账期</option>
+            <option v-for="point in monthlyTrend" :key="point.month" :value="point.month">{{ point.month }}</option>
+          </select>
+          <span role="status" class="trend-readout">
+            <template v-if="selectedTrend">
+              <span>应收 ¥ {{ formatMoney(selectedTrend.receivable) }}</span>
+              <span>实收 ¥ {{ formatMoney(selectedTrend.received) }}</span>
+              <span v-if="!selectedTrend.rows.length">本期无账单</span>
+            </template>
+            <template v-else>点选图中月份可查看对应账单</template>
+          </span>
+          <a v-if="selectedTrend?.rows.length" href="#dashboard-recent-bills" @click.prevent="focusRecentBills">
+            {{ selectedTrend.rows.length > recentBills.length ? '查看最近' : '查看' }} {{ recentBills.length }} 笔账单 <span aria-hidden="true">↓</span>
+          </a>
+        </div>
       </section>
 
       <DashboardPanel class="source-panel" title="账单来源结构" subtitle="按账单金额占比" :meta="bills ? `${billSourceData.length} 类来源` : ''">
@@ -51,9 +68,11 @@
     </div>
 
     <div class="activity-grid">
-      <DashboardPanel class="summary-card activity-bills" title="最近账单" subtitle="最近创建的 8 笔账单" :meta="bills ? `${recentBills.length} 笔` : ''">
+      <DashboardPanel id="dashboard-recent-bills" ref="recentBillsPanel" tabindex="-1" class="summary-card activity-bills"
+        :title="selectedTrend ? `${selectedMonth} 账单` : '最近账单'" subtitle="按创建时间倒序"
+        :meta="recentBillsMeta">
 
-        <el-table :data="recentBills" size="small" max-height="330" :empty-text="billHint || '暂无账单记录'" style="width: 100%">
+        <el-table :data="recentBills" size="small" max-height="330" :empty-text="billHint || (selectedTrend ? '本账期暂无账单' : '暂无账单记录')" style="width: 100%">
           <el-table-column prop="billNumber" label="账单编号" min-width="160" />
           <el-table-column prop="sourceName" label="来源" width="80" />
           <el-table-column prop="tenantId" label="租户ID" width="85" />
@@ -281,11 +300,25 @@ const expiringContracts = computed(() => {
     .sort((a, b) => String(a.endDate || '').localeCompare(String(b.endDate || '')))
 })
 
+const selectedMonth = ref('')
+const recentBillsPanel = ref(null)
+const selectedTrend = computed(() => monthlyTrend.value.find(point => point.month === selectedMonth.value))
+const scopedBills = computed(() => selectedTrend.value?.rows ?? allBills.value)
 const recentBills = computed(() => {
-  return [...allBills.value]
+  return [...scopedBills.value]
     .sort((a, b) => String(b.createdTime || '').localeCompare(String(a.createdTime || '')))
     .slice(0, 8)
 })
+const recentBillsMeta = computed(() => {
+  if (!bills.value) return ''
+  const total = scopedBills.value.length
+  return total > recentBills.value.length ? `最近 ${recentBills.value.length} / 共 ${total} 笔` : `${total} 笔`
+})
+
+function focusRecentBills() {
+  recentBillsPanel.value?.$el.focus({ preventScroll: true })
+  recentBillsPanel.value?.$el.scrollIntoView({ block: 'nearest' })
+}
 
 const tenantFinanceList = computed(() => {
   const map = new Map()
@@ -414,6 +447,7 @@ const monthlyTrend = computed(() => {
     const rows = allBills.value.filter(item => String(item.periodStart || '').startsWith(month))
     return {
       month,
+      rows,
       receivable: rows.reduce((sum, item) => sum + money(item.amount), 0),
       received: rows.reduce((sum, item) => sum + money(item.paidAmount), 0)
     }
@@ -483,6 +517,11 @@ const overdueRiskData = computed(() => {
 
 const hasPendingBills = computed(() => overdueRiskData.value.some(bucket => bucket.value > 0))
 
+function trendAxisLabel(month) {
+  const label = `${month.slice(2, 4)}年${month.slice(5)}月`
+  return month === selectedMonth.value ? `{selected|${label}}` : label
+}
+
 function createChart(elRef) {
   if (!elRef.value) return null
   resizeObserver?.observe(elRef.value)
@@ -510,7 +549,17 @@ function renderCharts() {
     },
     legend: { show: false, selected: { ...visibleSeries.value } },
     grid: { left: 4, right: 12, top: 24, bottom: 4, outerBoundsMode: 'same', outerBoundsContain: 'axisLabel' },
-    xAxis: { type: 'category', axisTick: { show: false }, axisLine: { lineStyle: { color: '#e4e7ec' } }, axisLabel: { color: '#475467', fontSize: 12, hideOverlap: true, formatter: value => `${value.slice(2, 4)}年${value.slice(5)}月` }, data: monthlyTrend.value.map(item => item.month) },
+    xAxis: {
+      type: 'category',
+      triggerEvent: true,
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: '#e4e7ec' } },
+      axisLabel: {
+        color: '#475467', fontSize: 12, hideOverlap: true, formatter: trendAxisLabel,
+        rich: { selected: { color: '#792b2d', fontWeight: 650, backgroundColor: '#f7ecec', borderRadius: 3, padding: [2, 3] } }
+      },
+      data: monthlyTrend.value.map(item => item.month)
+    },
     yAxis: {
       type: 'value',
       splitNumber: 3,
@@ -538,6 +587,16 @@ function renderCharts() {
         data: monthlyTrend.value.map(item => item.received)
       }
     ]
+  })
+  revenueTrend?.on('click', 'xAxis', event => {
+    if (event.targetType === 'axisLabel') selectedMonth.value = event.value
+  })
+  revenueTrend?.getZr().on('click', event => {
+    const point = [event.offsetX, event.offsetY]
+    if (!revenueTrend.containPixel({ gridIndex: 0 }, point)) return
+    const index = revenueTrend.convertFromPixel({ xAxisIndex: 0 }, point[0])
+    const month = monthlyTrend.value[index]
+    if (month) selectedMonth.value = month.month
   })
 
   billSource?.setOption({
@@ -653,6 +712,14 @@ async function loadDashboard() {
 watch(detailsOpen, open => {
   if (open && !detailsLoaded) loadDetails()
 })
+watch(monthlyTrend, () => {
+  if (!bills.value?.length || !selectedTrend.value) selectedMonth.value = ''
+})
+watch(selectedMonth, () => {
+  if (revenueTrendRef.value) {
+    echarts.getInstanceByDom(revenueTrendRef.value)?.setOption({ xAxis: { axisLabel: { formatter: trendAxisLabel } } })
+  }
+})
 watch([allBills, roomStats, detailsOpen], renderCharts, { flush: 'post' })
 
 onMounted(() => {
@@ -706,7 +773,19 @@ onBeforeUnmount(() => {
 .bar-mark { width: 12px; height: 8px; border-radius: 2px; background: #b7bdc3; }
 .line-mark { position: relative; width: 14px; height: 2px; background: #9e3738; }
 .line-mark::before { content: ''; position: absolute; inset: -2px auto auto 4px; width: 6px; height: 6px; box-sizing: border-box; background: white; border: 2px solid #9e3738; border-radius: 50%; }
-.trend-chart { height: 192px; }
+.trend-chart { height: 164px; }
+.trend-explorer, .trend-readout { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.trend-explorer { min-height: 28px; margin-top: 2px; font-size: 12px; color: var(--dhic-text-secondary); }
+.trend-explorer select {
+  min-height: 26px; padding: 2px 5px; font: inherit; color: var(--dhic-text-regular);
+  background: #fff; border: 1px solid var(--dhic-border-color); border-radius: var(--dhic-radius-small); cursor: pointer;
+}
+.trend-explorer a { color: var(--dhic-text-primary); text-decoration: underline; text-underline-offset: 3px; }
+.trend-explorer :focus-visible, .activity-bills:focus-visible { outline: 2px solid var(--dhic-focus-ring); outline-offset: 2px; }
+@media (pointer: coarse) {
+  .trend-explorer select, .trend-explorer a { min-height: 44px; }
+  .trend-explorer a { display: inline-flex; align-items: center; }
+}
 .source-breakdown { display: grid; grid-template-columns: minmax(100px, .82fr) minmax(150px, 1fr); align-items: center; gap: 12px; }
 .source-chart { height: 100%; }
 .source-legend { list-style: none; margin: 0; padding: 0; max-height: 100%; overflow-y: auto; }

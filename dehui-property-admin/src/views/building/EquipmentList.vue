@@ -122,7 +122,7 @@
             :cell-saving-key="inlineSavingCell"
             :cell-key="inlineCellKey"
             :edit-context-key="activeViewId"
-            :operation-column="{ width: 176, fixed: 'right', align: 'left' }"
+            :operation-column="{ width: 180, fixed: 'right', align: 'left' }"
             @selection-change="handleSelectionChange"
             @column-resize="handleHeaderDragEnd"
             @sort-change="handleTableSortChange"
@@ -131,6 +131,15 @@
             aria-label="设备台账数据表格"
           >
             <template #operations="{ row }">
+              <el-button
+                v-if="hasPermission(equipmentPermissions.view)"
+                class="equipment-view-button"
+                size="small"
+                link
+                aria-haspopup="dialog"
+                :aria-label="`查看设备：${row.equipmentName || row.equipmentCode || row.id}`"
+                @click="equipmentDrawer?.open(row.id, $event.currentTarget)"
+              >查看</el-button>
               <el-button v-if="hasPermission(equipmentPermissions.update)" size="small" type="primary" @click="edit(row)">编辑</el-button>
               <el-dropdown
                 v-if="equipmentSecondaryActions(row).length"
@@ -171,6 +180,8 @@
           </div>
         </template>
       </DataWorkspace>
+
+    <EquipmentRecordDrawer v-if="hasPermission(equipmentPermissions.view)" ref="equipmentDrawer" :rows="equipmentDetailRows" />
 
     <el-dialog v-model="visible" :title="form.id ? '编辑设备' : '新增设备'" width="620px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
@@ -346,6 +357,7 @@ import CustomFieldValueInput from '../../components/workspace/CustomFieldValueIn
 import DataWorkspace from '../../components/DataWorkspace.vue'
 import DhicDataToolbar from '../../components/DhicDataToolbar.vue'
 import WorkspaceDataGrid from '../../components/workspace/WorkspaceDataGrid.vue'
+import EquipmentRecordDrawer from './EquipmentRecordDrawer.vue'
 import { createEquipmentWorkspaceConfig, equipmentTypeOptions } from '../../workspaceConfigs/equipment'
 import { workspaceTableOptions } from '../../workspaceConfigs/workspaceConfig'
 let jsZipLoadPromise = null
@@ -376,6 +388,7 @@ const equipmentMetricData = equipmentMetrics.values
 const equipmentMetricStates = equipmentMetrics.states
 const formRef = ref(null)
 const equipmentTableRef = ref(null)
+const equipmentDrawer = ref(null)
 const buildings = ref([])
 const formFloors = ref([])
 const formRooms = ref([])
@@ -529,6 +542,8 @@ const {
     return value || '未填写'
   }
 }))
+
+const equipmentDetailRows = computed(() => tableRows.value.filter(selectableEquipmentRow))
 
 function equipmentTypeText(value) {
   return equipmentTypeOptions.find(item => item.value === value)?.label || value || '-'
@@ -773,6 +788,7 @@ function openDialog(row = null) {
     edit(row)
     return
   }
+  loadEquipmentLocationOptions()
   visible.value = true
 }
 
@@ -1314,9 +1330,7 @@ async function deleteEquipment(row) {
   }
 }
 
-onMounted(async () => {
-  await Promise.all([load(), loadEquipmentLocationOptions()])
-})
+onMounted(load)
 
 onBeforeUnmount(() => {
   disposeQueryLifecycle()
@@ -1359,6 +1373,10 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+@media (pointer: coarse) {
+  .equipment-view-button { min-width: 44px; min-height: 44px; }
 }
 
 @media (max-width: 720px) {
