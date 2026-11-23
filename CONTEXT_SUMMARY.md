@@ -5,6 +5,8 @@
 - 生产构建通过。验证命令为 `npm run build`、`NODE_OPTIONS=--max-old-space-size=6144 npm run test:components -- --maxWorkers=1`，以及 `node --test src/config/access.test.js src/utils/dashboardRoomStatistics.test.js src/utils/financeDashboard.test.js src/utils/authAccess.test.js tests/adminUiRefinement.test.mjs`。
 - 在 1600、1100、768、390 像素宽下以真实隔离开发数据验证驾驶舱、待办展开、图例、刷新、滚动及移动导航，复核能耗表具页和 FINANCE 角色无 AI 请求。双栏桌面横线高差及主分栏偏差均为 0 像素。正式版桌面模块纵距 20px、左右分栏内边距 22px，手机纵距 12px。1600×960 首屏完整显示 8 行最近账单，1100×960 显示 6 行。隔离的空业务库复核了零值和无数据状态。本地后端 8080、对照 5178 与验收 5179 在完成后已关闭。验收截图在工作区 `output/运营驾驶舱-20261123-验收/`。
 
+- 已通过阿里云 Workbench 发布，公网首页、能耗路由及 83 项静态文件均核对通过。构建版本、回滚备份路径及复核命令见 [驾驶舱前端发布记录](docs/dashboard-ui-2026-11-23.md)。
+
 ## 2026-11-23 管理后台全局界面与交互
 - 入口使用中文语言标识和系统名称。主题集中定义颜色、字号、密度、焦点、按压和减少动态效果，主导航补充当前页语义与跳至主内容入口。
 - 共享表格的金额列与表头对齐，行高档位生效。工具栏、状态标签、指标卡、弹窗和抽屉共用状态样式。账单详情先展示金额和收款情况，单独处理加载、失败重试及快速切换。
