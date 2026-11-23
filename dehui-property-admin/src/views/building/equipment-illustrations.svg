@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="fan" viewBox="0 0 96 76">
+    <rect x="18" y="21" width="50" height="38" rx="2" fill="#d9e3e6"/><path d="M18 21l8 -6h50l-8 6z" fill="#f5f6f1"/><path d="M68 21l8 -6v38l-8 6z" fill="#92a5ad"/><ellipse cx="43" cy="40" rx="16" ry="16" fill="#92a5ad"/><g transform="rotate(0 43 40)"><path d="M43 38Q36 31 42 25Q52 25 54 33Q47 31 45 39Z" fill="#f5f6f1"/></g><g transform="rotate(120 43 40)"><path d="M43 38Q36 31 42 25Q52 25 54 33Q47 31 45 39Z" fill="#f5f6f1"/></g><g transform="rotate(240 43 40)"><path d="M43 38Q36 31 42 25Q52 25 54 33Q47 31 45 39Z" fill="#f5f6f1"/></g><ellipse cx="43" cy="40" rx="3" ry="3" fill="#566b76"/><path d="M22 59v4m41 -4v4" fill="none"/>
+  </symbol>
+  <symbol id="silencer" viewBox="0 0 96 76">
+    <rect x="15" y="30" width="50" height="24" rx="2" fill="#d9e3e6"/><path d="M15 30l15 -6h50l-15 6z" fill="#f5f6f1"/><path d="M65 30l15 -6v24l-15 6z" fill="#92a5ad"/><rect x="18" y="33" width="44" height="17" rx="1" fill="#566b76"/><path d="M22 36h35" fill="none"/><path d="M22 40h35" fill="none"/><path d="M22 44h35" fill="none"/><path d="M68 30l9-5m-9 11 9-5" fill="none"/>
+  </symbol>
+  <symbol id="control" viewBox="0 0 96 76">
+    <rect x="29" y="17" width="32" height="44" rx="2" fill="#d9e3e6"/><path d="M29 17l8 -6h32l-8 6z" fill="#f5f6f1"/><path d="M61 17l8 -6v44l-8 6z" fill="#92a5ad"/><rect x="34" y="24" width="13" height="7" rx="1" fill="#566b76"/><path d="M37 28h6" fill="#96cbb0"/><ellipse cx="51" cy="37" rx="2" ry="2" fill="#cc6b56"/><ellipse cx="43" cy="37" rx="2" ry="2" fill="#efbf63"/><path d="M55 45v7" fill="none"/><path d="M33 61v4m24 -4v4" fill="none"/>
+  </symbol>
+  <symbol id="purifier" viewBox="0 0 96 76">
+    <rect x="31" y="15" width="28" height="48" rx="2" fill="#d9e3e6"/><path d="M31 15l8 -6h28l-8 6z" fill="#f5f6f1"/><path d="M59 15l8 -6v48l-8 6z" fill="#92a5ad"/><path d="M35 22h20" fill="none"/><path d="M35 26h20" fill="none"/><path d="M35 30h20" fill="none"/><path d="M35 34h20" fill="none"/><rect x="37" y="48" width="15" height="6" rx="2" fill="#c5e6e9"/><path d="M34 63v4m20 -4v4" fill="none"/>
+  </symbol>
+  <symbol id="rice-pail" viewBox="0 0 96 76">
+    <path d="M24 31l3 27q20 10 40 0l3 -27z" fill="#d9e3e6"/><ellipse cx="47" cy="31" rx="23" ry="7" fill="#f5f6f1"/><ellipse cx="47" cy="29" rx="18" ry="4" fill="#92a5ad"/><path d="M41 26q0 -7 9 -5l3 3" fill="none"/><path d="M24 37h-6v7h7m45 -13h5v7h-6" fill="none"/><path d="M32 39l1 17" fill="none"/><rect x="40" y="44" width="13" height="5" rx="2" fill="#566b76"/>
+  </symbol>
+  <symbol id="soup-pail" viewBox="0 0 96 76">
+    <path d="M24 23l3 35q20 10 40 0l3 -35z" fill="#d9e3e6"/><ellipse cx="47" cy="23" rx="23" ry="7" fill="#f5f6f1"/><ellipse cx="47" cy="21" rx="18" ry="4" fill="#92a5ad"/><path d="M41 18q0 -7 9 -5l3 3" fill="none"/><path d="M24 29h-6v7h7m45 -13h5v7h-6" fill="none"/><path d="M32 31l1 17" fill="none"/><path d="M49 51v5h8v4" fill="none"/><ellipse cx="50" cy="50" rx="3" ry="2" fill="#cc6b56"/>
+  </symbol>
+  <symbol id="glass-guard" viewBox="0 0 96 76">
+    <path d="M18 52h58l6-4H25z" fill="#d9e3e6"/><path d="M23 49V26l9-7v27m-9-20h45l9-7H32z" fill="#c5e6e9"/><path d="M68 26v24m9-31v28M35 34l6-6m-2 10 6-6" fill="none"/>
+  </symbol>
+  <symbol id="serving-counter" viewBox="0 0 96 76">
+    <rect x="14" y="33" width="59" height="25" rx="2" fill="#d9e3e6"/><path d="M14 33l8 -6h59l-8 6z" fill="#f5f6f1"/><path d="M73 33l8 -6v25l-8 6z" fill="#92a5ad"/><path d="M18 31l4-3h9l-4 3z" fill="#566b76"/><path d="M31 31l4-3h9l-4 3z" fill="#566b76"/><path d="M44 31l4-3h9l-4 3z" fill="#566b76"/><path d="M57 31l4-3h9l-4 3z" fill="#566b76"/><path d="M42 37v18m-4-14v5m8-5v5" fill="none"/><path d="M18 58v4m51 -4v4" fill="none"/>
+  </symbol>
+  <symbol id="work-cabinet" viewBox="0 0 96 76">
+    <rect x="17" y="27" width="54" height="30" rx="2" fill="#d9e3e6"/><path d="M17 27l8 -6h54l-8 6z" fill="#f5f6f1"/><path d="M71 27l8 -6v30l-8 6z" fill="#92a5ad"/><path d="M44 29v26m-5-22v7m10-7v7" fill="none"/><path d="M20 57v4m47 -4v4" fill="none"/>
+  </symbol>
+  <symbol id="worktable" viewBox="0 0 96 76">
+    <path d="M20 42v17h3V42m45-2v18h3V40" fill="none"/><path d="M20 52h48l7-4H27z" fill="#92a5ad"/><rect x="15" y="29" width="56" height="5" rx="2" fill="#d9e3e6"/><path d="M15 29l8 -6h56l-8 6z" fill="#f5f6f1"/><path d="M71 29l8 -6v5l-8 6z" fill="#92a5ad"/>
+  </symbol>
+  <symbol id="faucet" viewBox="0 0 96 76">
+    <ellipse cx="45" cy="57" rx="13" ry="3" fill="#92a5ad"/><path d="M40 56V28c0-15 25-16 25 0v5h-5v-6c0-8-14-8-14 1v28z" fill="#d9e3e6"/><path d="M42 46l-9-4v-4l11 3" fill="#566b76"/>
+  </symbol>
+  <symbol id="bollard" viewBox="0 0 96 76">
+    <ellipse cx="48" cy="61" rx="19" ry="4" fill="#92a5ad"/><path d="M37 57V20q11-7 22 0v37q-10 7-22 0z" fill="#d9e3e6"/><ellipse cx="48" cy="20" rx="11" ry="3" fill="#f5f6f1"/><path d="M37 27q11 5 22 0v5q-11 5-22 0z" fill="#efbf63"/>
+  </symbol>
+  <symbol id="elevator" viewBox="0 0 96 76">
+    <rect x="26" y="15" width="37" height="47" rx="2" fill="#d9e3e6"/><path d="M26 15l8 -6h37l-8 6z" fill="#f5f6f1"/><path d="M63 15l8 -6v47l-8 6z" fill="#92a5ad"/><rect x="30" y="25" width="28" height="36" rx="0" fill="#92a5ad"/><path d="M44 25v35" fill="none"/><rect x="39" y="19" width="10" height="3" rx="1" fill="#566b76"/><rect x="60" y="35" width="3" height="6" rx="1" fill="#efbf63"/>
+  </symbol>
+  <symbol id="pump" viewBox="0 0 96 76">
+    <rect x="17" y="55" width="59" height="5" rx="2" fill="#92a5ad"/><ellipse cx="34" cy="43" rx="13" ry="13" fill="#d9e3e6"/><ellipse cx="34" cy="43" rx="6" ry="6" fill="#c5e6e9"/><rect x="47" y="34" width="20" height="18" rx="2" fill="#d9e3e6"/><path d="M47 34l8 -6h20l-8 6z" fill="#f5f6f1"/><path d="M67 34l8 -6v18l-8 6z" fill="#92a5ad"/><path d="M49 39h15" fill="none"/><path d="M49 43h15" fill="none"/><path d="M49 47h15" fill="none"/><path d="M29 31V21h11v10m-15-10h19v-3H25z" fill="#d9e3e6"/>
+  </symbol>
+  <symbol id="revolving-door" viewBox="0 0 96 76">
+    <ellipse cx="47" cy="58" rx="29" ry="5" fill="#92a5ad"/><path d="M21 56V22q26-9 52 0v34q-26 8-52 0Z" fill="#c5e6e9"/><ellipse cx="47" cy="22" rx="26" ry="5" fill="#d9e3e6"/><path d="M47 26v33m0-4-19-8V28m19 25 18-16V26" fill="none"/>
+  </symbol>
+  <symbol id="ev-charger" viewBox="0 0 96 76">
+    <rect x="30" y="16" width="25" height="45" rx="2" fill="#d9e3e6"/><path d="M30 16l8 -6h25l-8 6z" fill="#f5f6f1"/><path d="M55 16l8 -6v45l-8 6z" fill="#92a5ad"/><rect x="34" y="22" width="17" height="11" rx="2" fill="#566b76"/><path d="M45 36l-6 8h5l-2 7 8-10h-5z" fill="#efbf63"/><path d="M63 28q7-1 7 8v15q0 7-6 5l-4-8" fill="none"/><rect x="58" y="39" width="5" height="10" rx="2" fill="#566b76"/><path d="M33 61v4m18 -4v4" fill="none"/>
+  </symbol>
+  <symbol id="warming-lamp" viewBox="0 0 96 76">
+    <path d="M30 18v10m34-10v10" fill="none"/><rect x="17" y="29" width="54" height="7" rx="2" fill="#d9e3e6"/><path d="M17 29l8 -6h54l-8 6z" fill="#f5f6f1"/><path d="M71 29l8 -6v7l-8 6z" fill="#92a5ad"/><path d="M21 39h46" fill="#efbf63"/><path d="M28 46l-3 5m20-5v5m17-5 3 5" fill="none"/>
+  </symbol>
+  <symbol id="display" viewBox="0 0 96 76">
+    <rect x="15" y="20" width="60" height="34" rx="2" fill="#d9e3e6"/><path d="M15 20l5 -6h60l-5 6z" fill="#f5f6f1"/><path d="M75 20l5 -6v34l-5 6z" fill="#92a5ad"/><rect x="18" y="23" width="54" height="27" rx="2" fill="#566b76"/><path d="M32 46l22-18m-11 18 15-12" fill="#c5e6e9"/><path d="M43 55v6h-8m14-6v6h8" fill="none"/>
+  </symbol>
+  <symbol id="hood" viewBox="0 0 96 76">
+    <path d="M20 43l13-19h32l13 19z" fill="#d9e3e6"/><path d="M20 43h58v6H20z" fill="#92a5ad"/><path d="M32 45h33m-28-21v-7h18v7" fill="#d9e3e6"/>
+  </symbol>
+  <symbol id="sink" viewBox="0 0 96 76">
+    <path d="M20 42v17h3V42m45-2v18h3V40" fill="none"/><rect x="16" y="34" width="53" height="8" rx="2" fill="#d9e3e6"/><path d="M16 34l8 -6h53l-8 6z" fill="#f5f6f1"/><path d="M69 34l8 -6v8l-8 6z" fill="#92a5ad"/><path d="M23 32l6-4h25l-6 4z" fill="#566b76"/><path d="M57 29v-9q0-5 6-5t5 6" fill="none"/>
+  </symbol>
+  <symbol id="fridge" viewBox="0 0 96 76">
+    <rect x="28" y="13" width="34" height="48" rx="2" fill="#d9e3e6"/><path d="M28 13l8 -6h34l-8 6z" fill="#f5f6f1"/><path d="M62 13l8 -6v48l-8 6z" fill="#92a5ad"/><path d="M45 15v43m-15-23h30m-18-11v7m6-7v7m-6 9v7m6-7v7" fill="none"/><path d="M31 61v4m27 -4v4" fill="none"/>
+  </symbol>
+  <symbol id="ice-maker" viewBox="0 0 96 76">
+    <rect x="25" y="24" width="40" height="36" rx="2" fill="#d9e3e6"/><path d="M25 24l8 -6h40l-8 6z" fill="#f5f6f1"/><path d="M65 24l8 -6v36l-8 6z" fill="#92a5ad"/><path d="M29 30h32l-4 13H30z" fill="#c5e6e9"/><path d="M31 49h22" fill="none"/><path d="M31 53h22" fill="none"/>
+  </symbol>
+  <symbol id="oven" viewBox="0 0 96 76">
+    <rect x="26" y="15" width="36" height="45" rx="2" fill="#d9e3e6"/><path d="M26 15l8 -6h36l-8 6z" fill="#f5f6f1"/><path d="M62 15l8 -6v45l-8 6z" fill="#92a5ad"/><rect x="30" y="22" width="22" height="29" rx="2" fill="#566b76"/><rect x="33" y="25" width="16" height="22" rx="2" fill="#c5e6e9"/><path d="M36 33h10" fill="none"/><path d="M36 37h10" fill="none"/><path d="M36 41h10" fill="none"/><ellipse cx="57" cy="27" rx="2" ry="2" fill="#efbf63"/><ellipse cx="57" cy="36" rx="2" ry="2" fill="#92a5ad"/><path d="M29 60v4m29 -4v4" fill="none"/>
+  </symbol>
+  <symbol id="range" viewBox="0 0 96 76">
+    <rect x="16" y="35" width="55" height="20" rx="2" fill="#d9e3e6"/><path d="M16 35l8 -6h55l-8 6z" fill="#f5f6f1"/><path d="M71 35l8 -6v20l-8 6z" fill="#92a5ad"/><ellipse cx="35" cy="31" rx="9" ry="3" fill="#566b76"/><ellipse cx="57" cy="31" rx="7" ry="3" fill="#566b76"/><ellipse cx="29" cy="42" rx="3" ry="3" fill="#cc6b56"/><ellipse cx="47" cy="42" rx="3" ry="3" fill="#566b76"/><path d="M20 55v4m45 -4v4" fill="none"/>
+  </symbol>
+  <symbol id="heater" viewBox="0 0 96 76">
+    <rect x="31" y="17" width="28" height="42" rx="2" fill="#d9e3e6"/><path d="M31 17l8 -6h28l-8 6z" fill="#f5f6f1"/><path d="M59 17l8 -6v42l-8 6z" fill="#92a5ad"/><rect x="35" y="24" width="13" height="7" rx="1" fill="#566b76"/><path d="M38 28h6" fill="#96cbb0"/><path d="M44 41h7v5m-14 5h16" fill="none"/><path d="M34 59v4m20 -4v4" fill="none"/>
+  </symbol>
+  <symbol id="dishwasher" viewBox="0 0 96 76">
+    <rect x="16" y="27" width="55" height="30" rx="2" fill="#d9e3e6"/><path d="M16 27l8 -6h55l-8 6z" fill="#f5f6f1"/><path d="M71 27l8 -6v30l-8 6z" fill="#92a5ad"/><rect x="20" y="32" width="15" height="17" rx="2" fill="#566b76"/><rect x="52" y="32" width="14" height="17" rx="2" fill="#566b76"/><path d="M10 50h69m-54 7v5m38-5v5" fill="none"/><ellipse cx="43" cy="36" rx="2" ry="2" fill="#efbf63"/>
+  </symbol>
+  <symbol id="disinfect" viewBox="0 0 96 76">
+    <rect x="28" y="14" width="32" height="48" rx="2" fill="#d9e3e6"/><path d="M28 14l8 -6h32l-8 6z" fill="#f5f6f1"/><path d="M60 14l8 -6v48l-8 6z" fill="#92a5ad"/><rect x="32" y="23" width="21" height="31" rx="2" fill="#c5e6e9"/><path d="M35 33h15" fill="none"/><path d="M35 37h15" fill="none"/><path d="M35 41h15" fill="none"/><path d="M35 45h15" fill="none"/><path d="M56 28v12" fill="none"/><ellipse cx="36" cy="18" rx="1" ry="1" fill="#efbf63"/>
+  </symbol>
+  <symbol id="shelf" viewBox="0 0 96 76">
+    <path d="M19 20v40m48-40v41m9-49v43m-48-42v42" fill="none"/><path d="M19 23l9-6h48l-9 6z" fill="#d9e3e6"/><path d="M19 38l9-6h48l-9 6z" fill="#d9e3e6"/><path d="M19 53l9-6h48l-9 6z" fill="#d9e3e6"/>
+  </symbol>
+  <symbol id="cart" viewBox="0 0 96 76">
+    <ellipse cx="25" cy="62" rx="4" ry="4" fill="#566b76"/><ellipse cx="71" cy="62" rx="4" ry="4" fill="#566b76"/><path d="M18 51V21h-5m5 4h5v26" fill="none"/><rect x="17" y="51" width="53" height="5" rx="2" fill="#d9e3e6"/><path d="M17 51l8 -6h53l-8 6z" fill="#f5f6f1"/><path d="M70 51l8 -6v5l-8 6z" fill="#92a5ad"/>
+  </symbol>
+  <symbol id="plate" viewBox="0 0 96 76">
+    <path d="M14 46l20-21h45L60 48z" fill="#d9e3e6"/><path d="M14 46v4l46 2 19-22v-5" fill="#92a5ad"/>
+  </symbol>
+  <symbol id="bin" viewBox="0 0 96 76">
+    <ellipse cx="25" cy="62" rx="4" ry="4" fill="#566b76"/><ellipse cx="54" cy="62" rx="4" ry="4" fill="#566b76"/><path d="M25 29h40l-5 28H30Z" fill="#92a5ad"/><rect x="22" y="24" width="45" height="5" rx="2" fill="#d9e3e6"/><path d="M22 24l8 -6h45l-8 6z" fill="#f5f6f1"/><path d="M67 24l8 -6v5l-8 6z" fill="#92a5ad"/><path d="M38 38v12m11-12v12" fill="none"/>
+  </symbol>
+  <symbol id="separator" viewBox="0 0 96 76">
+    <rect x="16" y="31" width="54" height="23" rx="2" fill="#d9e3e6"/><path d="M16 31l8 -6h54l-8 6z" fill="#f5f6f1"/><path d="M70 31l8 -6v23l-8 6z" fill="#92a5ad"/><path d="M16 38h-6v-5H7v10h9m61-8h10v5H77" fill="#d9e3e6"/><path d="M29 31l8-5m9 5 7-5" fill="none"/><path d="M20 54v4m45 -4v4" fill="none"/>
+  </symbol>
+  <symbol id="hydrant" viewBox="0 0 96 76">
+    <rect x="28" y="15" width="35" height="46" rx="2" fill="#d89788"/><path d="M28 15l5 -6h35l-5 6z" fill="#f5f6f1"/><path d="M63 15l5 -6v46l-5 6z" fill="#92a5ad"/><rect x="33" y="20" width="24" height="34" rx="2" fill="#f5f6f1"/><ellipse cx="45" cy="39" rx="9" ry="9" fill="#cc6b56"/><ellipse cx="45" cy="39" rx="5" ry="5" fill="#d9e3e6"/><path d="M42 29v-4h9m-1 20v6h4" fill="none"/>
+  </symbol>
+  <symbol id="fire-unit" viewBox="0 0 96 76">
+    <rect x="26" y="20" width="37" height="40" rx="2" fill="#db9a88"/><path d="M26 20l7 -6h37l-7 6z" fill="#f5f6f1"/><path d="M63 20l7 -6v40l-7 6z" fill="#92a5ad"/><rect x="31" y="25" width="26" height="8" rx="2" fill="#566b76"/><path d="M44 39v13m-7-7h14" fill="#f5f6f1"/><path d="M30 60v4m28 -4v4" fill="none"/>
+  </symbol>
+  <symbol id="solar" viewBox="0 0 96 76">
+    <path d="M14 48l18-30h48L63 48z" fill="#718998"/><path d="M21 38h48m-41-10h48M44 19 27 48m29-29L39 48m29-29L51 48" fill="none"/><path d="M29 50v8h-7m38-8v8h7" fill="none"/>
+  </symbol>
+  <symbol id="inverter" viewBox="0 0 96 76">
+    <rect x="27" y="19" width="35" height="37" rx="2" fill="#d9e3e6"/><path d="M27 19l8 -6h35l-8 6z" fill="#f5f6f1"/><path d="M62 19l8 -6v37l-8 6z" fill="#92a5ad"/><rect x="34" y="24" width="13" height="7" rx="1" fill="#566b76"/><path d="M37 28h6" fill="#96cbb0"/><path d="M33 38h22" fill="none"/><path d="M33 42h22" fill="none"/><path d="M33 46h22" fill="none"/><path d="M37 56v7m12-7v7" fill="none"/>
+  </symbol>
+  <symbol id="transformer" viewBox="0 0 96 76">
+    <rect x="16" y="51" width="57" height="6" rx="2" fill="#d9e3e6"/><path d="M16 51l8 -6h57l-8 6z" fill="#f5f6f1"/><path d="M73 51l8 -6v6l-8 6z" fill="#92a5ad"/><rect x="20" y="29" width="13" height="21" rx="5" fill="#cb9975"/><path d="M22 34h9" fill="none"/><path d="M22 38h9" fill="none"/><path d="M22 42h9" fill="none"/><path d="M26 29V20" fill="none"/><rect x="38" y="29" width="13" height="21" rx="5" fill="#cb9975"/><path d="M40 34h9" fill="none"/><path d="M40 38h9" fill="none"/><path d="M40 42h9" fill="none"/><path d="M44 29V20" fill="none"/><rect x="56" y="29" width="13" height="21" rx="5" fill="#cb9975"/><path d="M58 34h9" fill="none"/><path d="M58 38h9" fill="none"/><path d="M58 42h9" fill="none"/><path d="M62 29V20" fill="none"/><path d="M16 22h57v5H16z" fill="#92a5ad"/>
+  </symbol>
+  <symbol id="light" viewBox="0 0 96 76">
+    <path d="M35 42v12q12 8 24 0V42m-12 15v6" fill="none"/><rect x="26" y="23" width="38" height="24" rx="2" fill="#d9e3e6"/><path d="M26 23l8 -6h38l-8 6z" fill="#f5f6f1"/><path d="M64 23l8 -6v24l-8 6z" fill="#92a5ad"/><rect x="30" y="27" width="30" height="16" rx="2" fill="#f4e4af"/><path d="M34 31h22m-22 7h22" fill="none"/>
+  </symbol>
+  <symbol id="ac" viewBox="0 0 96 76">
+    <rect x="15" y="25" width="58" height="24" rx="2" fill="#d9e3e6"/><path d="M15 25l8 -6h58l-8 6z" fill="#f5f6f1"/><path d="M73 25l8 -6v24l-8 6z" fill="#92a5ad"/><path d="M20 39h48" fill="none"/><path d="M20 43h48" fill="none"/><ellipse cx="65" cy="32" rx="1.3" ry="1.3" fill="#efbf63"/>
+  </symbol>
+  <symbol id="camera" viewBox="0 0 96 76">
+    <path d="M18 22l43 9-14 17-35-10z" fill="#d9e3e6"/><path d="M61 31l12 3-8 12-11-3z" fill="#566b76"/><path d="M30 43l-3 9 15 5v5" fill="none"/>
+  </symbol>
+  <symbol id="network-rack" viewBox="0 0 96 76">
+    <rect x="30" y="12" width="28" height="50" rx="2" fill="#d9e3e6"/><path d="M30 12l8 -6h28l-8 6z" fill="#f5f6f1"/><path d="M58 12l8 -6v50l-8 6z" fill="#92a5ad"/><rect x="33" y="19" width="21" height="7" rx="2" fill="#566b76"/><rect x="33" y="28" width="21" height="7" rx="2" fill="#566b76"/><rect x="33" y="37" width="21" height="7" rx="2" fill="#566b76"/><rect x="33" y="46" width="21" height="7" rx="2" fill="#566b76"/>
+  </symbol>
+  <symbol id="network-switch" viewBox="0 0 96 76">
+    <rect x="13" y="34" width="63" height="14" rx="2" fill="#d9e3e6"/><path d="M13 34l8 -6h63l-8 6z" fill="#f5f6f1"/><path d="M76 34l8 -6v14l-8 6z" fill="#92a5ad"/><rect x="18" y="39" width="6" height="4" rx="0" fill="#566b76"/><rect x="27" y="39" width="6" height="4" rx="0" fill="#566b76"/><rect x="36" y="39" width="6" height="4" rx="0" fill="#566b76"/><rect x="45" y="39" width="6" height="4" rx="0" fill="#566b76"/><rect x="54" y="39" width="6" height="4" rx="0" fill="#566b76"/><rect x="63" y="39" width="6" height="4" rx="0" fill="#566b76"/>
+  </symbol>
+  <symbol id="record" viewBox="0 0 96 76">
+    <path d="M30 13h25l11 11v38H30z" fill="#f5f6f1"/><path d="M55 13v12h11" fill="none"/><path d="M36 33h22" fill="none"/><path d="M36 37h22" fill="none"/><path d="M36 41h22" fill="none"/><path d="M36 45h22" fill="none"/>
+  </symbol>
+</svg>

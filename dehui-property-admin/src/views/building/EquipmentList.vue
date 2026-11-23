@@ -107,6 +107,9 @@
             :rows="folderPageRows"
             :loading="loading"
             :error-text="listErrorText"
+            :ledger-total="equipmentMetricStates.total.value"
+            :total-error="equipmentMetricStates.total.error"
+            :filtered="activeFilterCount > 0"
             @open-folder="navigateFolder($event.key)"
             @back="navigateFolder(null)"
             @open-record="openFolderRecord"
@@ -615,7 +618,14 @@ function openFolderRecord(row, trigger) {
   equipmentDrawer.value?.open(row.id, trigger)
 }
 
-watch(folderKey, () => resetToFirstPage(folderPagination))
+watch(folderKey, key => {
+  resetToFirstPage(folderPagination)
+  if (key === 'OTHER' || key === '') {
+    const query = { ...route.query }
+    delete query.folder
+    router.replace({ query })
+  }
+}, { immediate: true })
 watch(folderMode, () => {
   clearEquipmentSelection()
   load()
@@ -807,10 +817,17 @@ async function load() {
   const requestId = listRequestGuard.start()
   const params = buildQueryParams(folderMode.value ? { page: 1, pageSize: 100 } : {})
   const requestContext = equipmentListState.begin({ viewId: activeViewId.value, folders: folderMode.value, params })
+  const metricRevision = equipmentMetrics.begin()
   if (folderMode.value) {
     resetToFirstPage(folderPagination)
     const controller = new AbortController()
     folderRequest = controller
+    const hasServerFilter = Boolean(params.keyword || params.equipmentType || params.status || params.customFilters)
+    if (hasServerFilter) {
+      loadListTotalResult('/equipments').then(result => {
+        applyEquipmentTotalMetric(metricRevision, { status: 'fulfilled', value: result })
+      })
+    }
     try {
       const records = await loadEquipmentFolderRecords(
         paging => request.get('/equipments', { params: { ...params, ...paging }, signal: controller.signal, silent: true }),
@@ -818,13 +835,16 @@ async function load() {
       )
       if (!equipmentListState.isCurrent(requestContext)) return
       list.value = records
+      if (!hasServerFilter) equipmentMetrics.resolve(metricRevision, 'total', records.length)
       equipmentListState.succeed(requestContext)
     } catch {
-      if (!controller.signal.aborted) equipmentListState.fail(requestContext, '设备目录加载失败，请重试')
+      if (!controller.signal.aborted) {
+        equipmentListState.fail(requestContext, '设备目录加载失败，请重试')
+        if (!hasServerFilter) equipmentMetrics.reject(metricRevision, 'total')
+      }
     }
     return
   }
-  const metricRevision = equipmentMetrics.begin()
   const listPromise = request.get('/equipments', { params, silent: true }).then(data => {
     const page = readPage(data)
     return {

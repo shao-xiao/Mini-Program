@@ -31,6 +31,7 @@ import { computed, ref, watch } from 'vue'
 import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import StatusDisplay from '../../components/StatusDisplay.vue'
 import { equipmentStatusOptions, equipmentTypeOptions } from '../../workspaceConfigs/equipment'
+import { getEquipmentCategory } from '../../utils/equipmentFolders'
 
 const props = defineProps({ rows: { type: Array, required: true } })
 const recordId = ref(null)
@@ -44,9 +45,12 @@ const fields = computed(() => {
   const row = record.value
   if (!row) return []
   const type = equipmentTypeOptions.find(option => option.value === row.equipmentType)
+  const originalType = type?.label || row.equipmentType || '未分类'
+  const category = getEquipmentCategory(row)
   return [
     ['设备编号', row.equipmentCode || '—'],
-    ['设备类型', type?.label || row.equipmentType || '—'],
+    ['设备类型', originalType],
+    ...(category.label === originalType ? [] : [['归档分类', category.label], ['归类依据', category.source]]),
     ['所属空间', [row.buildingName, row.floorName, row.roomCode].filter(Boolean).join(' / ')],
     ['位置', row.location],
     ['责任部门', row.responsibleDepartment],

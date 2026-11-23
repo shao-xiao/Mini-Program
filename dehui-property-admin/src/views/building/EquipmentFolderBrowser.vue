@@ -8,9 +8,23 @@
         </template>
         <h2 ref="heading" tabindex="-1">{{ activeFolder?.label ?? '设备类型' }}</h2>
       </nav>
-      <span v-if="!loading && !errorText" class="count">
-        {{ activeFolder ? `${activeFolder.count} 台设备` : `${folders.length} 个类型 · 共 ${totalDevices} 台设备` }}
-      </span>
+      <dl class="counts" aria-label="设备统计" aria-live="polite" aria-atomic="true">
+        <div class="ledger-count">
+          <dt>台账总数</dt>
+          <dd>{{ totalError ? '未取得' : ledgerTotal == null ? '加载中…' : `${ledgerTotal} 台` }}</dd>
+        </div>
+        <template v-if="!loading && !errorText">
+          <div v-if="filtered">
+            <dt>筛选结果</dt><dd>{{ matchingCount }} 台</dd>
+          </div>
+          <div v-if="activeFolder">
+            <dt>{{ filtered ? '本类命中' : '当前分类' }}</dt><dd>{{ activeFolder.count }} 台</dd>
+          </div>
+          <div v-else>
+            <dt>设备类型</dt><dd>{{ folders.length }} 个</dd>
+          </div>
+        </template>
+      </dl>
     </header>
 
     <div v-if="errorText" class="browser-state" role="alert">
@@ -23,7 +37,7 @@
           <button type="button" class="tile" :data-folder-key="folder.key" :aria-label="`打开${folder.label}文件夹，${folder.count} 台设备`" @click="enter(folder)">
             <span class="folder-art" aria-hidden="true">
               <span class="folder-sheet"></span>
-              <span class="folder-front"><EquipmentTypeIcon :folder="folder" /></span>
+              <span class="folder-front"><EquipmentIllustration v-if="coverName(folder)" :name="coverName(folder)" /><EquipmentTypeIcon v-else :folder="folder" /></span>
             </span>
             <span class="tile-name">{{ folder.label }}</span>
             <span class="tile-meta">{{ folder.count }} 台</span>
@@ -34,7 +48,7 @@
         <li v-for="row in rows" :key="row.id">
           <button type="button" class="tile" aria-haspopup="dialog" :aria-label="`查看设备：${row.equipmentName || row.equipmentCode || row.id}`"
             @click="emit('open-record', row, $event.currentTarget)">
-            <span class="record-art" aria-hidden="true"><EquipmentTypeIcon :folder="activeFolder" /></span>
+            <EquipmentThumbnail class="record-art" :value="row.imageFileIds"><EquipmentIllustration :name="row.equipmentName" /></EquipmentThumbnail>
             <span class="tile-name">{{ row.equipmentName || row.equipmentCode || '未命名设备' }}</span>
             <span class="tile-meta">{{ row.equipmentCode || row.location || `ID ${row.id}` }}</span>
           </button>
@@ -48,17 +62,27 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { ArrowRight } from '@element-plus/icons-vue'
+import EquipmentThumbnail from './EquipmentThumbnail.vue'
+import EquipmentIllustration from './EquipmentIllustration.vue'
+import { equipmentIllustrationKind } from './equipmentIllustrations'
 import EquipmentTypeIcon from './EquipmentTypeIcon.vue'
 
 const props = defineProps({
   folders: { type: Array, required: true },
   activeFolder: { type: Object, default: null },
   rows: { type: Array, default: () => [] },
+  ledgerTotal: { type: Number, default: null },
+  totalError: Boolean,
+  filtered: Boolean,
   loading: Boolean,
   errorText: { type: String, default: '' }
 })
 const emit = defineEmits(['open-folder', 'back', 'open-record', 'retry'])
-const totalDevices = computed(() => props.folders.reduce((sum, folder) => sum + folder.count, 0))
+const matchingCount = computed(() => props.folders.reduce((sum, folder) => sum + folder.count, 0))
+const coverExamples = { ELEVATOR: '客梯', HVAC: '新风机', FIRE: '消火栓箱', POWER: '配电柜', WATER: '排污泵' }
+function coverName(folder) {
+  return coverExamples[folder.key] || folder.rows.find(row => equipmentIllustrationKind(row.equipmentName) !== 'record')?.equipmentName
+}
 const browser = ref(null)
 const heading = ref(null)
 let focusAfterNavigation = false
@@ -90,15 +114,19 @@ watch(() => props.activeFolder?.key ?? null, async (key, previous) => {
   background: var(--dhic-card-bg);
 }
 .browser-header, .browser-header nav { display: flex; align-items: center; gap: 8px; }
-.browser-header { min-height: 48px; justify-content: space-between; border-bottom: 1px solid var(--dhic-border-color-light); }
+.browser-header { min-height: 48px; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding-block: 6px; border-bottom: 1px solid var(--dhic-border-color-light); }
 .browser-header nav { min-width: 0; }
 .browser-header nav > .el-icon { color: var(--dhic-text-secondary); font-size: 12px; }
 .browser-header h2 { margin: 0; font-size: 15px; line-height: 1.4; font-weight: 650; overflow-wrap: anywhere; }
 .browser-header h2:focus { outline: none; }
 .back-link, .tile { border: none; background: transparent; color: inherit; font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .back-link { min-height: 44px; padding: 0 2px; color: var(--dhic-text-regular); font-size: 14px; white-space: nowrap; }
-.count, .tile-meta { color: var(--dhic-text-secondary); font-size: 12px; line-height: 1.4; font-variant-numeric: tabular-nums; }
-.count { white-space: nowrap; }
+.counts, .tile-meta { color: var(--dhic-text-secondary); font-size: 12px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.counts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; }
+.counts > div { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.counts dd { margin: 0; }
+.ledger-count { color: var(--dhic-text-primary); }
+.ledger-count dd { font-size: 15px; font-weight: 650; }
 .icon-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(min(116px, 100%), 1fr));
   align-items: start; gap: 10px 8px; margin: 0; padding: 14px 0 4px; list-style: none;
@@ -128,16 +156,8 @@ watch(() => props.activeFolder?.key ?? null, async (key, previous) => {
   box-shadow: inset 0 1px 0 #fff1b3, var(--dhic-shadow-subtle);
 }
 .folder-front svg { width: 25px; height: 25px; }
-.record-art {
-  height: 49px; width: 45px; margin: 3px 0 2px; display: grid; place-items: center;
-  color: var(--dhic-sidebar-bg-secondary); border: 1px solid var(--dhic-table-heading-rule); border-radius: 4px 9px 4px 4px;
-  background: linear-gradient(150deg, var(--dhic-surface) 40%, var(--dhic-table-heading-bg)); box-shadow: var(--dhic-shadow-subtle);
-}
-.record-art::after {
-  content: ''; position: absolute; right: -1px; top: -1px; width: 10px; height: 10px;
-  background: linear-gradient(45deg, var(--dhic-border-color) 47%, var(--dhic-table-heading-rule) 49%, var(--dhic-card-bg) 54%); border-radius: 0 0 0 3px;
-}
-.record-art svg { width: 26px; height: 26px; }
+.record-art { width: 86px; height: 67px; }
+.folder-front .equipment-illustration { width: 48px; height: 38px; }
 @media (hover: hover) {
   .tile:hover { background: var(--dhic-row-hover); }
   .tile:hover .folder-art, .tile:hover .record-art { transform: translateY(-2px); }
@@ -149,6 +169,8 @@ watch(() => props.activeFolder?.key ?? null, async (key, previous) => {
 .browser-state { min-height: 120px; display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0; color: var(--dhic-text-secondary); }
 @media (max-width: 600px) {
   .equipment-browser { padding-inline: 10px; }
+  .browser-header { padding-block: 8px; }
+  .counts { flex-basis: 100%; gap: 3px 12px; }
   .icon-grid { grid-template-columns: repeat(auto-fill, minmax(min(92px, 100%), 1fr)); gap: 4px; }
 }
 @media (prefers-reduced-motion: reduce) {
