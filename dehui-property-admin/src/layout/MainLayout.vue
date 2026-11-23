@@ -1,7 +1,13 @@
 <template>
   <el-container class="layout-container">
     <a class="skip-navigation" href="#dhic-main" @click.prevent="mainRegion?.focus()">跳至主要内容</a>
-    <el-aside width="var(--dhic-sidebar-width)" class="aside">
+    <aside
+      id="dhic-primary-navigation"
+      ref="navigationPane"
+      class="aside el-aside"
+      :popover="compactNavigation ? 'auto' : null"
+      @toggle="navigationOpen = $event.newState === 'open'"
+    >
       <div class="brand">
         <img src="../assets/dehui-logo.png" class="logo" alt="德汇创新中心标志" />
         <div>
@@ -14,10 +20,8 @@
         :default-active="$route.path"
         router
         class="side-menu"
-        background-color="var(--dhic-sidebar-bg)"
-        text-color="var(--dhic-sidebar-text)"
-        active-text-color="#ffffff"
         aria-label="后台主导航"
+        @select="closeCompactNavigation"
       >
         <template v-for="item in orderedMenus" :key="menuKey(item)">
           <el-menu-item
@@ -35,6 +39,7 @@
               @click.capture="suppressMenuClickAfterDrag"
               @pointerdown="startMenuPointerDrag($event, 'root', '', item)"
             >
+              <component :is="navigationIcons[item.index] || Grid" class="nav-glyph" aria-hidden="true" />
               <span>{{ item.title }}</span>
             </div>
           </el-menu-item>
@@ -53,6 +58,7 @@
                 @click.capture="suppressMenuClickAfterDrag"
                 @pointerdown="startMenuPointerDrag($event, 'root', '', item)"
               >
+                <component :is="navigationIcons[item.index] || Grid" class="nav-glyph" aria-hidden="true" />
                 <span>{{ item.title }}</span>
               </div>
             </template>
@@ -78,11 +84,19 @@
           </el-sub-menu>
         </template>
       </el-menu>
-    </el-aside>
+    </aside>
 
     <el-container>
       <el-header class="header">
         <div class="header-context" aria-label="当前位置">
+          <button
+            v-if="compactNavigation"
+            type="button"
+            class="navigation-toggle"
+            popovertarget="dhic-primary-navigation"
+            :aria-expanded="navigationOpen"
+            :aria-label="navigationOpen ? '收起主导航' : '展开主导航'"
+          ><Expand aria-hidden="true" /></button>
           <span class="system-title">物业管理平台</span>
           <span class="header-context-separator" aria-hidden="true"></span>
           <strong class="current-page-title">{{ currentPageTitle }}</strong>
@@ -178,16 +192,51 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
-import { Lock, SwitchButton } from '@element-plus/icons-vue'
+import { computed, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import {
+  Coin, Collection, Expand, Grid, Lock, Odometer, OfficeBuilding, Promotion,
+  Setting, SwitchButton, TrendCharts, User
+} from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getCurrentRoles, getVisibleMenuSections } from '../config/access'
 import { clearAdminSession } from '../utils/authStorage'
 import request from '../utils/request'
 
+const navigationIcons = {
+  '/dashboard': Odometer,
+  dashboard: Odometer,
+  asset: OfficeBuilding,
+  'investment-announcement': Promotion,
+  lease: User,
+  operation: Collection,
+  finance: Coin,
+  ai: TrendCharts,
+  system: Setting
+}
+
 const route = useRoute()
 const router = useRouter()
+
+const narrowScreen = window.matchMedia('(max-width: 720px)')
+const navigationPane = ref(null)
+const navigationOpen = ref(false)
+const compactNavigation = ref(narrowScreen.matches && 'showPopover' in HTMLElement.prototype)
+
+function closeCompactNavigation() {
+  if (compactNavigation.value && navigationPane.value?.matches(':popover-open')) {
+    navigationPane.value.hidePopover()
+  }
+}
+
+function updateNavigationMode() {
+  closeCompactNavigation()
+  compactNavigation.value = narrowScreen.matches && 'showPopover' in HTMLElement.prototype
+}
+
+watch(() => route.fullPath, closeCompactNavigation)
+onMounted(() => narrowScreen.addEventListener('change', updateNavigationMode))
+onBeforeUnmount(() => narrowScreen.removeEventListener('change', updateNavigationMode))
 
 const username = localStorage.getItem('username') || '用户'
 const usernameInitial = username.trim().slice(0, 1).toUpperCase() || '用'
@@ -594,34 +643,30 @@ function logout() {
   flex-direction: column;
   overflow: hidden;
   background: var(--dhic-sidebar-bg);
-  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
 }
 
 .brand {
-  min-height: 64px;
-  flex: 0 0 64px;
+  min-height: 72px;
+  flex: 0 0 72px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 15px;
-  background: var(--dhic-sidebar-bg-secondary);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0 17px;
 }
 
 .logo {
-  width: 38px;
-  height: 38px;
+  width: 33px;
+  height: 33px;
   object-fit: contain;
   background: #fff;
-  border-radius: 6px;
-  padding: 3px;
+  border-radius: 4px;
 }
 
 .brand-title {
   overflow: hidden;
   color: #fff;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 650;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -645,54 +690,74 @@ function logout() {
   overflow-x: hidden;
   overflow-y: auto;
   border-right: none;
-  padding: 8px 0 14px;
-  background: transparent !important;
+  padding: 4px 0 16px;
+  --el-menu-bg-color: transparent;
+  --el-menu-text-color: var(--dhic-sidebar-text);
+  --el-menu-active-color: #fff;
+  --el-menu-hover-bg-color: #343539;
+  --el-menu-base-level-padding: 13px;
+  background: transparent;
   scrollbar-width: thin;
 }
 
-:deep(.el-menu-item),
-:deep(.el-sub-menu__title) {
-  height: 38px;
-  line-height: 38px;
-  margin: 2px 7px;
-  border-radius: 5px;
-  color: var(--dhic-sidebar-text);
-  font-size: 1rem;
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
-    opacity 0.16s ease,
-    transform 0.16s ease;
+.side-menu :deep(.el-menu--inline) {
+  --el-menu-bg-color: transparent;
+  --el-menu-hover-bg-color: #343539;
+  background: transparent;
 }
 
-:deep(.el-sub-menu .el-menu-item) {
+.side-menu :deep(.el-menu-item),
+.side-menu :deep(.el-sub-menu__title) {
+  height: 42px;
+  line-height: 42px;
+  margin: 2px 8px;
+  border-radius: 5px;
+  color: var(--dhic-sidebar-text);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color var(--dhic-motion-feedback) var(--dhic-ease),
+    color var(--dhic-motion-feedback) var(--dhic-ease);
+}
+
+.side-menu :deep(.el-sub-menu .el-menu-item) {
   min-width: 0;
-  height: 34px;
-  line-height: 34px;
-  padding-left: 34px !important;
-  font-size: .93rem;
+  height: 36px;
+  line-height: 36px;
+  padding-left: 39px !important;
+  font-size: 13px;
+  font-weight: 400;
   color: var(--dhic-sidebar-text-secondary);
 }
 
-:deep(.el-menu-item:hover),
-:deep(.el-sub-menu__title:hover) {
-  background: rgba(255, 255, 255, 0.055) !important;
+.side-menu :deep(.el-menu-item:hover),
+.side-menu :deep(.el-sub-menu__title:hover) {
+  background: var(--el-menu-hover-bg-color);
   color: #fff;
 }
 
-:deep(.el-menu-item.is-active),
-:deep(.el-menu-item.is-active:hover) {
-  background: #562923 !important;
-  color: #fff !important;
-  box-shadow: inset 3px 0 0 var(--dhic-brand-red);
-  font-weight: 600;
+.side-menu :deep(.el-menu-item.is-active),
+.side-menu :deep(.el-menu-item.is-active:hover) {
+  background: var(--dhic-sidebar-bg-secondary);
+  box-shadow: inset 3px 0 0 #f15b50;
+  color: #fff;
+  font-weight: 650;
+}
+
+.side-menu :deep(.el-menu-item.is-active .nav-glyph),
+.side-menu :deep(.el-sub-menu .el-menu-item.is-active) {
+  color: #fff;
+}
+
+.side-menu :deep(.el-sub-menu__icon-arrow) {
+  right: 11px;
+  color: var(--dhic-sidebar-text-secondary);
+  font-size: 11px;
 }
 
 .side-menu :deep(.el-menu-item:focus-visible),
 .side-menu :deep(.el-sub-menu:focus-visible > .el-sub-menu__title) {
-  outline: 2px solid #f8d6c4;
-  outline-offset: -3px;
+  outline: 2px solid #e8e9ee;
+  outline-offset: -2px;
 }
 
 .skip-navigation {
@@ -716,9 +781,19 @@ function logout() {
   min-width: 0;
   display: flex;
   align-items: center;
+  gap: 10px;
   cursor: pointer;
   position: relative;
   touch-action: none;
+}
+
+.nav-glyph {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  fill: currentColor;
+  color: var(--dhic-sidebar-text-secondary);
+  pointer-events: none;
 }
 
 .menu-row span:last-child {
@@ -729,7 +804,7 @@ function logout() {
 
 :deep(.menu-item-dragging > .el-menu-item),
 :deep(.menu-item-dragging > .el-sub-menu__title),
-:deep(.el-menu-item.menu-item-dragging) {
+.side-menu :deep(.el-menu-item.menu-item-dragging) {
   background: rgba(217, 48, 37, 0.24) !important;
   box-shadow:
     inset 4px 0 0 #d93025,
@@ -738,36 +813,36 @@ function logout() {
 
 :deep(.menu-item-drag-ready > .el-menu-item),
 :deep(.menu-item-drag-ready > .el-sub-menu__title),
-:deep(.el-menu-item.menu-item-drag-ready) {
+.side-menu :deep(.el-menu-item.menu-item-drag-ready) {
   background: rgba(217, 48, 37, 0.18) !important;
   box-shadow: inset 4px 0 0 #d93025;
 }
 
 :deep(.menu-item-dragging-active > .el-menu-item),
 :deep(.menu-item-dragging-active > .el-sub-menu__title),
-:deep(.el-menu-item.menu-item-dragging-active) {
+.side-menu :deep(.el-menu-item.menu-item-dragging-active) {
   opacity: 0.88;
   transform: translateX(4px) scale(0.985);
 }
 
 :deep(.menu-drop-before > .el-menu-item),
 :deep(.menu-drop-before > .el-sub-menu__title),
-:deep(.el-menu-item.menu-drop-before),
+.side-menu :deep(.el-menu-item.menu-drop-before),
 :deep(.menu-drop-after > .el-menu-item),
 :deep(.menu-drop-after > .el-sub-menu__title),
-:deep(.el-menu-item.menu-drop-after) {
+.side-menu :deep(.el-menu-item.menu-drop-after) {
   background: rgba(217, 48, 37, 0.12) !important;
 }
 
 :deep(.menu-drop-before > .el-menu-item),
 :deep(.menu-drop-before > .el-sub-menu__title),
-:deep(.el-menu-item.menu-drop-before) {
+.side-menu :deep(.el-menu-item.menu-drop-before) {
   box-shadow: inset 0 3px 0 #ff4d4f;
 }
 
 :deep(.menu-drop-after > .el-menu-item),
 :deep(.menu-drop-after > .el-sub-menu__title),
-:deep(.el-menu-item.menu-drop-after) {
+.side-menu :deep(.el-menu-item.menu-drop-after) {
   box-shadow: inset 0 -3px 0 #ff4d4f;
 }
 
@@ -795,6 +870,24 @@ function logout() {
   gap: 20px;
   padding: 0 var(--dhic-page-padding);
 }
+
+.navigation-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--dhic-text-regular);
+  background: transparent;
+  cursor: pointer;
+}
+
+.navigation-toggle:is(:hover, :active) { background: var(--el-fill-color-light); }
+.navigation-toggle:focus-visible { outline: 2px solid var(--dhic-focus-ring); }
+.navigation-toggle svg { width: 18px; height: 18px; }
 
 .header-context {
   display: flex;
@@ -860,10 +953,7 @@ function logout() {
   min-width: 0;
   align-items: center;
   gap: 7px;
-  padding: 3px 8px 3px 3px;
-  border: 1px solid var(--dhic-border-color-light);
-  border-radius: 18px;
-  background: #f7f8fa;
+  padding: 2px;
 }
 
 .user-avatar {
@@ -874,8 +964,8 @@ function logout() {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #3c3f44;
-  color: #fff;
+  background: #eceef2;
+  color: var(--dhic-text-regular);
   font-size: 12px;
   font-weight: 600;
 }
@@ -930,5 +1020,50 @@ function logout() {
   .user-account {
     padding-right: 3px;
   }
+}
+@media (max-width: 720px) {
+  .layout-container { --dhic-sidebar-width: 124px; }
+  .aside[popover]:not(:popover-open) { display: none; }
+  .layout-container > .aside[popover]:popover-open {
+    display: flex;
+    position: fixed;
+    inset: var(--dhic-header-height) auto 0 0;
+    box-sizing: border-box;
+    margin: 0;
+    width: min(230px, 80vw);
+    height: calc(100dvh - var(--dhic-header-height));
+    padding: 0;
+    border: 0;
+    border-right: 1px solid var(--dhic-border-color);
+    color: var(--dhic-sidebar-text);
+    background: var(--dhic-sidebar-bg);
+  }
+  .aside[popover]::backdrop { background: rgb(20 25 35 / 12%); }
+  .aside:not([popover]) .brand { min-height: 58px; flex-basis: 58px; padding: 0 9px; gap: 6px; }
+  .aside:not([popover]) .logo { width: 24px; height: 24px; }
+  .aside:not([popover]) .brand-title { font-size: 13px; }
+  .aside:not([popover]) .brand-subtitle { font-size: 10px; }
+  .aside:not([popover]) .side-menu { --el-menu-base-level-padding: 6px; }
+  .aside:not([popover]) .menu-row { gap: 5px; }
+  .aside:not([popover]) .nav-glyph { width: 14px; height: 14px; flex-basis: 14px; }
+  .aside:not([popover]) .side-menu :deep(.el-menu-item),
+  .aside:not([popover]) .side-menu :deep(.el-sub-menu__title) { margin-inline: 3px; font-size: 13px; }
+  .aside:not([popover]) .side-menu :deep(.el-sub-menu .el-menu-item) { padding-left: 15px !important; font-size: 12px; }
+  .aside:not([popover]) .side-menu :deep(.el-sub-menu__title) { padding-inline-end: 17px; }
+  .aside:not([popover]) .side-menu :deep(.el-sub-menu__icon-arrow) { right: 5px; }
+  .menu-row { touch-action: pan-y; }
+  .header { gap: 6px; padding-inline: 8px; }
+  .right { gap: 2px; }
+  .current-page-title { font-size: 13px; }
+  .right .change-password-btn :deep(span), .right .logout-btn :deep(span) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .right :deep(.el-button) { min-width: 28px; padding-inline: 4px; }
 }
 </style>

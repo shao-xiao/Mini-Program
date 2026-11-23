@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { beforeEach, test } from 'node:test'
-import { canAccessPath, canonicalAccessPath, getFirstAccessibleRoute, getVisibleMenuSections } from './access.js'
+import { canAccessPath, canViewDashboardReport, canonicalAccessPath, getFirstAccessibleRoute, getVisibleMenuSections } from './access.js'
 import { hasPermission } from '../utils/permission.js'
 
 const store = new Map()
@@ -257,4 +257,17 @@ test('a partial unified investment read bundle exposes only its permitted module
   assert.equal(investmentMenu, undefined)
   assert.equal(canAccessPath(['INVESTMENT_MANAGER'], '/investment/manage'), true)
   assert.equal(hasPermission('investment-content:view'), false)
+})
+
+test('dashboard AI summary requires current AI access and excludes finance roles', () => {
+  localStorage.setItem('token', 'session')
+  localStorage.setItem('roles', JSON.stringify(['ADMIN']))
+  assert.equal(canViewDashboardReport(), false)
+  localStorage.setItem('permissions', JSON.stringify(['ai:view']))
+  localStorage.setItem('menus', JSON.stringify([{ path: '/ai/daily-report', title: 'AI 运营日报' }]))
+  assert.equal(canViewDashboardReport(), true)
+  localStorage.setItem('roles', JSON.stringify(['ADMIN', 'FINANCE']))
+  assert.equal(canViewDashboardReport(), false)
+  localStorage.setItem('roles', JSON.stringify(['STAFF']))
+  assert.equal(canViewDashboardReport(), false)
 })

@@ -410,4 +410,13 @@ export function canAccessPath(currentRoles, path) {
   return pathPermissionCodes.length > 0 && hasAnyPermission(pathPermissionCodes)
 }
 
+// The dashboard report follows the project’s role restriction as well as the live access grants.
+export function canViewDashboardReport() {
+  const roles = getCurrentRoles()
+  return !roles.includes('FINANCE')
+    && hasAnyRole(['ADMIN', 'MANAGER'])
+    && hasAnyPermission(['ai:view'])
+    && canAccessPath(roles, '/ai/daily-report')
+}
+
 export { getCurrentRoles }

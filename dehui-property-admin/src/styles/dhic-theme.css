@@ -4,10 +4,10 @@
   --dhic-brand-red-active: #991f18;
   --dhic-brand-red-light: #fff1f0;
 
-  --dhic-sidebar-bg: #1d1919;
-  --dhic-sidebar-bg-secondary: #252020;
-  --dhic-sidebar-text: rgba(255, 255, 255, 0.82);
-  --dhic-sidebar-text-secondary: rgba(255, 255, 255, 0.72);
+  --dhic-sidebar-bg: #28292c;
+  --dhic-sidebar-bg-secondary: #3d3e42;
+  --dhic-sidebar-text: #f0f0f2;
+  --dhic-sidebar-text-secondary: #c1c2c6;
 
   --dhic-page-bg: #f3f4f6;
   --dhic-card-bg: #ffffff;
@@ -21,6 +21,8 @@
 
   --dhic-border-color: #dfe3e8;
   --dhic-border-color-light: #eaecf0;
+  --dhic-table-heading-bg: #eceef0;
+  --dhic-table-heading-rule: #a4a9ae;
 
   --dhic-success: #11754e;
   --dhic-warning: #945307;
@@ -54,7 +56,7 @@
   --dhic-shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.035);
 
   --dhic-header-height: 58px;
-  --dhic-sidebar-width: 212px;
+  --dhic-sidebar-width: 204px;
   --dhic-page-padding: 24px;
   --dhic-section-gap: 14px;
 
@@ -311,7 +313,7 @@ body {
   color: var(--dhic-text-regular);
   font-size: 13px;
   --el-table-border-color: var(--dhic-border-color-light);
-  --el-table-header-bg-color: #f7f8fa;
+  --el-table-header-bg-color: var(--dhic-table-heading-bg);
   --el-table-row-hover-bg-color: #fff8f7;
 }
 
@@ -626,7 +628,7 @@ button,
 
 .layout-container > .aside {
   width: var(--dhic-sidebar-width);
-  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  border-right: 1px solid var(--dhic-border-color);
 }
 
 .layout-container > .el-container > .header {
@@ -725,7 +727,7 @@ button,
 }
 
 .el-table {
-  --el-table-header-bg-color: #f7f8fa;
+  --el-table-header-bg-color: var(--dhic-table-heading-bg);
   --el-table-row-hover-bg-color: #fff8f7;
   --el-table-border-color: var(--dhic-border-color);
   color: var(--dhic-text-primary);
@@ -1476,7 +1478,11 @@ body,
 
 .el-table th.el-table__cell,
 .el-table__header-wrapper {
-  background: #f7f8fa;
+  background: var(--dhic-table-heading-bg);
+}
+.el-table thead th.el-table__cell {
+  color: #303337;
+  border-bottom: 1px solid var(--dhic-table-heading-rule);
 }
 
 .el-input__wrapper,
