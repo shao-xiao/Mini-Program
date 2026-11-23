@@ -6,6 +6,8 @@
 
 任何 AI Agent、Codex App、Continue、自动化编码工具，在修改本项目代码前，必须先阅读并遵守本文件。
 
+新增、导入设备或维护设备台账目录时，遵循[设备台账新增与归档规则](docs/equipment-ledger-rules.md)。
+
 ---
 
 # 一、项目位置
