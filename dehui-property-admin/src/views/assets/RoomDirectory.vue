@@ -102,9 +102,21 @@ const folderSections = computed(() => {
     return { ...item, rooms, occupied: rooms.filter(room => status(room) === 'RENTED').length }
   })
   if (!props.building) return items.length ? [{ label:'在册楼宇', items }] : []
+  const upper = [], lower = [], basement = [], roofs = [], other = []
+  for (const item of items) {
+    const number = Number(item.floorNumber)
+    if (/屋面|屋顶/.test(item.floorName || '')) roofs.push(item)
+    else if (number >= 6) upper.push(item)
+    else if (number >= 1) lower.push(item)
+    else if (number < 0) basement.push(item)
+    else other.push(item)
+  }
+  const ascending = (a, b) => a.floorNumber - b.floorNumber
   return [
-    { label:'地下楼层', items: items.filter(item => item.floorNumber < 0) },
-    { label:'地上楼层', items: items.filter(item => !(item.floorNumber < 0)) }
+    { label: roofs.length ? '6F 至屋面' : '6F 及以上', items: [...upper.sort(ascending), ...roofs.sort(ascending)] },
+    { label: '1F 至 5F', items: lower.sort(ascending) },
+    { label: '其他楼层', items: other },
+    { label: '地下楼层', items: basement.sort((a, b) => b.floorNumber - a.floorNumber) }
   ].filter(section => section.items.length)
 })
 function backToFloors() { allRooms.value = false; emit('floor', null) }
