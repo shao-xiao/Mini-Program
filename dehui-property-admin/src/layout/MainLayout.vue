@@ -1,5 +1,6 @@
 <template>
   <el-container class="layout-container">
+    <a class="skip-navigation" href="#dhic-main" @click.prevent="mainRegion?.focus()">跳至主要内容</a>
     <el-aside width="var(--dhic-sidebar-width)" class="aside">
       <div class="brand">
         <img src="../assets/dehui-logo.png" class="logo" alt="德汇创新中心标志" />
@@ -22,6 +23,7 @@
           <el-menu-item
             v-if="item.path"
             :index="item.path"
+            :aria-current="$route.path === item.path ? 'page' : undefined"
             :class="menuItemClass('root', '', item)"
             @click.capture="suppressMenuClickAfterDrag"
           >
@@ -58,6 +60,7 @@
               v-for="child in item.children"
               :key="menuKey(child)"
               :index="child.path"
+              :aria-current="$route.path === child.path ? 'page' : undefined"
               :class="menuItemClass('child', menuKey(item), child)"
               @click.capture="suppressMenuClickAfterDrag"
             >
@@ -116,9 +119,9 @@
         </div>
       </el-header>
 
-      <el-main class="main">
+      <main id="dhic-main" ref="mainRegion" class="el-main main" tabindex="-1">
         <router-view />
-      </el-main>
+      </main>
     </el-container>
 
     <el-dialog
@@ -506,6 +509,7 @@ const roleSummary = computed(() => {
 })
 const currentPageTitle = computed(() => String(route.meta?.title || '工作台'))
 
+const mainRegion = ref(null)
 const passwordDialogVisible = ref(false)
 const passwordSubmitting = ref(false)
 const passwordFormRef = ref()
@@ -594,19 +598,19 @@ function logout() {
 }
 
 .brand {
-  height: 68px;
-  flex: 0 0 68px;
+  min-height: 64px;
+  flex: 0 0 64px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 12px;
+  padding: 0 15px;
   background: var(--dhic-sidebar-bg-secondary);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .logo {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   object-fit: contain;
   background: #fff;
   border-radius: 6px;
@@ -648,12 +652,12 @@ function logout() {
 
 :deep(.el-menu-item),
 :deep(.el-sub-menu__title) {
-  height: 42px;
-  line-height: 42px;
-  margin: 1px 6px;
+  height: 38px;
+  line-height: 38px;
+  margin: 2px 7px;
   border-radius: 5px;
   color: var(--dhic-sidebar-text);
-  font-size: 13px;
+  font-size: 1rem;
   transition:
     background-color 0.16s ease,
     border-color 0.16s ease,
@@ -664,7 +668,10 @@ function logout() {
 
 :deep(.el-sub-menu .el-menu-item) {
   min-width: 0;
-  padding-left: 40px !important;
+  height: 34px;
+  line-height: 34px;
+  padding-left: 34px !important;
+  font-size: .93rem;
   color: var(--dhic-sidebar-text-secondary);
 }
 
@@ -674,12 +681,34 @@ function logout() {
   color: #fff;
 }
 
-:deep(.el-menu-item.is-active) {
-  background: rgba(217, 45, 32, 0.18);
-  color: #fff;
+:deep(.el-menu-item.is-active),
+:deep(.el-menu-item.is-active:hover) {
+  background: #562923 !important;
   color: #fff !important;
   box-shadow: inset 3px 0 0 var(--dhic-brand-red);
   font-weight: 600;
+}
+
+.side-menu :deep(.el-menu-item:focus-visible),
+.side-menu :deep(.el-sub-menu:focus-visible > .el-sub-menu__title) {
+  outline: 2px solid #f8d6c4;
+  outline-offset: -3px;
+}
+
+.skip-navigation {
+  position: fixed;
+  z-index: 10;
+  top: 6px;
+  left: 8px;
+  padding: 6px 12px;
+  border-radius: var(--dhic-radius-base);
+  background: #fff;
+  color: var(--dhic-text-primary);
+  transform: translateY(-160%);
+}
+
+.skip-navigation:focus-visible {
+  transform: none;
 }
 
 .menu-row {
@@ -818,9 +847,9 @@ function logout() {
   overflow: hidden;
   padding: 3px 8px;
   border-radius: 16px;
-  background: var(--dhic-brand-red-light);
-  color: var(--dhic-brand-red);
-  font-size: 12px;
+  background: var(--el-fill-color-light);
+  color: var(--dhic-text-regular);
+  font-size: var(--dhic-type-caption);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -1,5 +1,5 @@
 <template>
-  <div class="workspace-data-grid" role="region" :aria-label="ariaLabel">
+  <div class="workspace-data-grid" role="region" :aria-label="ariaLabel" :aria-busy="loading">
     <div v-if="errorText && rows.length" class="workspace-grid-error-banner" role="alert">
       <span>{{ errorText }}</span>
       <el-button v-if="retryable" link type="primary" @click="$emit('retry')">{{ retryLabel }}</el-button>
@@ -7,6 +7,7 @@
     <el-table
       ref="tableRef"
       v-loading="loading"
+      element-loading-text="正在加载"
       :data="rows"
       :height="height || undefined"
       :row-key="resolvedRowKey"
@@ -78,7 +79,8 @@
         :sortable="resolveColumnSortable(field)"
         :sort-orders="['ascending', 'descending', null]"
         :resizable="field.resizable !== false"
-        :align="field.align"
+        :align="field.align || (isNumericFieldType(field.type) ? 'right' : undefined)"
+        :class-name="isNumericFieldType(field.type) ? 'workspace-numeric-column' : undefined"
         :header-align="field.headerAlign"
         :show-overflow-tooltip="resolveOverflowTooltip(field)"
       >
@@ -215,6 +217,7 @@ import CellEditor from '../CellEditor.vue'
 import CellRenderer from '../CellRenderer.vue'
 import CustomFieldCellEditor from './CustomFieldCellEditor.vue'
 import CustomFieldCellRenderer from './CustomFieldCellRenderer.vue'
+import { isNumericFieldType } from '../../config/fieldTypes.js'
 import { useWorkspaceGrid } from './workspaceGridContext.js'
 import {
   buildWorkspaceDisplayIndexMap,
@@ -611,6 +614,30 @@ defineExpose({
   outline: none;
 }
 
+.workspace-data-grid :deep(td.is-right .workspace-grid-cell) {
+  justify-content: flex-end;
+}
+
+.workspace-data-grid :deep(td.is-center .workspace-grid-cell) {
+  justify-content: center;
+}
+
+.workspace-data-grid :deep(.workspace-numeric-column) {
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-data-grid :deep(.density-compact .workspace-grid-cell) {
+  min-height: 22px;
+}
+
+.workspace-data-grid :deep(.dhic-multitable td.el-table__cell) {
+  padding-block: var(--dhic-grid-cell-inset, 6px);
+}
+
+.workspace-data-grid :deep(.density-compact) { --dhic-grid-cell-inset: 3px; }
+.workspace-data-grid :deep(.density-comfortable) { --dhic-grid-cell-inset: 10px; }
+.workspace-data-grid :deep(.density-spacious) { --dhic-grid-cell-inset: 14px; }
+
 .workspace-grid-cell > :deep(*) {
   min-width: 0;
 }
@@ -621,7 +648,7 @@ defineExpose({
 
 .workspace-grid-cell.is-editable:focus-visible {
   border-radius: 3px;
-  box-shadow: inset 0 0 0 2px var(--el-color-primary-light-5);
+  box-shadow: inset 0 0 0 2px var(--dhic-focus-ring, var(--dhic-primary));
 }
 
 .workspace-cell-edit-icon {
@@ -647,6 +674,10 @@ defineExpose({
 }
 
 .workspace-grid-empty.is-error {
-  color: var(--dhic-primary);
+  color: var(--dhic-danger);
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-cell-saving { animation: none; }
+  .workspace-cell-edit-icon { transition: none; }
 }
 </style>

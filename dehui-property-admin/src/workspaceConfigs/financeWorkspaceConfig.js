@@ -19,6 +19,17 @@ export const billTypeOptions = [
   { label: '其他', value: 'OTHER' }
 ]
 
+// Legacy imports used PROPERTY_FEE and MEETING before the bill editor standardized the codes.
+const billTypeLabels = new Map(billTypeOptions.map(({ value, label }) => [value, label]))
+billTypeLabels.set('PROPERTY_FEE', billTypeLabels.get('PROPERTY'))
+billTypeLabels.set('MEETING', billTypeLabels.get('MEETING_ROOM'))
+billTypeLabels.set('ENERGY', '能耗')
+billTypeLabels.set('UTILITY', '水电煤')
+
+export function formatBillType(type) {
+  return billTypeLabels.get(type) || type || '—'
+}
+
 export const billSourceTypeOptions = [
   { label: '手工账单', value: 'MANUAL' },
   { label: '租金依据', value: 'RENT' },
@@ -191,9 +202,9 @@ export function createBillWorkspaceConfig({ tenantOptions = [] } = {}) {
     metrics: [
       { title: '账单总数', field: 'totalCount', type: 'count', desc: '当前筛选范围', tone: 'neutral' },
       { title: '应收合计', field: 'totalAmount', type: 'money', desc: '不含已取消账单', tone: 'money' },
-      { title: '待收款', field: 'unpaidCount', type: 'count', desc: '当前筛选范围', tone: 'warning' },
+      { title: '待收款', field: 'unpaidCount', type: 'count', desc: '当前筛选范围', tone: data => Number(data.unpaidCount) > 0 ? 'warning' : 'neutral' },
       { title: '待收金额', field: 'unpaidAmount', type: 'money', desc: '当前筛选范围', tone: 'money' },
-      { title: '逾期账单', field: 'overdueCount', type: 'count', desc: '已超过到期日', tone: 'danger' },
+      { title: '逾期账单', field: 'overdueCount', type: 'count', desc: '已超过到期日', tone: data => Number(data.overdueCount) > 0 ? 'danger' : 'neutral' },
       { title: '已收金额', field: 'paidAmount', type: 'money', desc: '当前筛选范围', tone: 'success' }
     ],
     table: {

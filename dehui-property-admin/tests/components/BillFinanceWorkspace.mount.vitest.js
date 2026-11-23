@@ -55,6 +55,21 @@ describe('bill finance workspace components', () => {
     expect(wrapper.emitted('select')?.[1]).toEqual([tenant])
   })
 
+  test('drawer distinguishes a pending request, a failed request and a zero balance', async () => {
+    const bill = { id: 1, billNumber: 'BIL-001', finalAmount: 100, paidAmount: 100, unpaidAmount: 0 }
+    const wrapper = mountComponent(BillDetailDrawer, { modelValue: true, bill, loading: true })
+    expect(wrapper.get('[role="status"]').text()).toContain('正在加载')
+    expect(wrapper.find('.bill-detail').exists()).toBe(false)
+
+    await wrapper.setProps({ loading: false, errorText: '详情暂时无法加载' })
+    expect(wrapper.get('[role="alert"]').text()).toContain('详情暂时无法加载')
+    await wrapper.get('[role="alert"] button').trigger('click')
+    expect(wrapper.emitted('retry')).toHaveLength(1)
+
+    await wrapper.setProps({ errorText: '' })
+    expect(wrapper.get('.amount-strip').text()).toContain('未收金额¥0.00')
+  })
+
   test('bill detail drawer presents persisted fields without inventing source line items', () => {
     const wrapper = mountComponent(BillDetailDrawer, {
       modelValue: true,

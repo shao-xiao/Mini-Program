@@ -16,5 +16,6 @@ const resolvedTone = computed(() => props.tone || tones[key.value] || 'info')
 </script>
 <style scoped>
 .dhic-status-display { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; }
-.dhic-status-display__dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: currentColor; }
+.dhic-status-display :deep(.el-tag__content) { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.dhic-status-display__dot { display: inline-block; width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: currentColor; }
 </style>

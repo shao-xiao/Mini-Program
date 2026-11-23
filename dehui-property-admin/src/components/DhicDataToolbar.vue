@@ -21,7 +21,7 @@
     </div>
 
     <div class="toolbar-right">
-      <el-button v-if="hasActiveViewState" link type="danger" @click="$emit('reset-view')">重置视图</el-button>
+      <el-button v-if="hasActiveViewState" link class="workspace-reset-view" @click="$emit('reset-view')">重置视图</el-button>
       <slot name="right" />
     </div>
   </div>
@@ -324,10 +324,25 @@ function legacyCustomFieldWorkspaceKey(configId) {
   box-shadow: none;
 }
 
-.dhic-data-toolbar .workspace-toolbar-button:hover,
-.dhic-data-toolbar .workspace-toolbar-button.active {
+.dhic-data-toolbar .workspace-toolbar-button:not(.is-disabled):hover {
+  color: var(--dhic-text-primary);
+  background: var(--dhic-hover-bg, #f1f3f5);
+}
+
+.dhic-data-toolbar .workspace-toolbar-button.active,
+.dhic-data-toolbar .workspace-toolbar-button[aria-expanded="true"] {
   color: var(--dhic-primary);
   background: var(--dhic-primary-soft);
+}
+
+.dhic-data-toolbar .workspace-toolbar-button:focus-visible,
+.dhic-data-toolbar .workspace-reset-view:focus-visible {
+  outline: 2px solid var(--dhic-focus-ring, var(--dhic-primary));
+  outline-offset: 1px;
+}
+
+.dhic-data-toolbar .workspace-toolbar-button + .workspace-toolbar-button {
+  margin-left: 0;
 }
 
 .workspace-button-count {

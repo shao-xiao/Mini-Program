@@ -64,7 +64,6 @@ function trendClass(trend) {
   border-radius: var(--dhic-radius-large);
   background: var(--summary-bg);
   box-shadow: var(--dhic-shadow-card);
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .list-summary-card::before {
@@ -76,11 +75,6 @@ function trendClass(trend) {
   border-radius: 0 3px 3px 0;
   background: var(--summary-accent);
   content: '';
-}
-
-.list-summary-card:hover {
-  border-color: #d3d8df;
-  box-shadow: 0 3px 10px rgba(32, 33, 36, 0.06);
 }
 
 .list-summary-card.neutral {
@@ -95,19 +89,19 @@ function trendClass(trend) {
 }
 
 .list-summary-card.danger {
-  --summary-accent: #d93026;
+  --summary-accent: var(--dhic-danger);
   --summary-value: #b42318;
   --summary-bg: #fff6f6;
 }
 
 .list-summary-card.success {
-  --summary-accent: #18a058;
+  --summary-accent: var(--dhic-success);
   --summary-value: #137333;
   --summary-bg: #f4fbf7;
 }
 
 .list-summary-card.warning {
-  --summary-accent: #d97706;
+  --summary-accent: var(--dhic-warning);
   --summary-value: #9a4d00;
   --summary-bg: #fff9ed;
 }
@@ -121,7 +115,7 @@ function trendClass(trend) {
 .summary-label,
 .summary-desc {
   overflow: hidden;
-  color: #7b8494;
+  color: var(--dhic-text-secondary);
   font-size: 12px;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -144,7 +138,7 @@ function trendClass(trend) {
 }
 
 .summary-desc {
-  color: #98a2b3;
+  color: var(--dhic-text-secondary);
 }
 
 .summary-footer {
@@ -172,7 +166,7 @@ function trendClass(trend) {
 }
 
 .summary-trend.neutral {
-  color: #7b8494;
+  color: var(--dhic-text-secondary);
 }
 
 @media (max-width: 640px) {
@@ -185,10 +179,4 @@ function trendClass(trend) {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .list-summary-card {
-    transition: none;
-  }
-
-}
 </style>

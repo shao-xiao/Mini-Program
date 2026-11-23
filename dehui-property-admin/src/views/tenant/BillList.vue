@@ -445,7 +445,13 @@
       </main>
     </template>
 
-    <BillDetailDrawer v-model="detailDrawerVisible" :bill="detailBill" />
+    <BillDetailDrawer
+      v-model="detailDrawerVisible"
+      :bill="detailBill"
+      :loading="detailLoading"
+      :error-text="detailError"
+      @retry="openBillDetails(detailBill)"
+    />
 
     <input
       ref="invoiceInputRef"
@@ -680,6 +686,9 @@ const summaryStats = reactive(emptySummary())
 const editingBillId = ref(null)
 const detailDrawerVisible = ref(false)
 const detailBill = ref(null)
+const detailLoading = ref(false)
+const detailError = ref('')
+const detailRequestGuard = createLatestRequestGuard()
 const billActionState = reactive(new Map())
 
 const paymentColumns = [
@@ -1287,13 +1296,19 @@ function openCreateDialog() {
 }
 
 async function openBillDetails(row) {
+  const requestId = detailRequestGuard.start()
+  detailLoading.value = true
+  detailError.value = ''
   detailBill.value = row
   detailDrawerVisible.value = true
   try {
     const detail = await request.get(`/bills/${row.id}`, { silent: true })
+    if (!detailRequestGuard.isCurrent(requestId)) return
     detailBill.value = detail || row
   } catch (error) {
-    ElMessage.error(error?.response?.data?.message || error?.message || '账单详情加载失败')
+    if (detailRequestGuard.isCurrent(requestId)) detailError.value = requestErrorMessage(error, '账单详情加载失败')
+  } finally {
+    if (detailRequestGuard.isCurrent(requestId)) detailLoading.value = false
   }
 }
 
@@ -1888,6 +1903,7 @@ onBeforeUnmount(() => {
   summaryRequestGuard.dispose()
   paymentRequestGuard.dispose()
   invoiceRequestGuard.dispose()
+  detailRequestGuard.dispose()
 })
 </script>
 
@@ -2094,11 +2110,6 @@ onBeforeUnmount(() => {
   bottom: 9px;
 }
 
-.finance-summary-region :deep(.list-summary-card:hover) {
-  box-shadow: var(--dhic-shadow-subtle);
-  transform: none;
-}
-
 .finance-summary-region :deep(.summary-value) {
   margin: 4px 0 2px;
   font-size: 20px;
@@ -2263,7 +2274,7 @@ onBeforeUnmount(() => {
   background: transparent;
 }
 
-.finance-tabs :deep(.toolbar-right > .el-button--danger.is-link) {
+.finance-tabs :deep(.toolbar-right > .workspace-reset-view) {
   margin: 0;
 }
 

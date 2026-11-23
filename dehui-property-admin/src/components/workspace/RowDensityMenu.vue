@@ -59,10 +59,19 @@ const rowDensity = computed(() => controller.view.rowDensity || 'standard')
   text-align: left;
 }
 
-.density-menu button:hover,
+.density-menu button:hover {
+  background: var(--dhic-hover-bg, #f1f3f5);
+}
+
+.density-menu button:focus-visible {
+  outline: 2px solid var(--dhic-focus-ring, var(--dhic-primary));
+  outline-offset: -2px;
+}
+
 .density-menu button.active {
   color: var(--dhic-primary);
   background: var(--dhic-primary-soft);
+  font-weight: 600;
 }
 
 .icon-space {
