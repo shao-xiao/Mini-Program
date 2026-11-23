@@ -9,15 +9,14 @@
 
     <div v-if="failedSections.length" class="data-notice" role="status">{{ failedSections.join('、') }}暂时无法加载，请稍后刷新。</div>
     <dl class="overview-measures" aria-label="运营概览">
-      <div v-for="item in primaryMetrics" :key="item.label">
+      <div v-for="item in kpiCards" :key="item.label">
         <dt>{{ item.label }}</dt>
-        <dd>{{ item.value }}</dd>
+        <dd :class="item.className">{{ item.value }}</dd>
         <small>{{ item.desc }}</small>
       </div>
     </dl>
 
     <div class="overview-body">
-
       <section class="primary-trend" aria-labelledby="trend-heading">
         <header class="trend-heading">
           <div><h2 id="trend-heading">应收 / 实收趋势</h2><span>近 6 个月</span></div>
@@ -35,7 +34,57 @@
         </div>
         <div v-else class="chart-empty">{{ billHint || '暂无账单记录' }}</div>
       </section>
-      <DashboardAttention :overdue-bills="overdueBills" :expiring-contracts="expiringContracts" :bill-hint="billHint" :contract-hint="contractHint" />
+
+      <DashboardPanel class="source-panel" title="账单来源结构" subtitle="按账单金额占比" :meta="bills ? `${billSourceData.length} 类来源` : ''">
+        <div v-if="sourceTotal > 0" class="source-breakdown">
+          <div ref="billSourceRef" class="chart source-chart" role="img" aria-label="账单来源金额占比环形图"></div>
+          <ul class="source-legend">
+            <li v-for="(item, index) in billSourceData" :key="item.name">
+              <span class="legend-name"><i :style="{ backgroundColor: sourceColors[index % sourceColors.length] }"></i>{{ item.name }}</span>
+              <strong :title="`¥ ${formatMoney(item.value)}`">{{ formatShortMoney(item.value) }}</strong>
+              <small>{{ sourcePercent(item.value) }}%</small>
+            </li>
+          </ul>
+        </div>
+        <div v-else class="chart-empty">{{ billHint || '暂无账单来源数据' }}</div>
+      </DashboardPanel>
+    </div>
+
+    <div class="activity-grid">
+      <DashboardPanel class="summary-card activity-bills" title="最近账单" subtitle="最近创建的 8 笔账单" :meta="bills ? `${recentBills.length} 笔` : ''">
+
+        <el-table :data="recentBills" size="small" max-height="330" :empty-text="billHint || '暂无账单记录'" style="width: 100%">
+          <el-table-column prop="billNumber" label="账单编号" min-width="160" />
+          <el-table-column prop="sourceName" label="来源" width="80" />
+          <el-table-column prop="tenantId" label="租户ID" width="85" />
+          <el-table-column label="金额" min-width="120" align="right">
+            <template #default="{ row }">¥ {{ formatMoney(row.amount) }}</template>
+          </el-table-column>
+          <el-table-column prop="dueDate" label="到期日" width="115" />
+          <el-table-column label="状态" width="95">
+            <template #default="{ row }">
+              <el-tag v-if="row.status === 'PAID'" type="success">已支付</el-tag>
+              <el-tag v-else-if="isOverdue(row)" type="danger">已逾期</el-tag>
+              <el-tag v-else-if="row.status === 'UNPAID'" type="warning">未支付</el-tag>
+              <el-tag v-else type="info">{{ statusText(row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+      </DashboardPanel>
+      <div class="activity-side">
+        <DashboardPanel class="room-panel" title="房源出租状态" subtitle="房源数量与出租占比" :meta="roomStats ? `共 ${roomTotal} 间` : ''">
+          <div class="room-breakdown">
+            <div v-show="hasRoomStats" ref="roomStatusRef" class="chart room-chart" role="img" aria-label="已出租及未出租房源数量"></div>
+            <div v-if="!hasRoomStats" class="room-empty"><span>—</span><p>{{ roomStatsHint }}</p></div>
+            <div class="room-counts">
+              <div><span><i class="dot rented"></i>已出租</span><strong>{{ roomStats ? roomStats.rentedRoomCount : '—' }}<small> 间</small></strong></div>
+              <div><span><i class="dot vacant"></i>未出租</span><strong>{{ roomStats ? roomStats.availableRoomCount : '—' }}<small> 间</small></strong></div>
+              <p>出租率 <b>{{ roomStats ? `${roomRentRate}%` : '—' }}</b></p>
+            </div>
+          </div>
+        </DashboardPanel>
+        <DashboardAttention :overdue-bills="overdueBills" :expiring-contracts="expiringContracts" :bill-hint="billHint" :contract-hint="contractHint" />
+      </div>
     </div>
 
     <section class="more-section">
@@ -44,89 +93,25 @@
       </button>
       <div id="dashboard-more" :hidden="!detailsOpen">
         <div v-if="detailsOpen" class="more-content">
-          <div class="kpi-grid" aria-label="核心运营指标">
-            <div v-for="item in secondaryMetrics" :key="item.label" class="kpi-card" :class="item.className">
-              <div class="card-title">{{ item.label }}</div>
-              <div class="card-value" :class="item.className">{{ item.value }}</div>
-              <div class="card-desc">{{ item.desc }}</div>
-              <progress v-if="item.progress !== undefined" class="metric-track" :value="Math.max(0, Math.min(100, item.progress))" max="100" aria-hidden="true"></progress>
-            </div>
-          </div>
+          <DashboardPanel class="risk-panel" title="账单到期风险" subtitle="未支付账单 · 按到期日分布" :meta="bills ? `${finance.overdueBillCount} 笔已逾期` : ''" :alert="finance.overdueBillCount > 0">
+            <div v-if="hasPendingBills" ref="overdueRiskRef" class="chart risk-chart" role="img" :aria-label="overdueRiskData.map(item => `${item.name}${item.value}笔`).join('，')"></div>
+            <div v-else class="risk-empty">{{ billHint || (bills?.length ? '当前没有待收账单' : '暂无账单记录') }}</div>
+          </DashboardPanel>
 
-          <div class="chart-grid">
-            <DashboardPanel class="source-panel" title="账单来源结构" subtitle="按账单金额占比" :meta="bills ? `${billSourceData.length} 类来源` : ''">
-              <div v-if="sourceTotal > 0" class="source-breakdown">
-                <div ref="billSourceRef" class="chart source-chart" role="img" aria-label="账单来源金额占比环形图"></div>
-                <ul class="source-legend">
-                  <li v-for="(item, index) in billSourceData" :key="item.name">
-                    <span class="legend-name"><i :style="{ backgroundColor: sourceColors[index % sourceColors.length] }"></i>{{ item.name }}</span>
-                    <strong :title="`¥ ${formatMoney(item.value)}`">{{ formatShortMoney(item.value) }}</strong>
-                    <small>{{ sourcePercent(item.value) }}%</small>
-                  </li>
-                </ul>
-              </div>
-              <div v-else class="chart-empty">{{ billHint || '暂无账单来源数据' }}</div>
-            </DashboardPanel>
+          <DashboardPanel class="summary-card" title="合同到期预警" subtitle="未来 30 天内到期的生效合同" :meta="contracts ? `${expiringContracts.length} 份` : ''" :alert="expiringContracts.length > 0">
 
-            <DashboardPanel class="room-panel" title="房源出租状态" subtitle="房源数量与出租占比" :meta="roomStats ? `共 ${roomTotal} 间` : ''">
-              <div class="room-breakdown">
-                <div v-show="hasRoomStats" ref="roomStatusRef" class="chart room-chart" role="img" aria-label="已出租及未出租房源数量"></div>
-                <div v-if="!hasRoomStats" class="room-empty"><span>—</span><p>{{ roomStatsHint }}</p></div>
-                <div class="room-counts">
-                  <div><span><i class="dot rented"></i>已出租</span><strong>{{ roomStats ? roomStats.rentedRoomCount : '—' }}<small> 间</small></strong></div>
-                  <div><span><i class="dot vacant"></i>未出租</span><strong>{{ roomStats ? roomStats.availableRoomCount : '—' }}<small> 间</small></strong></div>
-                  <p>出租率 <b>{{ roomStats ? `${roomRentRate}%` : '—' }}</b></p>
-                </div>
-              </div>
-            </DashboardPanel>
-
-            <DashboardPanel class="risk-panel" title="账单到期风险" subtitle="未支付账单 · 按到期日分布" :meta="bills ? `${finance.overdueBillCount} 笔已逾期` : ''" :alert="finance.overdueBillCount > 0">
-              <div v-if="hasPendingBills" ref="overdueRiskRef" class="chart risk-chart" role="img" :aria-label="overdueRiskData.map(item => `${item.name}${item.value}笔`).join('，')"></div>
-              <div v-else class="risk-empty">{{ billHint || (bills?.length ? '当前没有待收账单' : '暂无账单记录') }}</div>
-            </DashboardPanel>
-          </div>
-
-          <div class="detail-grid">
-            <div class="detail-grid__bills">
-              <DashboardPanel class="summary-card" title="最近账单" subtitle="最近创建的 8 笔账单" :meta="bills ? `${recentBills.length} 笔` : ''">
-
-                <el-table :data="recentBills" size="small" max-height="330" :empty-text="billHint || '暂无账单记录'" style="width: 100%">
-                  <el-table-column prop="billNumber" label="账单编号" min-width="160" />
-                  <el-table-column prop="sourceName" label="来源" width="80" />
-                  <el-table-column prop="tenantId" label="租户ID" width="85" />
-                  <el-table-column label="金额" min-width="120" align="right">
-                    <template #default="{ row }">¥ {{ formatMoney(row.amount) }}</template>
-                  </el-table-column>
-                  <el-table-column prop="dueDate" label="到期日" width="115" />
-                  <el-table-column label="状态" width="95">
-                    <template #default="{ row }">
-                      <el-tag v-if="row.status === 'PAID'" type="success">已支付</el-tag>
-                      <el-tag v-else-if="isOverdue(row)" type="danger">已逾期</el-tag>
-                      <el-tag v-else-if="row.status === 'UNPAID'" type="warning">未支付</el-tag>
-                      <el-tag v-else type="info">{{ statusText(row.status) }}</el-tag>
-                    </template>
-                  </el-table-column>
-                </el-table>
-              </DashboardPanel>
-            </div>
-
-            <div class="detail-grid__contracts">
-              <DashboardPanel class="summary-card" title="合同到期预警" subtitle="未来 30 天内到期的生效合同" :meta="contracts ? `${expiringContracts.length} 份` : ''" :alert="expiringContracts.length > 0">
-
-                <el-table :data="expiringContracts" size="small" max-height="330" :empty-text="contractHint || '未来 30 天暂无到期合同'" style="width: 100%">
-                  <el-table-column prop="contractNumber" label="合同编号" min-width="140" />
-                  <el-table-column prop="tenantId" label="租户ID" width="85" />
-                  <el-table-column prop="endDate" label="结束日期" width="115" />
-                  <el-table-column label="状态" width="90">
-                    <template #default="{ row }">
-                      <el-tag v-if="row.status === 'ACTIVE'" type="success">生效</el-tag>
-                      <el-tag v-else type="info">{{ statusText(row.status) }}</el-tag>
-                    </template>
-                  </el-table-column>
-                </el-table>
-              </DashboardPanel>
-            </div>
-          </div>
+            <el-table :data="expiringContracts" size="small" max-height="330" :empty-text="contractHint || '未来 30 天暂无到期合同'" style="width: 100%">
+              <el-table-column prop="contractNumber" label="合同编号" min-width="140" />
+              <el-table-column prop="tenantId" label="租户ID" width="85" />
+              <el-table-column prop="endDate" label="结束日期" width="115" />
+              <el-table-column label="状态" width="90">
+                <template #default="{ row }">
+                  <el-tag v-if="row.status === 'ACTIVE'" type="success">生效</el-tag>
+                  <el-tag v-else type="info">{{ statusText(row.status) }}</el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+          </DashboardPanel>
 
           <DashboardPanel class="summary-card" title="租户财务排行" subtitle="按未收金额从高到低排列" :meta="bills ? `${tenantFinanceList.length} 家租户` : ''">
 
@@ -372,14 +357,12 @@ const finance = computed(() => {
 
 const kpiCards = computed(() => [
   {
-    primary: true,
     label: '本月应收',
     value: `¥ ${formatShortMoney(finance.value.monthReceivable)}`,
     desc: `本月账单 ${finance.value.monthBillCount} 笔`,
     className: ''
   },
   {
-    primary: true,
     label: '本月实收',
     value: `¥ ${formatShortMoney(finance.value.monthReceived)}`,
     desc: `已支付 ${finance.value.paidBillCount} 笔`,
@@ -399,7 +382,6 @@ const kpiCards = computed(() => [
     className: finance.value.monthReceivable > 0 && finance.value.collectionRate >= 80 ? 'success' : ''
   },
   {
-    primary: true,
     label: '房间出租率',
     roomMetric: true,
     progress: roomStats.value ? roomRentRate.value : undefined,
@@ -416,9 +398,6 @@ const kpiCards = computed(() => [
 ].map(card => !card.roomMetric && billHint.value
   ? { ...card, value: '—', desc: billHint.value, className: '', progress: undefined }
   : card))
-
-const primaryMetrics = computed(() => kpiCards.value.filter(item => item.primary))
-const secondaryMetrics = computed(() => kpiCards.value.filter(item => !item.primary))
 
 const roomRentRate = computed(() => roomStats.value?.rentalRate ?? 0)
 
@@ -573,7 +552,7 @@ function renderCharts() {
     animation: false,
     color: ['#c84238', '#c5cbd3'],
     tooltip: { trigger: 'item', confine: true, valueFormatter: value => `${value} 间` },
-    title: { text: `${roomRentRate.value}%`, subtext: '出租率', left: 'center', top: '32%', textStyle: { color: '#202124', fontSize: 24, fontWeight: 600 }, subtextStyle: { color: '#475467', fontSize: 12 } },
+    title: { text: `${roomRentRate.value}%`, subtext: '出租率', left: 'center', top: '30%', textStyle: { color: '#202124', fontSize: 18, fontWeight: 600 }, subtextStyle: { color: '#475467', fontSize: 12 } },
     series: [{ type: 'pie', radius: ['67%', '84%'], center: ['50%', '50%'], label: { show: false }, stillShowZeroSum: false, data: [
       { name: '已出租', value: roomStats.value.rentedRoomCount },
       { name: '未出租', value: roomStats.value.availableRoomCount }
@@ -709,41 +688,8 @@ onBeforeUnmount(() => {
   border-radius: var(--dhic-radius-small);
   font-size: 13px;
 }
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  overflow: hidden;
-  gap: 1px;
-  background: var(--dhic-border-color-light);
-  border: 1px solid var(--dhic-border-color);
-  border-radius: var(--dhic-radius-large);
-}
-.kpi-card { min-width: 0; padding: 14px 16px; background: var(--dhic-card-bg); }
-.card-title { color: var(--dhic-text-regular); font-size: 13px; font-weight: 550; }
-.card-value {
-  margin: 6px 0;
-  color: var(--dhic-text-primary);
-  font-size: clamp(22px, 2.2cqi, 30px);
-  font-weight: 650;
-  line-height: 1.25;
-  letter-spacing: -.025em;
-  white-space: nowrap;
-}
-.card-desc { line-height: 1.5; }
-.metric-track {
-  display: block; width: 100%; height: 3px; appearance: none;
-  margin-top: 8px; border: 0; border-radius: 4px;
-  background: var(--dhic-border-color-light); overflow: hidden;
-}
-.metric-track::-webkit-progress-bar { background: var(--dhic-border-color-light); }
-.metric-track::-webkit-progress-value { background: var(--dhic-text-secondary); }
-.metric-track::-moz-progress-bar { background: var(--dhic-text-secondary); }
-.success .metric-track::-webkit-progress-value { background: var(--dhic-success); }
-.success .metric-track::-moz-progress-bar { background: var(--dhic-success); }
-.chart-grid { display: grid; row-gap: var(--dhic-section-gap); }
-.risk-panel { grid-column: 1 / -1; }
 .chart { width: 100%; min-width: 0; }
-.source-breakdown, .chart-empty { height: 204px; }
+.source-breakdown, .chart-empty { height: 190px; }
 .trend-body { position: relative; }
 .trend-no-series.chart-empty { position: absolute; inset: 0; height: auto; background: var(--dhic-card-bg); }
 .trend-legend { display: flex; justify-content: flex-end; gap: 4px; }
@@ -760,7 +706,7 @@ onBeforeUnmount(() => {
 .bar-mark { width: 12px; height: 8px; border-radius: 2px; background: #b7bdc3; }
 .line-mark { position: relative; width: 14px; height: 2px; background: #9e3738; }
 .line-mark::before { content: ''; position: absolute; inset: -2px auto auto 4px; width: 6px; height: 6px; box-sizing: border-box; background: white; border: 2px solid #9e3738; border-radius: 50%; }
-.trend-chart { height: clamp(216px, 29vh, 318px); }
+.trend-chart { height: 192px; }
 .source-breakdown { display: grid; grid-template-columns: minmax(100px, .82fr) minmax(150px, 1fr); align-items: center; gap: 12px; }
 .source-chart { height: 100%; }
 .source-legend { list-style: none; margin: 0; padding: 0; max-height: 100%; overflow-y: auto; }
@@ -775,7 +721,7 @@ onBeforeUnmount(() => {
 .source-legend strong, .source-legend small { text-align: end; white-space: nowrap; }
 .source-legend strong { font-weight: 600; }
 .room-breakdown { display: grid; grid-template-columns: minmax(96px, .82fr) minmax(120px, 1fr); gap: 16px; align-items: center; }
-.room-chart, .risk-chart, .room-empty, .risk-empty { height: 132px; }
+.room-chart, .risk-chart, .room-empty, .risk-empty { height: 104px; }
 .room-empty, .chart-empty, .risk-empty {
   display: grid; place-content: center; justify-items: center;
   color: var(--dhic-text-secondary); font-size: 13px;
@@ -790,28 +736,14 @@ onBeforeUnmount(() => {
 .room-counts b { font-weight: 600; color: var(--dhic-text-primary); }
 .rented { background: #c84238; }
 .vacant { background: #c5cbd3; }
-.detail-grid { display: grid; align-items: start; row-gap: var(--dhic-section-gap); }
-.detail-grid > div { min-width: 0; }
 .summary-card :deep(.el-table) { font-variant-numeric: tabular-nums; }
 .success { color: var(--dhic-success); }
 .danger { color: var(--dhic-danger); }
 .warning { color: var(--dhic-warning); }
 .ai-summary { margin: 0; font-size: 13px; line-height: 1.6; }
 
-@container (max-width: 1160px) {
-  .kpi-card { padding: 12px; }
-}
 @container (max-width: 1000px) {
-  .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .source-breakdown { grid-template-columns: minmax(96px, .75fr) minmax(140px, 1fr); gap: 6px; }
+  .source-breakdown { grid-template-columns: minmax(90px, .75fr) minmax(134px, 1fr); gap: 6px; }
   .source-legend li { gap: 4px; }
-}
-@container (max-width: 760px) {
-  .trend-panel, .source-panel, .room-panel, .risk-panel { grid-column: 1 / -1; }
-  .source-breakdown { grid-template-columns: minmax(96px, .8fr) minmax(140px, 1fr); }
-}
-@container (max-width: 500px) {
-  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .card-value { font-size: 22px; }
 }
 </style>

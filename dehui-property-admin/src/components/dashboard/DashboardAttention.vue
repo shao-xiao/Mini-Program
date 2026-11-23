@@ -1,44 +1,47 @@
 <template>
   <section class="attention" aria-labelledby="dashboard-attention-heading">
     <h2 id="dashboard-attention-heading">待处理</h2>
-    <div v-for="group in groups" :key="group.key" class="attention-group">
-      <button
-        v-if="group.records.length && !group.hint"
-        type="button"
-        class="attention-row"
-        :aria-expanded="expanded === group.key"
-        :aria-controls="`attention-${group.key}`"
-        @click="expanded = expanded === group.key ? null : group.key"
-      >
-        <span>{{ group.title }}</span>
-        <span class="attention-count">{{ group.records.length }} {{ group.unit }}</span>
-        <ArrowRight class="attention-arrow" aria-hidden="true" />
-      </button>
-      <div v-else class="attention-row">
-        <span>{{ group.title }}</span>
-        <span class="attention-hint">{{ group.hint || `0 ${group.unit}` }}</span>
+    <p v-if="allClear" class="attention-empty">逾期账单 0 笔 · 30 天内到期合同 0 份</p>
+    <template v-else>
+      <div v-for="group in groups" :key="group.key" class="attention-group">
+        <button
+          v-if="group.records.length && !group.hint"
+          type="button"
+          class="attention-row"
+          :aria-expanded="expanded === group.key"
+          :aria-controls="`attention-${group.key}`"
+          @click="expanded = expanded === group.key ? null : group.key"
+        >
+          <span>{{ group.title }}</span>
+          <span class="attention-count">{{ group.records.length }} {{ group.unit }}</span>
+          <ArrowRight class="attention-arrow" aria-hidden="true" />
+        </button>
+        <div v-else class="attention-row">
+          <span>{{ group.title }}</span>
+          <span class="attention-hint">{{ group.hint || `0 ${group.unit}` }}</span>
+        </div>
+        <div
+          v-if="group.records.length && !group.hint"
+          v-show="expanded === group.key"
+          :id="`attention-${group.key}`"
+          class="attention-records"
+          role="region"
+          :aria-label="`${group.title}明细`"
+          tabindex="0"
+        >
+          <table v-if="expanded === group.key">
+            <thead><tr><th scope="col">{{ group.numberLabel }}</th><th scope="col">租户</th><th scope="col">到期日</th></tr></thead>
+            <tbody>
+              <tr v-for="record in group.records" :key="record.id ?? record[group.numberKey]">
+                <td>{{ record[group.numberKey] || '—' }}</td>
+                <td>{{ record.tenantName?.trim() || (record.tenantId != null ? `ID ${record.tenantId}` : '—') }}</td>
+                <td>{{ record[group.dateKey] || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div
-        v-if="group.records.length && !group.hint"
-        v-show="expanded === group.key"
-        :id="`attention-${group.key}`"
-        class="attention-records"
-        role="region"
-        :aria-label="`${group.title}明细`"
-        tabindex="0"
-      >
-        <table v-if="expanded === group.key">
-          <thead><tr><th scope="col">{{ group.numberLabel }}</th><th scope="col">租户</th><th scope="col">到期日</th></tr></thead>
-          <tbody>
-            <tr v-for="record in group.records" :key="record.id ?? record[group.numberKey]">
-              <td>{{ record[group.numberKey] || '—' }}</td>
-              <td>{{ record.tenantName?.trim() || (record.tenantId != null ? `ID ${record.tenantId}` : '—') }}</td>
-              <td>{{ record[group.dateKey] || '—' }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    </template>
   </section>
 </template>
 
@@ -54,6 +57,8 @@ const props = defineProps({
 })
 
 const expanded = ref(null)
+const allClear = computed(() => !props.billHint && !props.contractHint
+  && props.overdueBills.length === 0 && props.expiringContracts.length === 0)
 const groups = computed(() => [
   {
     key: 'bills', title: '逾期账单', unit: '笔', numberLabel: '账单编号',
@@ -77,6 +82,7 @@ const groups = computed(() => [
   font-weight: 650;
   color: var(--dhic-text-primary);
 }
+.attention-empty { margin: 10px 0; color: var(--dhic-text-secondary); font-size: 12px; }
 .attention-group {
   border-bottom: 1px solid var(--dhic-border-color-light);
 }
