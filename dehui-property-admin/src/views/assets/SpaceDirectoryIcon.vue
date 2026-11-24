@@ -1,5 +1,5 @@
 <template>
-  <svg :viewBox="floorLabel ? '0 -17 72 70' : '0 0 72 56'" width="66" :height="floorLabel ? 64 : 52" fill="none" stroke="#52616a"
+  <svg viewBox="0 0 72 56" width="66" height="52" fill="none" stroke="#52616a"
     stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true" focusable="false">
     <g v-if="kind === 'building'">
       <path fill="#edf1f2" d="m16 13 27 5v32l-27-5z"/>
@@ -31,18 +31,9 @@
         <path fill="#b7c4c7" d="m37 16 8-4v6l-8 4z"/>
       </g>
     </g>
-    <g v-if="floorLabel">
-      <path :d="kind === 'basement' ? 'M25 3v17m21-17v19' : 'M25 3v12m21-12v14'" stroke-width="2"/>
-      <rect x="16" y="-15" width="39" height="20" rx="2" fill="#33434b" stroke="#27373f"/>
-      <text x="35.5" y="0" text-anchor="middle" fill="#fff" stroke="none" font-family="system-ui, sans-serif"
-        font-weight="700" :font-size="floorLabel.length > 3 ? 11 : 14">{{ floorLabel }}</text>
-    </g>
   </svg>
 </template>
 
 <script setup>
-defineProps({
-  kind: { type: String, required: true },
-  floorLabel: { type: String, default: '' }
-})
+defineProps({ kind: { type: String, required: true } })
 </script>

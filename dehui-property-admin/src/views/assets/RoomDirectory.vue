@@ -20,7 +20,7 @@
         <header class="rule"><h3>{{ section.label }}</h3><i></i><span>{{ section.items.length }} {{ building ? '层' : '栋' }}</span></header>
         <div class="folders">
           <button v-for="item in section.items" :key="item.id" class="tile" @click="building ? emit('floor', item.id) : emit('building', item.id)">
-            <SpaceDirectoryIcon :kind="item.iconKind" :floor-label="building ? floorSign(item) : ''" />
+            <SpaceDirectoryIcon :kind="item.iconKind" />
             <strong>{{ building ? floorName(item) : item.buildingName }}</strong>
             <small>{{ item.rooms.length }} 间 · 已入住 {{ item.occupied }}</small>
           </button>
@@ -91,12 +91,6 @@ const collator = new Intl.Collator('zh-CN', {numeric: true})
 const shown = computed(() => options.value.filter(group => counts.value[group.value] && (!filter.value || group.value === filter.value))
   .map(group => ({ ...group, rooms: scope.value.filter(room => status(room) === group.value)
     .sort((a,b) => collator.compare(a.roomNumber || a.roomCode || '', b.roomNumber || b.roomCode || '') || a.id-b.id) })))
-function floorSign(floor) {
-  if (floor.iconKind === 'roof') return '屋面'
-  const number = floor.floorNumber
-  if (number == null) return floorName(floor)
-  return number < 0 ? 'B' + Math.abs(number) : number + 'F'
-}
 function floorIconKind(floor) {
   if (/屋面|屋顶/.test(floor.floorName || '')) return 'roof'
   return floor.floorNumber < 0 ? 'basement' : 'floor'
