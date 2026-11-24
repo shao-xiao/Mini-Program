@@ -21,6 +21,7 @@ export function objectSpecs(group,index,{core,garage,room,points,label}) {
   const {sides,area} = measurements(points)
   if (group === 'rooms') return [
     ['所选空间',room.name],...(room.fields || []),
+    ['平面投影面积（图面量取）',area.toFixed(2)+' ㎡'],
     ['模型表达',room.name.includes('电梯井') ? '图上井道轮廓与开顶轿厢示意，运行状态未接入' : '图上空间轮廓，按 1.20 m 展示剖切'],
     ...(!room.fields?.length ? [['核对状态','图上名称已核对，详细注记待关联']] : []),
     ['标注依据',room.source === 'A401' ? 'A401 地下二层核心筒放大平面' : 'A101 地下二层平面图']

@@ -1,6 +1,6 @@
 <template>
   <div class="water-layout">
-    <FloorScene :key="system+layer" :water-rooms="rooms" :geometry="geometry" :water-items="items" :selection="selection" @select="index=$event.index"/>
+    <FloorScene :core="core" :floor-elevation="floorElevation" :plumbing="model" :rooms="rooms" :key="system+layer" :geometry="geometry" :water-items="items" :selection="selection" @select="index=$event.index"/>
     <aside aria-label="给排水构件规格">
       <h3><i :style="{background:highlight}"></i>{{ selected.name || pipeLayers[selected.layer][0] }}</h3>
       <label>显示图层<select :value="layer" @change="setLayer($event.target.value)">
@@ -38,7 +38,7 @@ import FloorScene from './FloorScene.vue'
 import {buildStations} from './plumbingStations'
 import {pipeLayers,waterSystems} from './plumbingCatalog'
 import {selectionColor as highlight} from './garageMarkings'
-const props = defineProps({geometry:Object, model:Object, system:String, rooms:{type:Array,default:()=>[]}})
+const props = defineProps({core:Object, floorElevation:Number, geometry:Object, model:Object, system:String, rooms:{type:Array,default:()=>[]}})
 defineEmits(['source','station'])
 const systemItems = computed(() => {
   const links = new Map()

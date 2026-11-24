@@ -1,6 +1,6 @@
 <template>
   <div class="stations">
-    <FloorScene :key="filter" :geometry="geometry"  :start-in-elevation="Boolean(initialName)" :stations="visible" :selection="selection" @select="index=$event.index" />
+    <FloorScene :core="core" :floor-elevation="floorElevation" :plumbing="model" :rooms="rooms" :key="filter" :geometry="geometry"  :start-in-elevation="Boolean(initialName)" :stations="visible" :selection="selection" @select="index=$event.index" />
     <aside aria-label="设备间与流路详情">
       <h3>{{ station.name }}</h3>
       <label>显示范围<select :value="filter" @change="changeFilter($event.target.value)">
@@ -35,7 +35,7 @@
 import {computed,ref} from 'vue'
 import {buildStations,stationMedia} from './plumbingStations'
 import FloorScene from './FloorScene.vue'
-const props=defineProps({geometry:Object,model:Object,rooms:Array,initialName:String})
+const props=defineProps({core:Object, floorElevation:Number, geometry:Object,model:Object,rooms:Array,initialName:String})
 defineEmits(['source'])
 const stations=computed(()=>buildStations(props.model,props.rooms))
 const filter=ref('全部')

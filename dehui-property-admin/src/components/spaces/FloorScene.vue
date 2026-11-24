@@ -21,12 +21,14 @@ import { addStations } from './stationScene'
 import { addPlumbing } from './plumbingScene'
 import { createFloorMotion } from './floorMotion'
 import { createFloorLabels } from './floorLabels'
-import { addSpaceCutaway } from './spaceCutaway'
+import { defineRoomModule, createRoomInstance } from './roomModule'
+import { createStationParts } from './stationEquipment'
+import { buildStations } from './plumbingStations'
 import { addGarageMarkings, selectionColor, garageColors, rampProfile, rampGeometry, roadLevel } from './garageMarkings'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { SVGRenderer } from 'three/addons/renderers/SVGRenderer.js'
 
-const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array, waterRooms: Array, stations: Array, startInElevation: Boolean })
+const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array, plumbing: Object, floorElevation: Number, stations: Array, startInElevation: Boolean })
 const emit = defineEmits(['select'])
 const stage = ref(null)
 const labelLayer = ref(null)
@@ -36,6 +38,8 @@ const backdrop=[]
 const scene = new T.Scene()
 const camera = new T.OrthographicCamera(-60, 60, 60, -60, 0.1, 1000)
 const meshes = new Map()
+const roomInstances=new Map()
+let roomDefinitions=[]
 const palette = { outline: 0xdde5e6, walls: 0x849a9f, columns: 0x536e79, bays: 0xb5ccbc, coreWalls: 0x9c8366, coreColumns: 0x54737b, ...garageColors, crossings:garageColors.lanes }
 const resources = new Set()
 const cut = 1.2
@@ -86,6 +90,13 @@ function surface(points, group, index) {
   const shape = new T.Shape()
   points.forEach(([x,z], i) => i ? shape.lineTo(x, -z) : shape.moveTo(x, -z))
   shape.closePath()
+  if(group==='outline') {
+    for (const room of roomDefinitions) {
+      if (room.origin[1]>=0) continue
+      const outline=room.points.map(([x,z])=>new T.Vector2(x+room.origin[0],-z-room.origin[2]))
+      shape.holes.push(new T.Path(outline))
+    }
+  }
   const solid = ['walls','columns','coreWalls','coreColumns'].includes(group)
   const ramp = group === 'lanes' && rampProfile(props.garage.lanes[index])
   const geom = ramp ? retain(rampGeometry(ramp)) : retain(solid
@@ -93,19 +104,13 @@ function surface(points, group, index) {
     : new T.ShapeGeometry(shape))
   if (!ramp) geom.rotateX(-Math.PI / 2)
   const color = group === 'parking' ? garageColors[props.garage.parking[index].zone] : palette[group]
-  const room = group === 'rooms' && props.rooms[index]
-  const floorColor = room?.name === '电梯厅' ? 0xe6d4aa : room?.name?.includes('电梯井') ? 0x92a7b7 : color
-  const material = retain(new T.MeshLambertMaterial({ color:floorColor, side: (props.waterItems || props.stations) && !solid ? T.FrontSide : T.DoubleSide, transparent: Boolean(props.waterItems || props.stations), opacity: props.waterItems || props.stations ? (solid ? .20 : .09) : 1, depthWrite: !(props.waterItems || props.stations) }))
+  const material = retain(new T.MeshLambertMaterial({ color, side: (props.waterItems || props.stations) && !solid ? T.FrontSide : T.DoubleSide, transparent: Boolean(props.waterItems || props.stations), opacity: props.waterItems || props.stations ? (solid ? .20 : .09) : 1, depthWrite: !(props.waterItems || props.stations) }))
   const mesh = new T.Mesh(geom, material)
   mesh.position.y = { bays:.018, lanes:roadLevel, crossings:.05, parking:.04, rooms:.025 }[group] || 0
   mesh.userData = { group, index }
   pickables.push(mesh)
-  if (room) {
-    addSpaceCutaway(mesh,room,props.rooms,retain,pickables)
-    motion.equipment(mesh,room,pickables)
-  }
-  const item = room || (['parking','lanes'].includes(group) && props.garage[group][index])
-  if (item) labels.add(group,index,item.name,points,ramp ? ramp.height : () => mesh.userData.hasEquipment ? 2.65 : room ? 1.25 : .10)
+  const item = (['parking','lanes'].includes(group) && props.garage[group][index])
+  if (item) labels.add(group,index,item.name,points,ramp ? ramp.height : () => .10)
   scene.add(mesh)
   meshes.set(group + ':' + index, mesh)
   if (solid || group === 'bays' || group === 'parking') {
@@ -214,6 +219,14 @@ function selectPoint(event) {
     emit('select', data.indices ? {group:'water',index:data.indices[hit.instanceId]} : data)
   }
 }
+async function exportSelectedRoom() {
+  const index=props.selection?.index
+  const room=roomDefinitions[index]
+  if (props.selection?.group!=='rooms' || !room) return
+  const {exportRoom}=await import('./roomExport')
+  await exportRoom(room)
+}
+defineExpose({exportSelectedRoom})
 function startPoint(event) { pointer = { x:event.clientX, y:event.clientY } }
 const selectedMaterial = retain(new T.MeshBasicMaterial({color:selectionColor,side:T.DoubleSide}))
 let previousMaterial
@@ -246,6 +259,11 @@ onMounted(() => {
   stage.value.prepend(renderer.domElement)
   labels = createFloorLabels(labelLayer.value)
   const geo = props.geometry
+  const rooms=props.rooms || []
+  const lifts=new Map(buildStations(props.plumbing,rooms).filter(s=>s.kind==='处理间').map(s=>[s.name,s]))
+  const coreStrokes=props.core ? [...geo.lines,...props.core.lines] : geo.lines
+  roomDefinitions=rooms.map(room=>defineRoomModule(room,rooms,lifts.get(room.name),props.floorElevation,
+    room.inCore ? coreStrokes : geo.lines))
   if (!props.detail) {
     surface(geo.outline, 'outline', 0)
     for (const group of (props.traffic || props.waterItems || props.stations ? ['walls','columns'] : ['bays','walls','columns'])) geo[group].forEach((points, i) => surface(points, group, i))
@@ -256,26 +274,40 @@ onMounted(() => {
       for (const group of ['lanes','parking']) props.garage[group].forEach((item,i) => surface(item.points,group,i))
     }
   }
-  if (props.stations) {
-    backdrop.push(...scene.children)
-    pickables.length=0
-    stationMotion=addStations(scene,props.stations,retain,pickables,labels)
-  }
-  if (props.waterItems) {
-    pickables.length=0
-    for (const [i,room] of (props.waterRooms || []).entries()) {
-      linework([[...room.points,room.points[0]]])
-      labels.add('water-room',i,room.name,room.points,()=>.06)
+  const professional=Boolean(props.stations || props.waterItems)
+  const parts=createStationParts(retain)
+  roomDefinitions.forEach((module,index)=>{
+    const room=props.rooms[index]
+    const instance=createRoomInstance(module,{retain,motion,parts})
+    roomInstances.set(room.name,instance)
+    scene.add(instance.root)
+    if (!professional) {
+      instance.root.traverse(child=>{
+        if (child.isMesh) { child.userData={group:'rooms',index}; pickables.push(child) }
+      })
+      meshes.set('rooms:'+index,instance.slab)
     }
-    plumbingMotion=addPlumbing(scene,props.waterItems,retain,pickables,labels,Boolean(renderer.isWebGLRenderer))
-  }
-  props.rooms?.forEach((item,i) => surface(item.points,'rooms',i))
+    if (!props.stations?.some(s=>s.name===room.name)) {
+      labels.add(professional?'water-room':'rooms',index,room.name,room.points,
+        ()=>module.origin[1]+(instance.root.userData.hasEquipment?2.65:1.25))
+    }
+  })
   if (props.core) {
     props.core.walls.forEach((points,i) => surface(points,'coreWalls',i))
     if (props.detail) {
       props.core.columns.forEach((points,i) => surface(points,'coreColumns',i))
       linework(props.core.lines)
     }
+  }
+  if (props.stations) {
+    const activeRooms=new Set(props.stations.map(s=>roomInstances.get(s.name)?.root))
+    backdrop.push(...scene.children.filter(object=>!activeRooms.has(object)))
+    pickables.length=0
+    stationMotion=addStations(scene,props.stations,retain,pickables,labels,roomInstances,parts)
+  }
+  if (props.waterItems) {
+    pickables.length=0
+    plumbingMotion=addPlumbing(scene,props.waterItems,retain,pickables,labels,Boolean(renderer.isWebGLRenderer))
   }
   const fitPoints = props.detail ? [...props.core.columns.flat(), ...props.core.walls.flat(), ...props.core.lines.flat()] : geo.outline
   bounds = new T.Box3().setFromPoints(fitPoints.map(([x,z]) => new T.Vector3(x,0,z)))

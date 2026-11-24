@@ -2,10 +2,10 @@ import * as T from 'three'
 import { parkingRoutes,vehiclePose } from './garageDrive'
 
 // Schematic objects are transient scene children. They have no business records.
-export function createFloorMotion(retain) {
+export function createFloorMotion(retain, exportMotion=false) {
   const cube=retain(new T.BoxGeometry(1,1,1))
   const round=retain(new T.CylinderGeometry(1,1,1,14))
-  const materials=new Map(), ticks=[]
+  const materials=new Map(), ticks=[], clips=[]
   function part(parent,geometry,color,x,y,z,w,h,d) {
     if (!materials.has(color)) materials.set(color,retain(new T.MeshLambertMaterial({color})))
     const m=new T.Mesh(geometry,materials.get(color))
@@ -18,6 +18,12 @@ export function createFloorMotion(retain) {
   const cylinder=(g,color,x,y,z,r,h)=>part(g,round,color,x,y,z,r,h,r)
   function lamp(g,x,y,z,offset) {
     const lamp=box(g,0x7af6af,x,y,z,.095,.08,.09)
+    if (exportMotion) {
+      const period=1.9
+      const times=[0,1.2-offset,period-offset,period].filter((t,i,a)=>t>=0 && t<=period && a.indexOf(t)===i).sort((a,b)=>a-b)
+      const values=times.flatMap(t=>(t+offset+.0001)%period<1.2 ? lamp.scale.toArray() : [0,0,0])
+      clips.push(new T.VectorKeyframeTrack(lamp.uuid+'.scale',times,values,T.InterpolateDiscrete))
+    }
     ticks.push(t=>{lamp.visible=(t+offset)%1.9<1.2})
   }
   function rack(g,electric) {
@@ -56,7 +62,14 @@ export function createFloorMotion(retain) {
       box(g,0x4d889c,.59,.33,0,.56,.19,.19)
       cylinder(g,0x4d889c,.81,.50,0,.11,.49)
     }
-    ticks.push(t=>{rotor.rotation.y=t*(pump ? 2.7 : 4.1)})
+    const speed=pump ? 2.7 : 4.1
+    if (exportMotion) {
+      const times=[0,1,2,3,4].map(i=>i*Math.PI/(2*speed))
+      const up=new T.Vector3(0,1,0)
+      const values=times.flatMap(t=>new T.Quaternion().setFromAxisAngle(up,t*speed).toArray())
+      clips.push(new T.QuaternionKeyframeTrack(rotor.uuid+'.quaternion',times,values))
+    }
+    ticks.push(t=>{rotor.rotation.y=t*speed})
   }
   function equipment(mesh,room,pickables) {
     let model
@@ -83,7 +96,6 @@ export function createFloorMotion(retain) {
     if (!best) return
     const g=new T.Group()
     g.position.set(best.x,0,best.y)
-    g.scale.setScalar(Math.min(1.45,clearance*.9))
     mesh.add(g)
     model(g)
     mesh.userData.hasEquipment=true
@@ -115,5 +127,5 @@ export function createFloorMotion(retain) {
       })
     })
   }
-  return {equipment,traffic,get active(){return ticks.length>0},update(time){for(const tick of ticks) tick(time)}}
+  return {equipment,traffic,animationClips(){return clips.length ? [new T.AnimationClip('设备循环示意',-1,clips)] : []},get active(){return ticks.length>0},update(time){for(const tick of ticks) tick(time)}}
 }

@@ -39,7 +39,7 @@
       <p v-if="message || coreError" role="alert">{{ message || coreError }}</p>
       <template v-if="tab === '平面图' && !original">
         <div class="model-workbench">
-        <FloorScene :key="mode" :rooms="visibleRooms" :garage="garage" :traffic="mode === 'traffic'" :core="core" :detail="detail" :geometry="model.geometry" :selection="selection" @select="selection = $event" />
+        <FloorScene ref="floorScene" :floor-elevation="model.elevation" :plumbing="plumbing" :key="mode" :rooms="visibleRooms" :garage="garage" :traffic="mode === 'traffic'" :core="core" :detail="detail" :geometry="model.geometry" :selection="selection" @select="selection = $event" />
         <aside class="properties" :class="{'picked':selection.group !== 'outline'}" aria-label="模型规格">
           <h3>{{ detail ? '核心筒规格' : '构件规格' }}</h3>
           <div class="pickers">
@@ -51,6 +51,7 @@
             </select></label>
           </div>
           <dl aria-live="polite"><div v-for="[label,val] in specs" :key="label" :class="{'selected-value':selection.group !== 'outline' && !commonSpecs.includes(label)}"><dt>{{ label }}</dt><dd>{{ val }}</dd></div></dl>
+          <button v-if="selection.group==='rooms'" type="button" :disabled="exporting" @click="downloadRoom">导出房间模块 · GLB</button>
           <button v-if="selectedSheet" type="button" @click="sourceCode = selectedSheet; original = true">核对所选图纸 · {{ selectedSheet }}</button>
           <p v-if="['lanes','parking','crossings'].includes(selection.group) || (mode === 'traffic' && selection.group === 'outline')" class="note">编号及方向取自交通竣工图第 5 页，分区取自第 6 页。车位和车道按扫描图定位。</p>
           <p v-else-if="detail && selection.group !== 'rooms'" class="note">A401 · 1:50。{{ core.columns.length }} 个柱截面与 A101 逐角配准，最大偏差 {{ core.maxErrorMm }} mm。墙柱显示至地坪以上 1.20 m。</p>
@@ -58,8 +59,8 @@
         </aside>
         </div>
       </template>
-      <PlumbingRoomModel v-if="tab === '给排水' && waterSystem === 'stations' && hasStationSurvey(plumbing)" v-show="!original" :initial-name="stationName" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" @source="code=>{sourceCode=code;original=true}" />
-      <PlumbingModel @station="openStation" v-else-if="tab === '给排水' && plumbing" v-show="!original" :key="waterSystem" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" :system="waterSystem" @source="code=>{sourceCode=code;original=true}"/>
+      <PlumbingRoomModel :core="core" :floor-elevation="model.elevation" v-if="tab === '给排水' && waterSystem === 'stations' && hasStationSurvey(plumbing)" v-show="!original" :initial-name="stationName" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" @source="code=>{sourceCode=code;original=true}" />
+      <PlumbingModel :core="core" :floor-elevation="model.elevation" @station="openStation" v-else-if="tab === '给排水' && plumbing" v-show="!original" :key="waterSystem" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" :system="waterSystem" @source="code=>{sourceCode=code;original=true}"/>
       <table v-else-if="!original && tab !== '平面图'" class="drawing-index">
         <thead><tr><th>图号</th><th>图名</th><th>核对状态</th></tr></thead>
         <tbody><tr v-for="s in sources" :key="s.code"><td>{{ s.code }}</td><td>{{ sheetTitle(s) }}</td><td><button v-if="s.code==='P401' && availableWaterSystems.sprinkler" @click="changeTab('给排水'); waterSystem='sprinkler'">查看自动喷淋模型</button><template v-else>已核对图签 · 未建模</template></td></tr></tbody>
@@ -85,7 +86,7 @@ import { selectionColor } from './garageMarkings'
 import { hasPermission } from '../../utils/permission'
 import { readFloorArchive, attachFloorArchive, attachSupplement, openSource } from './floorDrawingArchive'
 import { waterSystems } from './plumbingCatalog'
-import { hasStationSurvey } from './plumbingStations'
+import { buildStations, hasStationSurvey } from './plumbingStations'
 const PlumbingRoomModel = defineAsyncComponent(() => import('./PlumbingRoomModel.vue'))
 const stationName = ref('')
 function openStation(name = '') {
@@ -96,6 +97,13 @@ const PlumbingModel = defineAsyncComponent(() => import('./PlumbingModel.vue'))
 const FloorScene = defineAsyncComponent(() => import('./FloorScene.vue'))
 const props = defineProps({ floorId: { type: Number, required: true }, ledgerArea: [String, Number] })
 const tabs = ['平面图','给排水','强电','消防','弱电']
+const floorScene=ref(null), exporting=ref(false)
+async function downloadRoom() {
+  exporting.value=true
+  try { await floorScene.value.exportSelectedRoom() }
+  catch (error) { message.value='房间模块导出失败：'+error.message }
+  finally { exporting.value=false }
+}
 const baseLabels = { outline:'楼层轮廓', bays:'车位', columns:'柱', walls:'实填墙段' }
 const core = shallowRef(null), coreArchive = shallowRef(null), mode = ref('building'), coreError = ref('')
 const garage = shallowRef(null), garageArchive = shallowRef(null)
@@ -191,16 +199,19 @@ async function attachDetail(event,kind) {
 }
 watch(() => props.floorId, load, { immediate:true })
 onBeforeUnmount(() => { epoch++; pdfEpoch++; clearPdf() })
+const liftStations=computed(()=>buildStations(plumbing.value).filter(s=>s.kind==='处理间'))
 const specs = computed(() => {
   const m = model.value
   if (!m) return []
   const {group,index} = selection.value
   const base = [['本层地坪标高', m.elevation.toFixed(3) + ' m'],['B2 至 B1 层高', (m.upperElevation - m.elevation).toFixed(3) + ' m']]
   if (group === 'outline') return [['竣工图面积',m.area + ' ㎡'],...(props.ledgerArea != null ? [['台账登记面积',props.ledgerArea + ' ㎡']] : []),['外包尺寸',m.span.map(n => n.toFixed(2)).join(' × ') + ' m'],['A101 建筑图注',m.geometry.bays.length + ' 辆'],...(garage.value ? [['交通竣工图',garage.value.parking.length+' 个一般小型车位'],['分区数量',['C','D'].map(z=>z+'区 '+garage.value.parking.filter(b=>b.zone===z).length+' 个').join(' · ')]] : []),...base,['标注依据','A101 平面图、A301 1–1 剖面图']]
-  return objectSpecs(group,index,{
+  const rows=objectSpecs(group,index,{
     model:m,core:core.value,garage:garage.value,room:visibleRooms.value[index],
     points:paths.value?.[index],label:labels.value[group]
   })
+  const station=group==='rooms' && liftStations.value.find(s=>s.name===visibleRooms.value[index]?.name)
+  return station ? [...rows,['设备 · P301',[station.machine,station.model].filter(Boolean).join(' ')],['图注流量 · 扬程 · 功率',station.performance]] : rows
 })
 const selectedSheet = computed(() => {
   const {group,index} = selection.value
