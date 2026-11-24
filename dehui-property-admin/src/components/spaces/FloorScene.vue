@@ -16,13 +16,13 @@ import { addGarageMarkings, selectionColor, garageColors } from './garageMarking
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { SVGRenderer } from 'three/addons/renderers/SVGRenderer.js'
 
-const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, traffic: Boolean })
+const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean })
 const emit = defineEmits(['select'])
 const stage = ref(null)
 const scene = new T.Scene()
 const camera = new T.OrthographicCamera(-60, 60, 60, -60, 0.1, 1000)
 const meshes = new Map()
-const palette = { outline: 0xdde5e6, walls: 0x849a9f, columns: 0x536e79, bays: 0xb5ccbc, coreWalls: 0x9c8366, coreColumns: 0x54737b, ...garageColors }
+const palette = { outline: 0xdde5e6, walls: 0x849a9f, columns: 0x536e79, bays: 0xb5ccbc, coreWalls: 0x9c8366, coreColumns: 0x54737b, ...garageColors, crossings:garageColors.lanes }
 const resources = new Set()
 const cut = 1.2
 let renderer, controls, observer, highlighted, pointer, frame
@@ -37,7 +37,7 @@ function surface(points, group, index) {
   const shape = new T.Shape()
   points.forEach(([x,z], i) => i ? shape.lineTo(x, -z) : shape.moveTo(x, -z))
   shape.closePath()
-  const solid = ['walls','columns','coreWalls','coreColumns','rooms'].includes(group)
+  const solid = ['walls','columns','coreWalls','coreColumns'].includes(group)
   const geom = retain(solid
     ? new T.ExtrudeGeometry(shape, { depth: cut, bevelEnabled: false })
     : new T.ShapeGeometry(shape))
@@ -45,7 +45,7 @@ function surface(points, group, index) {
   const color = group === 'parking' ? garageColors[props.garage.parking[index].zone] : palette[group]
   const material = retain(new T.MeshLambertMaterial({ color, side: T.DoubleSide }))
   const mesh = new T.Mesh(geom, material)
-  mesh.position.y = { bays:.018, lanes:.014, parking:.04, rooms:.012 }[group] || 0
+  mesh.position.y = { bays:.018, lanes:.014, crossings:.05, parking:.04, rooms:.025 }[group] || 0
   mesh.userData = { group, index }
   scene.add(mesh)
   meshes.set(group + ':' + index, mesh)
@@ -141,11 +141,13 @@ onMounted(() => {
     surface(geo.outline, 'outline', 0)
     for (const group of (props.traffic ? ['walls','columns'] : ['bays','walls','columns'])) geo[group].forEach((points, i) => surface(points, group, i))
     linework(geo.lines)
-    props.garage?.rooms.forEach((item,i) => surface(item.points,'rooms',i))
+
     if (props.traffic) {
+      props.garage.crossings?.forEach((points,i) => surface(points,'crossings',i))
       for (const group of ['lanes','parking']) props.garage[group].forEach((item,i) => surface(item.points,group,i))
     }
   }
+  props.rooms?.forEach((item,i) => surface(item.points,'rooms',i))
   if (props.core) {
     props.core.walls.forEach((points,i) => surface(points,'coreWalls',i))
     if (props.detail) {

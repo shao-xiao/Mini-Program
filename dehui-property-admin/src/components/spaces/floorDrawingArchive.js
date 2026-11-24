@@ -71,6 +71,10 @@ export async function readFloorArchive(id) {
     base[kind] = data
     base[kind + 'Archive'] = archive
   }
+  if (base.survey && base.survey.detailReference !== base.core?.source.sha256) {
+    delete base.survey
+    errors.push('建筑空间规格对应的 A401 版本未关联')
+  }
   base.coreError = errors.join(' · ')
   return base
 }
@@ -85,6 +89,22 @@ async function parseSupplement(file, model) {
   if (archive.file('core.json')) {
     const result = await parseCore(archive, model)
     return {kind:'core', data:result.core, archive}
+  }
+  const survey = archive.file('spaces.json')
+  if (survey) {
+    if (survey._data.uncompressedSize > 256 * 1024) throw Error('空间规格清单过大')
+    const data = JSON.parse(await survey.async('string'))
+    if (data.version !== 1 || data.floor !== model.floor || data.buildingCode !== model.buildingCode ||
+        !data.reference || data.reference !== model.sources.find(s => s.code === 'A101')?.sha256 ||
+        !/^[a-f0-9]{64}$/.test(data.detailReference) ||
+        !Array.isArray(data.rooms) || !data.rooms.length || data.rooms.length > 500 ||
+        new Set(data.rooms.map(r => r.name)).size !== data.rooms.length ||
+        !data.rooms.every(r => typeof r.name === 'string' && r.name.trim() && ['A101','A401'].includes(r.source) &&
+          typeof r.inCore === 'boolean' && Array.isArray(r.points) && r.points.length >= 3 &&
+          r.points.length <= 100 && r.points.every(validPoint) && Array.isArray(r.fields) &&
+          r.fields.length <= 30 && r.fields.every(pair => Array.isArray(pair) && pair.length === 2 &&
+            pair.every(v => typeof v === 'string' && v.length <= 300)))) throw Error('建筑空间规格与底图不符')
+    return {kind:'survey', data, archive}
   }
   const entry = archive.file('garage.json')
   if (!entry || entry._data.uncompressedSize > 1024 * 1024) throw Error('缺少交通图清单')
@@ -114,8 +134,13 @@ async function parseSupplement(file, model) {
 export async function attachSupplement(id, file, model, kind) {
   const result = await parseSupplement(file, model)
   if (result.kind !== kind) throw Error('请选择对应的详图包')
-  const pdf = await openSource(result.archive, result.data.source)
-  URL.revokeObjectURL(pdf)
+  if (kind === 'survey') {
+    if (result.data.detailReference !== model.sources.find(s => s.code === 'A401')?.sha256)
+      throw Error('请先关联规格对应的 A401 详图')
+  } else {
+    const pdf = await openSource(result.archive, result.data.source)
+    URL.revokeObjectURL(pdf)
+  }
   const before = normalizeCustomFieldFiles((await values(id))[field])
   if (!before.length) throw Error('请先关联底图')
   for (const item of before.slice(1)) {
