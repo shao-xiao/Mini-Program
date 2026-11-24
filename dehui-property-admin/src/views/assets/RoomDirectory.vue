@@ -29,25 +29,31 @@
       <p v-if="!folderSections.length" class="state">{{ building ? '暂无登记楼层' : '暂无楼宇' }}</p>
     </template>
     <template v-else>
-      <div class="filters" aria-label="筛选房间状态">
-        <button :aria-pressed="!filter" @click="filter = ''">全部 {{ scope.length }}</button>
-        <button v-for="g in options" :key="g.value" :aria-pressed="filter === g.value" @click="filter = g.value">{{ g.label }} {{ counts[g.value] || 0 }}</button>
+      <div :class="{ 'floor-workspace': hasB2Drawing }">
+        <section class="room-list" aria-label="房间台账">
+          <h3 v-if="hasB2Drawing">房间</h3>
+          <div class="filters" aria-label="筛选房间状态">
+            <button :aria-pressed="!filter" @click="filter = ''">全部 {{ scope.length }}</button>
+            <button v-for="g in options" :key="g.value" :aria-pressed="filter === g.value" @click="filter = g.value">{{ g.label }} {{ counts[g.value] || 0 }}</button>
+          </div>
+          <section v-for="g in shown" :key="g.value" class="section">
+            <header class="rule"><h3>{{ g.label }}</h3><i></i><span>{{ g.rooms.length }} 间房间</span></header>
+            <div class="rooms">
+              <button v-for="room in g.rooms" :key="room.id" class="tile room" aria-haspopup="dialog"
+                :aria-label="`查看房间 ${room.roomNumber || room.roomCode}，${g.label}`" @click="show(room)">
+                <svg viewBox="0 0 46 40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true" :class="g.value.toLowerCase()">
+                  <path d="M7 35h32M11 35V6h25v29" />
+                  <path d="M15 34V10l15-2v27z" fill="currentColor" fill-opacity=".11"/><path d="M25 22h2"/>
+                  <path v-if="g.value === 'RENTED'" d="M17 17h6v4h-6z" fill="currentColor"/>
+                </svg>
+                <strong>{{ room.roomNumber || room.roomCode }}</strong><small>{{ areaText(room.area) }}</small>
+              </button>
+            </div>
+          </section>
+          <p v-if="!shown.length" class="state">{{ hasB2Drawing && !scope.length ? 'B2 尚无登记房间' : '当前范围内没有符合条件的房间' }}</p>
+        </section>
+        <BasementDrawing v-if="hasB2Drawing" :key="floor.id" :floor-id="Number(floor.id)" :ledger-area="floor.totalArea" />
       </div>
-      <section v-for="g in shown" :key="g.value" class="section">
-        <header class="rule"><h3>{{ g.label }}</h3><i></i><span>{{ g.rooms.length }} 间房间</span></header>
-        <div class="rooms">
-          <button v-for="room in g.rooms" :key="room.id" class="tile room" aria-haspopup="dialog"
-            :aria-label="`查看房间 ${room.roomNumber || room.roomCode}，${g.label}`" @click="show(room)">
-            <svg viewBox="0 0 46 40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true" :class="g.value.toLowerCase()">
-              <path d="M7 35h32M11 35V6h25v29" />
-              <path d="M15 34V10l15-2v27z" fill="currentColor" fill-opacity=".11"/><path d="M25 22h2"/>
-              <path v-if="g.value === 'RENTED'" d="M17 17h6v4h-6z" fill="currentColor"/>
-            </svg>
-            <strong>{{ room.roomNumber || room.roomCode }}</strong><small>{{ areaText(room.area) }}</small>
-          </button>
-        </div>
-      </section>
-      <p v-if="!shown.length" class="state">当前范围内没有符合条件的房间</p>
     </template>
     <el-drawer v-model="drawer" title="房间详情" direction="rtl" size="min(420px, 96vw)">
       <template v-if="selected">
@@ -58,10 +64,11 @@
   </section>
 </template>
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import SpaceDirectoryIcon from './SpaceDirectoryIcon.vue'
 import { roomStatusOptions, roomTypeOptions, roomContractStageOptions } from '../../workspaceConfigs/buildingWorkspaceConfig.js'
 
+const BasementDrawing = defineAsyncComponent(() => import('../../components/spaces/BasementDrawing.vue'))
 const props = defineProps({
   buildings: Array, floors: Array, rooms: Array, building: Object, floor: Object, loading: Boolean, error: String
 })
@@ -79,6 +86,7 @@ const inRooms = computed(() => Boolean(props.building && (props.floor || allRoom
 const scope = computed(() => props.rooms.filter(room =>
   (!props.building || Number(room.buildingId) === Number(props.building.id)) &&
   (!props.floor || Number(room.floorId) === Number(props.floor.id))))
+const hasB2Drawing = computed(() => props.building?.buildingCode === 'BLD-3C5CD7268F55' && Number(props.floor?.floorNumber) === -2)
 const counts = computed(() => {
   const result = {}
   for (const room of scope.value) result[status(room)] = (result[status(room)] || 0) + 1
@@ -140,7 +148,7 @@ watch(allRooms, () => { filter.value = '' })
 watch(selected, room => { if (!room) drawer.value = false })
 </script>
 <style scoped>
-.directory { background:var(--dhic-surface); color:var(--dhic-text-primary); border:1px solid var(--dhic-border-color); border-radius:8px; padding:6px 18px 20px; }
+.directory { container-type:inline-size; background:var(--dhic-surface); color:var(--dhic-text-primary); border:1px solid var(--dhic-border-color); border-radius:8px; padding:6px 18px 20px; }
 .directory-head,.directory-head nav,.rule,.filters,.floor-tools { display:flex; align-items:center; gap:10px; }
 .directory-head { flex-wrap:wrap; justify-content:space-between; min-height:48px; border-bottom:1px solid var(--dhic-border-color-light); }
 h2,h3 { margin:0; font-size:15px; } h3 {font-size:13px;}
@@ -160,4 +168,11 @@ small,.summary,.rule span,.state {font-size:12px;color:var(--dhic-text-secondary
 .room svg {width:38px;height:34px;color:#747c86;} .room .vacant {color:#38775e;} .room .rented {color:#8b6435;}
 .state {padding:24px 0;text-align:center;} dl div {display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--dhic-border-color-light);}
 dt {color:var(--dhic-text-secondary);}dd {margin:0;text-align:right;overflow-wrap:anywhere;}
+.floor-workspace { display:grid; grid-template-columns:minmax(220px, 0.72fr) minmax(0,1.28fr); gap:clamp(16px,2vw,36px); padding-top:16px; }
+.floor-workspace .room-list {min-width:0; padding-right:16px; border-right:1px solid var(--dhic-border-color-light);}
+.floor-workspace .room-list .state {text-align:start;}
+@container (max-width:760px) {
+  .floor-workspace {grid-template-columns:minmax(0,1fr);}
+  .floor-workspace .room-list {padding:0;border-right:0;border-bottom:1px solid var(--dhic-border-color-light);}
+}
 </style>
