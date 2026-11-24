@@ -36,9 +36,7 @@ async function download(file) {
   return request.get('/files/' + fileId, { responseType: 'blob', silent: true, timeout: 60000 })
 }
 
-async function parseCore(file, model) {
-  if (file.size > maxBytes) throw Error('核心筒图包超过 20 MB')
-  const archive = await JSZip.loadAsync(await file.arrayBuffer())
+async function parseCore(archive, model) {
   const entry = archive.file('core.json')
   if (!entry || entry._data.uncompressedSize > 1024 * 1024) throw Error('缺少有效核心筒清单')
   const core = JSON.parse(await entry.async('string'))
@@ -64,29 +62,72 @@ export async function readFloorArchive(id) {
   const files = normalizeCustomFieldFiles((await values(id))[field])
   if (!files.length) return null
   const base = await parseArchive(await download(files[0]))
-  if (files.length > 1) {
-    try {
-      const detail = await parseCore(await download(files[1]), base.model)
-      base.core = detail.core
-      base.coreArchive = detail.archive
-    } catch (error) {
-      base.coreError = error.message || '核心筒附件读取失败'
-    }
+  const results = await Promise.allSettled(files.slice(1).map(async file =>
+    parseSupplement(await download(file), base.model)))
+  const errors = []
+  for (const result of results) {
+    if (result.status === 'rejected') { errors.push(result.reason.message); continue }
+    const { kind, data, archive } = result.value
+    base[kind] = data
+    base[kind + 'Archive'] = archive
   }
+  base.coreError = errors.join(' · ')
   return base
 }
 
-export async function attachCoreArchive(id, file, model) {
-  const { core, archive } = await parseCore(file, model)
-  const pdf = await openSource(archive, core.source)
+function validPoint(p) {
+  return Array.isArray(p) && p.length === 2 && p.every(n => Number.isFinite(n) && Math.abs(n) < 500)
+}
+
+async function parseSupplement(file, model) {
+  if (file.size > maxBytes) throw Error('详图包超过 20 MB')
+  const archive = await JSZip.loadAsync(await file.arrayBuffer())
+  if (archive.file('core.json')) {
+    const result = await parseCore(archive, model)
+    return {kind:'core', data:result.core, archive}
+  }
+  const entry = archive.file('garage.json')
+  if (!entry || entry._data.uncompressedSize > 1024 * 1024) throw Error('缺少交通图清单')
+  const data = JSON.parse(await entry.async('string'))
+  if (data.version !== 1 || data.floor !== model.floor || data.buildingCode !== model.buildingCode ||
+      data.reference !== model.sources.find(s => s.code === 'A101')?.sha256 ||
+      data.source?.code !== 'B2交通' || data.source.file !== 'garage.pdf' || !archive.file(data.source.file))
+    throw Error('交通图与底图版本不符')
+  for (const group of ['parking','lanes','rooms']) {
+    if (!Array.isArray(data[group]) || !data[group].length || data[group].length > 2000 ||
+        !data[group].every(item => typeof item.name === 'string' && item.name.trim() &&
+          Array.isArray(item.points) && item.points.length >= 3 && item.points.length <= 100 && item.points.every(validPoint)))
+      throw Error('交通图轮廓无效')
+  }
+  if (new Set(data.parking.map(p => p.name)).size !== data.parking.length ||
+      !data.parking.every(p => ['C','D'].includes(p.zone)) ||
+      !data.lanes.every(l => Array.isArray(l.arrows) && l.arrows.length <= 100 && l.arrows.every(a =>
+        Array.isArray(a) && a.length === 3 && validPoint(a.slice(0,2)) && Number.isFinite(a[2]))))
+    throw Error('车位分区、编号或车道信息无效')
+  if (!data.lanes.every(l => !l.centerline || (Array.isArray(l.centerline) && l.centerline.length === 2 && l.centerline.every(validPoint))) ||
+      (data.crossings && (!Array.isArray(data.crossings) || data.crossings.length > 100 ||
+        !data.crossings.every(r => Array.isArray(r) && r.length === 4 && r.every(validPoint)))))
+    throw Error('道路标线未通过校验')
+  return {kind:'garage',data,archive}
+}
+
+export async function attachSupplement(id, file, model, kind) {
+  const result = await parseSupplement(file, model)
+  if (result.kind !== kind) throw Error('请选择对应的详图包')
+  const pdf = await openSource(result.archive, result.data.source)
   URL.revokeObjectURL(pdf)
   const before = normalizeCustomFieldFiles((await values(id))[field])
-  if (before.length !== 1) throw Error('楼层附件已变化，请刷新查看')
+  if (!before.length) throw Error('请先关联底图')
+  for (const item of before.slice(1)) {
+    const existing = await parseSupplement(await download(item),model)
+    if (existing.kind === kind) throw Error('该详图已关联，请刷新查看')
+  }
   const uploaded = await uploadCustomFieldAttachment(file, { workspaceKey:'floors', timeout:60000 })
   const current = await values(id)
   const files = normalizeCustomFieldFiles(current[field])
-  if (files.length !== 1 || files[0].fileId !== before[0].fileId) throw Error('底图已变化，请刷新查看')
-  await saveCustomFieldValues('floors', id, { ...current, [field]: [...files, { ...uploaded, sortOrder:1 }] })
+  if (files.length !== before.length || files.some((item,i) => item.fileId !== before[i].fileId))
+    throw Error('附件已变化，请刷新查看')
+  await saveCustomFieldValues('floors', id, { ...current, [field]: [...files, { ...uploaded, sortOrder:files.length }] })
 }
 
 // The floor workspace saves the entire custom-field record. Initial setup is only

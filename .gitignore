@@ -37,3 +37,6 @@ dehui-property-admin/pnpm-lock.yaml
 
 # OS metadata
 .DS_Store
+
+# Private B2 drawing attachments and local digitization working files
+/output/b2-garage-private/

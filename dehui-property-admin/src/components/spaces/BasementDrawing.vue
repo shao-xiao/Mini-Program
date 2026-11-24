@@ -1,5 +1,5 @@
 <template>
-  <section class="drawing" aria-label="B2 楼层图模">
+  <section ref="drawing" class="drawing" :style="{'--selection-color':selectionColor}" aria-label="B2 楼层图模">
     <nav aria-label="图纸专业">
       <button v-for="name in tabs" :key="name" type="button" :aria-pressed="tab === name" @click="changeTab(name)">{{ name }}</button>
     </nav>
@@ -12,30 +12,34 @@
     <template v-else>
       <header><h3>{{ tab === '平面图' ? '地下二层 · 建筑模型' : tab + '竣工图' }}</h3>
         <div v-if="tab === '平面图'" class="views">
-          <div v-if="core && !original" class="scope" aria-label="模型范围">
-            <button :aria-pressed="!detail" @click="scope(false)">整层</button>
-            <button :aria-pressed="detail" @click="scope(true)">核心筒</button>
+          <div v-if="(core || garage) && !original" class="scope" aria-label="模型范围">
+            <button v-if="garage" :aria-pressed="mode === 'traffic'" @click="scope('traffic')">车位与车道</button>
+            <button :aria-pressed="mode === 'building'" @click="scope('building')">建筑</button>
+            <button v-if="core" :aria-pressed="detail" @click="scope('core')">核心筒</button>
           </div>
-          <label v-if="canAttach && !core && !coreError" class="upload">关联核心筒详图<input type="file" accept=".zip" @change="attachCore"></label>
+          <label v-if="canAttach && !core && !coreError" class="upload">关联核心筒详图<input type="file" accept=".zip" @change="attachDetail($event,'core')"></label>
+          <label v-if="canAttach && !garage && !coreError" class="upload">关联车库详图<input type="file" accept=".zip" @change="attachDetail($event,'garage')"></label>
+          <button v-if="!original && fullscreenAvailable" @click="toggleFull">{{ full ? '退出全屏' : '全屏' }}</button>
           <button v-if="tab === '平面图'" type="button" @click="original = !original">{{ original ? '返回三维模型' : '核对建筑原图' }}</button>
         </div>
       </header>
       <p v-if="message || coreError" role="alert">{{ message || coreError }}</p>
       <template v-if="tab === '平面图' && !original">
         <div class="model-workbench">
-        <FloorScene :key="detail" :core="core" :detail="detail" :geometry="model.geometry" :selection="selection" @select="selection = $event" />
-        <aside class="properties" aria-label="模型规格">
+        <FloorScene :key="mode" :garage="garage" :traffic="mode === 'traffic'" :core="core" :detail="detail" :geometry="model.geometry" :selection="selection" @select="selection = $event" />
+        <aside class="properties" :class="{'picked':selection.group !== 'outline'}" aria-label="模型规格">
           <h3>{{ detail ? '核心筒规格' : '构件规格' }}</h3>
           <div class="pickers">
             <label>构件类型<select aria-label="构件类型" :value="selection.group" @change="selection = { group: $event.target.value, index: 0 }">
               <option v-for="(label,key) in labels" :key="key" :value="key">{{ label }}</option>
             </select></label>
             <label v-if="selection.group !== 'outline'">图元<select aria-label="图元" :value="selection.index" @change="selection = { ...selection, index: Number($event.target.value) }">
-              <option v-for="(_,i) in paths" :key="i" :value="i">{{ labels[selection.group] }} {{ i + 1 }}</option>
+              <option v-for="(_,i) in paths" :key="i" :value="i">{{ itemName(selection.group,i) }}</option>
             </select></label>
           </div>
-          <dl aria-live="polite"><div v-for="[label,val] in specs" :key="label"><dt>{{ label }}</dt><dd>{{ val }}</dd></div></dl>
-          <p v-if="detail" class="note">A401 · 1:50。{{ core.columns.length }} 个柱截面与 A101 逐角配准，最大偏差 {{ core.maxErrorMm }} mm。墙柱显示至地坪以上 1.20 m。</p>
+          <dl aria-live="polite"><div v-for="[label,val] in specs" :key="label" :class="{'selected-value':selection.group !== 'outline' && !commonSpecs.includes(label)}"><dt>{{ label }}</dt><dd>{{ val }}</dd></div></dl>
+          <p v-if="mode === 'traffic'" class="note">编号及方向取自交通竣工图第 5 页，分区取自第 6 页。车位和车道按扫描图定位。</p>
+          <p v-else-if="detail" class="note">A401 · 1:50。{{ core.columns.length }} 个柱截面与 A101 逐角配准，最大偏差 {{ core.maxErrorMm }} mm。墙柱显示至地坪以上 1.20 m。</p>
           <p v-else class="note">图面按同一米制比例重建。墙柱在地坪以上 1.20 m 处剖切，楼梯与内隔墙未核实的高度仅显示平面线稿。图元序号仅用于本图定位。</p>
         </aside>
         </div>
@@ -59,32 +63,50 @@
 </template>
 
 <script setup>
-import { computed, ref, shallowRef, watch, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { computed, ref, shallowRef, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { selectionColor } from './garageMarkings'
 import { hasPermission } from '../../utils/permission'
-import { readFloorArchive, attachFloorArchive, attachCoreArchive, openSource } from './floorDrawingArchive'
+import { readFloorArchive, attachFloorArchive, attachSupplement, openSource } from './floorDrawingArchive'
 const FloorScene = defineAsyncComponent(() => import('./FloorScene.vue'))
 const props = defineProps({ floorId: { type: Number, required: true }, ledgerArea: [String, Number] })
 const tabs = ['平面图','给排水','强电','消防','弱电']
 const baseLabels = { outline:'楼层轮廓', bays:'车位', columns:'柱', walls:'实填墙段' }
-const core = shallowRef(null), coreArchive = shallowRef(null), detail = ref(false), coreError = ref('')
+const core = shallowRef(null), coreArchive = shallowRef(null), mode = ref('building'), coreError = ref('')
+const garage = shallowRef(null), garageArchive = shallowRef(null)
+const detail = computed(() => mode.value === 'core')
+const commonSpecs = ['本层地坪标高','B2 至 B1 层高','尺寸依据','标注依据']
+const drawing = ref(null), full = ref(false)
+const fullscreenAvailable = typeof document !== 'undefined' && document.fullscreenEnabled
+function syncFullscreen() { full.value = document.fullscreenElement === drawing.value }
+async function toggleFull() {
+  try { if (full.value) await document.exitFullscreen(); else await drawing.value.requestFullscreen() }
+  catch { message.value = '浏览器未能进入全屏' }
+}
+onMounted(() => document.addEventListener('fullscreenchange',syncFullscreen))
+onBeforeUnmount(() => document.removeEventListener('fullscreenchange',syncFullscreen))
+function itemName(group,i) {
+  const record = garage.value?.[group]?.[i]
+  return record ? (group === 'parking' ? record.zone + '区 · ' + record.name : record.name) : labels.value[group]+' '+(i+1)
+}
 const labels = computed(() => detail.value ? {coreWalls:'核心筒墙段', coreColumns:'核心筒柱'} :
-  {...baseLabels, ...(core.value ? {coreWalls:'核心筒墙段'} : {})})
+  {...(mode.value === 'traffic' ? {outline:'楼层概览',parking:'车位',lanes:'车道',columns:'柱',walls:'实填墙段'} : baseLabels), ...(garage.value ? {rooms:'建筑用房'} : {}), ...(core.value ? {coreWalls:'核心筒墙段'} : {})})
 const paths = computed(() => {
   const group = selection.value.group
   if (group === 'coreWalls') return core.value.walls
   if (group === 'coreColumns') return core.value.columns
+  if (garage.value?.[group]) return garage.value[group].map(item => item.points)
   return model.value?.geometry[group]
 })
 function scope(value) {
-  detail.value = value
-  selection.value = { group:value ? 'coreWalls' : 'outline', index:0 }
+  mode.value = value
+  selection.value = { group:value === 'core' ? 'coreWalls' : 'outline', index:0 }
 }
 const canAttach = hasPermission('floor:update')
 const tab = ref(tabs[0]), original = ref(false), selection = ref({ group:'outline', index:0 })
 const model = shallowRef(null), archive = shallowRef(null), busy = ref(false), message = ref('')
 const sourceCode = ref(''), pdfUrl = ref(''), sourceError = ref('')
 let epoch = 0, pdfEpoch = 0
-const sources = computed(() => [...(model.value?.sources || []), ...(core.value ? [core.value.source] : [])].filter(s => tab.value === '平面图' ? ['建筑','剖面'].includes(s.group) : s.group === tab.value) || [])
+const sources = computed(() => [...(model.value?.sources || []), ...(core.value ? [core.value.source] : []), ...(garage.value ? [garage.value.source] : [])].filter(s => tab.value === '平面图' ? ['建筑','剖面'].includes(s.group) : s.group === tab.value) || [])
 const source = computed(() => sources.value.find(s => s.code === sourceCode.value))
 function changeTab(name) { tab.value = name; original.value = false }
 function sheetTitle(s) { return s.name.replace(/^.*?地下二层/, '地下二层').replace(/\.pdf$/i, '') }
@@ -95,17 +117,17 @@ watch([source, original, tab, archive], async () => {
   clearPdf(); sourceError.value = ''
   if (!source.value?.file || !archive.value || (tab.value === '平面图' && !original.value)) return
   try {
-    const url = await openSource(source.value.code === 'A401' ? coreArchive.value : archive.value, source.value)
+    const url = await openSource(source.value.code === 'A401' ? coreArchive.value : source.value.code === 'B2交通' ? garageArchive.value : archive.value, source.value)
     if (run === pdfEpoch) pdfUrl.value = url
     else URL.revokeObjectURL(url)
   } catch (e) { if (run === pdfEpoch) sourceError.value = e.message }
 })
 async function load() {
   const run = ++epoch
-  busy.value = true; message.value = ''; model.value = null; archive.value = null; core.value = null; coreArchive.value = null; coreError.value = ''; scope(false)
+  busy.value = true; message.value = ''; model.value = null; archive.value = null; core.value = null; coreArchive.value = null; coreError.value = ''; garage.value = null; garageArchive.value = null; scope('building')
   try {
     const data = await readFloorArchive(props.floorId)
-    if (data && run === epoch) { archive.value = data.archive; model.value = data.model; core.value = data.core; coreArchive.value = data.coreArchive; coreError.value = data.coreError }
+    if (data && run === epoch) { archive.value = data.archive; model.value = data.model; core.value = data.core; coreArchive.value = data.coreArchive; coreError.value = data.coreError; garage.value = data.garage; garageArchive.value = data.garageArchive; if (garage.value) scope('traffic') }
   } catch (e) { if (run === epoch) message.value = e.message || '读取失败' }
   finally { if (run === epoch) busy.value = false }
 }
@@ -116,11 +138,11 @@ async function attach(event) {
   try { await attachFloorArchive(props.floorId, file); await load() }
   catch (e) { message.value = e.message || '关联失败'; busy.value = false }
 }
-async function attachCore(event) {
+async function attachDetail(event,kind) {
   const file = event.target.files[0]
   if (!file) return
   busy.value = true
-  try { await attachCoreArchive(props.floorId,file,model.value); await load(); if (core.value) scope(true) }
+  try { await attachSupplement(props.floorId,file,model.value,kind); await load(); if (kind === 'core' && core.value) scope('core') }
   catch (e) { message.value = e.message || '关联失败'; busy.value = false }
 }
 watch(() => props.floorId, load, { immediate:true })
@@ -130,7 +152,13 @@ const specs = computed(() => {
   if (!m) return []
   const {group,index} = selection.value
   const base = [['本层地坪标高', m.elevation.toFixed(3) + ' m'],['B2 至 B1 层高', (m.upperElevation - m.elevation).toFixed(3) + ' m']]
-  if (group === 'outline') return [['竣工图面积',m.area + ' ㎡'],...(props.ledgerArea != null ? [['台账登记面积',props.ledgerArea + ' ㎡']] : []),['外包尺寸',m.span.map(n => n.toFixed(2)).join(' × ') + ' m'],['图注实际停车',m.geometry.bays.length + ' 辆'],...base,['标注依据','A101 平面图、A301 1–1 剖面图']]
+  if (group === 'outline') return [['竣工图面积',m.area + ' ㎡'],...(props.ledgerArea != null ? [['台账登记面积',props.ledgerArea + ' ㎡']] : []),['外包尺寸',m.span.map(n => n.toFixed(2)).join(' × ') + ' m'],['A101 建筑图注',m.geometry.bays.length + ' 辆'],...(garage.value ? [['交通竣工图',garage.value.parking.length+' 个一般小型车位'],['分区数量',['C','D'].map(z=>z+'区 '+garage.value.parking.filter(b=>b.zone===z).length+' 个').join(' · ')]] : []),...base,['标注依据','A101 平面图、A301 1–1 剖面图']]
+  const item = garage.value?.[group]?.[index]
+  if (item) {
+    if (group === 'parking') return [['车位编号',item.name],['所属分区',item.zone+' 区'],['车位类型','一般小型车位'],['标注依据','交通竣工图 · 第 5、6 页']]
+    if (group === 'lanes') return [['所选车道',item.name],['图示行车方向', new Set(item.arrows.map(a=>a[2])).size > 1 ? '双向' : '按图示箭头方向'],['标注依据','交通竣工图 · 第 5 页']]
+    return [['建筑用房',item.name],['模型表达','空间轮廓 · 1.20 m 展示剖切'],['标注依据','A101 建筑平面图'],...base]
+  }
   const pts = paths.value[index]
   const lengths = pts.map(([x,z],i) => {const b=pts[(i+1)%pts.length]; return Math.hypot(x-b[0],z-b[1])})
   const dimensions = ['平面轮廓四边', lengths.map(n => n.toFixed(2)).join(' / ') + ' m']
@@ -172,4 +200,9 @@ dt,.note,small {font-size:12px;color:var(--dhic-text-secondary);} dd {margin:4px
   .properties {border:0;padding:0;}
   .properties dl {grid-template-columns:repeat(auto-fit,minmax(min(145px,100%),1fr));}
 }
+.properties.picked h3::before { content:''; width:9px;height:9px;background:var(--selection-color);display:inline-block;margin-right:7px;border-radius:50%; }
+.selected-value dd {color:var(--selection-color);font-weight:650;}
+.drawing:fullscreen {background:#fff;box-sizing:border-box;padding:8px 16px;overflow:auto;}
+.drawing:fullscreen :deep(.model-stage) {height:calc(100dvh - 115px);}
+@container (max-width:800px) { .drawing:fullscreen :deep(.model-stage) {height:min(65svh,98cqw);} }
 </style>
