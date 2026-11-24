@@ -756,7 +756,7 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 .chart { width: 100%; min-width: 0; }
-.source-breakdown, .chart-empty { height: 190px; }
+.source-breakdown, .chart-empty { height: calc(clamp(168px, min(15cqw, 30svh), 360px) + 30px); }
 .trend-body { position: relative; }
 .trend-no-series.chart-empty { position: absolute; inset: 0; height: auto; background: var(--dhic-card-bg); }
 .trend-legend { display: flex; justify-content: flex-end; gap: 4px; }
@@ -773,7 +773,7 @@ onBeforeUnmount(() => {
 .bar-mark { width: 12px; height: 8px; border-radius: 2px; background: #b7bdc3; }
 .line-mark { position: relative; width: 14px; height: 2px; background: #9e3738; }
 .line-mark::before { content: ''; position: absolute; inset: -2px auto auto 4px; width: 6px; height: 6px; box-sizing: border-box; background: white; border: 2px solid #9e3738; border-radius: 50%; }
-.trend-chart { height: 164px; }
+.trend-chart { height: clamp(168px, min(15cqw, 30svh), 360px); }
 .trend-explorer, .trend-readout { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
 .trend-explorer { min-height: 28px; margin-top: 2px; font-size: 12px; color: var(--dhic-text-secondary); }
 .trend-explorer select {
@@ -800,7 +800,8 @@ onBeforeUnmount(() => {
 .source-legend strong, .source-legend small { text-align: end; white-space: nowrap; }
 .source-legend strong { font-weight: 600; }
 .room-breakdown { display: grid; grid-template-columns: minmax(96px, .82fr) minmax(120px, 1fr); gap: 16px; align-items: center; }
-.room-chart, .risk-chart, .room-empty, .risk-empty { height: 104px; }
+.room-chart, .room-empty { height: clamp(104px, 7.5cqw, 168px); }
+.risk-chart, .risk-empty { height: 104px; }
 .room-empty, .chart-empty, .risk-empty {
   display: grid; place-content: center; justify-items: center;
   color: var(--dhic-text-secondary); font-size: 13px;
