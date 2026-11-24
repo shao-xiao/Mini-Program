@@ -14,6 +14,7 @@
 <script setup>
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import * as T from 'three'
+import { addPlumbing } from './plumbingScene'
 import { createFloorMotion } from './floorMotion'
 import { createFloorLabels } from './floorLabels'
 import { addSpaceCutaway } from './spaceCutaway'
@@ -21,12 +22,12 @@ import { addGarageMarkings, selectionColor, garageColors, rampProfile, rampGeome
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { SVGRenderer } from 'three/addons/renderers/SVGRenderer.js'
 
-const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean })
+const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array })
 const emit = defineEmits(['select'])
 const stage = ref(null)
 const labelLayer = ref(null)
 const pickables = []
-let labels
+let labels, plumbingMotion
 const scene = new T.Scene()
 const camera = new T.OrthographicCamera(-60, 60, 60, -60, 0.1, 1000)
 const meshes = new Map()
@@ -51,6 +52,7 @@ function render(now) {
   if (labelsDirty || (animate && (previousTime==null || now-previousTime>=50))) {
     if (animate && previousTime!=null) elapsed+=(now-previousTime)/1000
     previousTime=animate ? now : undefined
+    plumbingMotion?.update(elapsed)
     motion.update(elapsed)
     renderer.render(scene,camera)
     if (labelsDirty) labels.update(camera,stage.value.clientWidth,stage.value.clientHeight,props.selection)
@@ -193,13 +195,17 @@ onMounted(() => {
   const geo = props.geometry
   if (!props.detail) {
     surface(geo.outline, 'outline', 0)
-    for (const group of (props.traffic ? ['walls','columns'] : ['bays','walls','columns'])) geo[group].forEach((points, i) => surface(points, group, i))
+    for (const group of (props.traffic || props.waterItems ? ['walls','columns'] : ['bays','walls','columns'])) geo[group].forEach((points, i) => surface(points, group, i))
     linework(geo.lines)
 
     if (props.traffic) {
       props.garage.crossings?.forEach((points,i) => surface(points,'crossings',i))
       for (const group of ['lanes','parking']) props.garage[group].forEach((item,i) => surface(item.points,group,i))
     }
+  }
+  if (props.waterItems) {
+    pickables.length=0
+    plumbingMotion=addPlumbing(scene,props.waterItems,retain,pickables,meshes,labels)
   }
   props.rooms?.forEach((item,i) => surface(item.points,'rooms',i))
   if (props.core) {
@@ -216,7 +222,7 @@ onMounted(() => {
     addGarageMarkings(scene,props.garage,retain)
     motion.traffic(scene,props.garage)
   }
-  hasMotion.value=motion.active
+  hasMotion.value=motion.active || plumbingMotion?.active
   readMotionPreference()
   motionPreference.addEventListener('change',readMotionPreference)
   document.addEventListener('visibilitychange',resetClock)
@@ -236,7 +242,7 @@ onMounted(() => {
   sizeToViewport()
   window.addEventListener('resize', sizeToViewport)
   labels.prepare()
-  reset(false)
+  reset(Boolean(props.waterItems))
   highlight()
   observer = new ResizeObserver(() => { sizeToViewport(); fit() })
   observer.observe(stage.value)

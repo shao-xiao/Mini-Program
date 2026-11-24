@@ -10,7 +10,17 @@
       <label v-if="canAttach">关联竣工图包<input type="file" accept=".zip" @change="attach"></label>
     </div>
     <template v-else>
-      <header><h3>{{ tab === '平面图' ? '地下二层 · 建筑模型' : tab + '竣工图' }}</h3>
+      <header><h3>{{ tab === '平面图' ? '地下二层 · 建筑模型' : (tab === '给排水' && plumbing ? '地下二层 · 给排水模型' : tab + '竣工图') }}</h3>
+        <div v-if="tab === '给排水'" class="views">
+          <template v-if="plumbing">
+            <div v-if="!original" class="scope" aria-label="给排水模型分类">
+              <button v-for="(info,key) in waterSystems" :key="key" :aria-pressed="waterSystem===key" @click="waterSystem=key">{{ info.name }}</button>
+            </div>
+            <button v-if="!original && fullscreenAvailable" @click="toggleFull">{{ full ? '退出全屏' : '全屏' }}</button>
+            <button @click="original=!original">{{ original ? '返回给排水模型' : '核对专业原图' }}</button>
+          </template>
+          <label v-else-if="canAttach" class="upload">关联给排水图包<input type="file" accept=".zip" @change="attachDetail($event,'plumbing')"></label>
+        </div>
         <div v-if="tab === '平面图'" class="views">
           <div v-if="(core || garage) && !original" class="scope" aria-label="模型范围">
             <button v-if="garage" :aria-pressed="mode === 'traffic'" @click="scope('traffic')">车位与车道</button>
@@ -46,7 +56,8 @@
         </aside>
         </div>
       </template>
-      <table v-else-if="tab !== '平面图'" class="drawing-index">
+      <PlumbingModel v-else-if="tab === '给排水' && plumbing && !original" :model="plumbing" :geometry="model.geometry" :system="waterSystem" @source="code=>{sourceCode=code;original=true}"/>
+      <table v-else-if="!original && tab !== '平面图'" class="drawing-index">
         <thead><tr><th>图号</th><th>图名</th><th>核对状态</th></tr></thead>
         <tbody><tr v-for="s in sources" :key="s.code"><td>{{ s.code }}</td><td>{{ sheetTitle(s) }}</td><td>已核对图签 · 未建模</td></tr></tbody>
       </table>
@@ -70,12 +81,15 @@ import { objectSpecs } from './floorDrawingSpecs'
 import { selectionColor } from './garageMarkings'
 import { hasPermission } from '../../utils/permission'
 import { readFloorArchive, attachFloorArchive, attachSupplement, openSource } from './floorDrawingArchive'
+import { waterSystems } from './plumbingCatalog'
+const PlumbingModel = defineAsyncComponent(() => import('./PlumbingModel.vue'))
 const FloorScene = defineAsyncComponent(() => import('./FloorScene.vue'))
 const props = defineProps({ floorId: { type: Number, required: true }, ledgerArea: [String, Number] })
 const tabs = ['平面图','给排水','强电','消防','弱电']
 const baseLabels = { outline:'楼层轮廓', bays:'车位', columns:'柱', walls:'实填墙段' }
 const core = shallowRef(null), coreArchive = shallowRef(null), mode = ref('building'), coreError = ref('')
 const garage = shallowRef(null), garageArchive = shallowRef(null)
+const plumbing = shallowRef(null), plumbingArchive = shallowRef(null), waterSystem = ref('drain')
 const survey = shallowRef(null)
 const visibleRooms = computed(() => {
   const all = survey.value?.rooms || garage.value?.rooms || []
@@ -118,7 +132,8 @@ const tab = ref(tabs[0]), original = ref(false), selection = ref({ group:'outlin
 const model = shallowRef(null), archive = shallowRef(null), busy = ref(false), message = ref('')
 const sourceCode = ref(''), pdfUrl = ref(''), sourceError = ref('')
 let epoch = 0, pdfEpoch = 0
-const sources = computed(() => [...(model.value?.sources || []), ...(core.value ? [core.value.source] : []), ...(garage.value ? [garage.value.source] : [])].filter(s => tab.value === '平面图' ? ['建筑','剖面'].includes(s.group) : s.group === tab.value) || [])
+const buildingSources = computed(() => [...(model.value?.sources || []), ...(core.value ? [core.value.source] : []), ...(garage.value ? [garage.value.source] : [])])
+const sources = computed(() => tab.value === '给排水' && plumbing.value ? plumbing.value.sources : buildingSources.value.filter(s => tab.value === '平面图' ? ['建筑','剖面'].includes(s.group) : s.group === tab.value) || [])
 const source = computed(() => sources.value.find(s => s.code === sourceCode.value))
 function changeTab(name) { tab.value = name; original.value = false }
 function sheetTitle(s) { return s.name.replace(/^.*?地下二层/, '地下二层').replace(/\.pdf$/i, '') }
@@ -127,19 +142,20 @@ watch(sources, list => { sourceCode.value = list[0]?.code || '' }, { immediate:t
 watch([source, original, tab, archive], async () => {
   const run = ++pdfEpoch
   clearPdf(); sourceError.value = ''
-  if (!source.value?.file || !archive.value || (tab.value === '平面图' && !original.value)) return
+  if (!source.value?.file || !archive.value || !original.value) return
   try {
-    const url = await openSource(source.value.code === 'A401' ? coreArchive.value : source.value.code === 'B2交通' ? garageArchive.value : archive.value, source.value)
+    const url = await openSource(tab.value === '给排水' ? plumbingArchive.value : source.value.code === 'A401' ? coreArchive.value : source.value.code === 'B2交通' ? garageArchive.value : archive.value, source.value)
     if (run === pdfEpoch) pdfUrl.value = url
     else URL.revokeObjectURL(url)
   } catch (e) { if (run === pdfEpoch) sourceError.value = e.message }
 })
 async function load() {
   const run = ++epoch
+  plumbing.value = null; plumbingArchive.value = null
   busy.value = true; message.value = ''; model.value = null; archive.value = null; core.value = null; coreArchive.value = null; coreError.value = ''; garage.value = null; garageArchive.value = null; scope('building')
   try {
     const data = await readFloorArchive(props.floorId)
-    if (data && run === epoch) { archive.value = data.archive; model.value = data.model; core.value = data.core; coreArchive.value = data.coreArchive; coreError.value = data.coreError; survey.value = data.survey; garage.value = data.garage; garageArchive.value = data.garageArchive; if (garage.value) scope('traffic') }
+    if (data && run === epoch) { plumbing.value = data.plumbing; plumbingArchive.value = data.plumbingArchive; archive.value = data.archive; model.value = data.model; core.value = data.core; coreArchive.value = data.coreArchive; coreError.value = data.coreError; survey.value = data.survey; garage.value = data.garage; garageArchive.value = data.garageArchive; if (garage.value) scope('traffic') }
   } catch (e) { if (run === epoch) message.value = e.message || '读取失败' }
   finally { if (run === epoch) busy.value = false }
 }
@@ -154,7 +170,7 @@ async function attachDetail(event,kind) {
   const file = event.target.files[0]
   if (!file) return
   busy.value = true
-  try { await attachSupplement(props.floorId,file,{...model.value,sources:sources.value},kind); await load(); if (kind === 'core' && core.value) scope('core') }
+  try { await attachSupplement(props.floorId,file,{...model.value,sources:buildingSources.value},kind); await load(); if (kind === 'core' && core.value) scope('core') }
   catch (e) { message.value = e.message || '关联失败'; busy.value = false }
 }
 watch(() => props.floorId, load, { immediate:true })

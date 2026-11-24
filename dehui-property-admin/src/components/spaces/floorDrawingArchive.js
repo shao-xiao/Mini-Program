@@ -1,4 +1,5 @@
 import JSZip from 'jszip'
+import { pipeLayers, waterSystems } from './plumbingCatalog'
 import { normalizeCustomFieldFiles } from '../../utils/customFieldValues'
 import request from '../../utils/request'
 import { listCustomFieldValues, listCustomFieldDefinitions, createCustomFieldDefinition,
@@ -90,6 +91,25 @@ async function parseSupplement(file, model) {
     const result = await parseCore(archive, model)
     return {kind:'core', data:result.core, archive}
   }
+  const water = archive.file('plumbing.json')
+  if (water) {
+    if (water._data.uncompressedSize > 1024*1024) throw Error('给排水清单过大')
+    const data = JSON.parse(await water.async('string'))
+    const codes = ['P202','P203','P204','P301','P302']
+    if (data.version !== 1 || data.floor !== model.floor || data.buildingCode !== model.buildingCode ||
+        !data.reference || data.reference !== model.sources.find(s=>s.code==='A101')?.sha256 ||
+        !Array.isArray(data.sources) || data.sources.length !== codes.length ||
+        !codes.every(code=>data.sources.some(s=>s.code===code && s.file===code+'.pdf' && archive.file(s.file) && /^[0-9a-f]{64}$/.test(s.sha256))) ||
+        !Array.isArray(data.items) || !data.items.length || data.items.length>4000 ||
+        !Object.keys(waterSystems).every(key=>data.items.some(i=>i.system===key)) ||
+        !data.items.every(i=>Object.hasOwn(waterSystems,i.system) && Object.hasOwn(pipeLayers,i.layer) &&
+          ['管段','立管','集水坑'].includes(i.kind) && Array.isArray(i.points) &&
+          i.points.length===(i.kind==='管段'?2:1) && i.points.every(validPoint) &&
+          (i.kind!=='集水坑' || (typeof i.name==='string' && typeof i.pump==='string' && typeof i.duty==='string' &&
+          [i.flow,i.head,i.power].every(Number.isFinite) && Array.isArray(i.levels) && i.levels.length===3 && i.levels.every(Number.isFinite)))))
+      throw Error('给排水图包与本层底图或构件规格不匹配')
+    return {kind:'plumbing',data,archive}
+  }
   const survey = archive.file('spaces.json')
   if (survey) {
     if (survey._data.uncompressedSize > 256 * 1024) throw Error('空间规格清单过大')
@@ -138,8 +158,10 @@ export async function attachSupplement(id, file, model, kind) {
     if (result.data.detailReference !== model.sources.find(s => s.code === 'A401')?.sha256)
       throw Error('请先关联规格对应的 A401 详图')
   } else {
-    const pdf = await openSource(result.archive, result.data.source)
-    URL.revokeObjectURL(pdf)
+    for (const source of kind === 'plumbing' ? result.data.sources : [result.data.source]) {
+      const pdf = await openSource(result.archive,source)
+      URL.revokeObjectURL(pdf)
+    }
   }
   const before = normalizeCustomFieldFiles((await values(id))[field])
   if (!before.length) throw Error('请先关联底图')
