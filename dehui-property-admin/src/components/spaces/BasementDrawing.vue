@@ -11,21 +11,33 @@
     </div>
     <template v-else>
       <header><h3>{{ tab === '平面图' ? '地下二层 · 建筑模型' : tab + '竣工图' }}</h3>
-        <button v-if="tab === '平面图'" type="button" @click="original = !original">{{ original ? '返回三维模型' : '核对建筑原图' }}</button>
+        <div v-if="tab === '平面图'" class="views">
+          <div v-if="core && !original" class="scope" aria-label="模型范围">
+            <button :aria-pressed="!detail" @click="scope(false)">整层</button>
+            <button :aria-pressed="detail" @click="scope(true)">核心筒</button>
+          </div>
+          <label v-if="canAttach && !core && !coreError" class="upload">关联核心筒详图<input type="file" accept=".zip" @change="attachCore"></label>
+          <button v-if="tab === '平面图'" type="button" @click="original = !original">{{ original ? '返回三维模型' : '核对建筑原图' }}</button>
+        </div>
       </header>
+      <p v-if="message || coreError" role="alert">{{ message || coreError }}</p>
       <template v-if="tab === '平面图' && !original">
-        <FloorScene :geometry="model.geometry" :selection="selection" @select="selection = $event" />
-        <div class="properties">
+        <div class="model-workbench">
+        <FloorScene :key="detail" :core="core" :detail="detail" :geometry="model.geometry" :selection="selection" @select="selection = $event" />
+        <aside class="properties" aria-label="模型规格">
+          <h3>{{ detail ? '核心筒规格' : '构件规格' }}</h3>
           <div class="pickers">
             <label>构件类型<select aria-label="构件类型" :value="selection.group" @change="selection = { group: $event.target.value, index: 0 }">
               <option v-for="(label,key) in labels" :key="key" :value="key">{{ label }}</option>
             </select></label>
             <label v-if="selection.group !== 'outline'">图元<select aria-label="图元" :value="selection.index" @change="selection = { ...selection, index: Number($event.target.value) }">
-              <option v-for="(_,i) in model.geometry[selection.group]" :key="i" :value="i">{{ labels[selection.group] }} {{ i + 1 }}</option>
+              <option v-for="(_,i) in paths" :key="i" :value="i">{{ labels[selection.group] }} {{ i + 1 }}</option>
             </select></label>
           </div>
           <dl aria-live="polite"><div v-for="[label,val] in specs" :key="label"><dt>{{ label }}</dt><dd>{{ val }}</dd></div></dl>
-          <p class="note">图面按同一米制比例重建。墙柱在地坪以上 1.20 m 处剖切，楼梯与内隔墙未核实的高度仅显示平面线稿。图元序号仅用于本图定位。</p>
+          <p v-if="detail" class="note">A401 · 1:50。{{ core.columns.length }} 个柱截面与 A101 逐角配准，最大偏差 {{ core.maxErrorMm }} mm。墙柱显示至地坪以上 1.20 m。</p>
+          <p v-else class="note">图面按同一米制比例重建。墙柱在地坪以上 1.20 m 处剖切，楼梯与内隔墙未核实的高度仅显示平面线稿。图元序号仅用于本图定位。</p>
+        </aside>
         </div>
       </template>
       <table v-else-if="tab !== '平面图'" class="drawing-index">
@@ -49,17 +61,30 @@
 <script setup>
 import { computed, ref, shallowRef, watch, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { hasPermission } from '../../utils/permission'
-import { readFloorArchive, attachFloorArchive, openSource } from './floorDrawingArchive'
+import { readFloorArchive, attachFloorArchive, attachCoreArchive, openSource } from './floorDrawingArchive'
 const FloorScene = defineAsyncComponent(() => import('./FloorScene.vue'))
 const props = defineProps({ floorId: { type: Number, required: true }, ledgerArea: [String, Number] })
 const tabs = ['平面图','给排水','强电','消防','弱电']
-const labels = { outline:'楼层轮廓', bays:'车位', columns:'柱', walls:'实填墙段' }
+const baseLabels = { outline:'楼层轮廓', bays:'车位', columns:'柱', walls:'实填墙段' }
+const core = shallowRef(null), coreArchive = shallowRef(null), detail = ref(false), coreError = ref('')
+const labels = computed(() => detail.value ? {coreWalls:'核心筒墙段', coreColumns:'核心筒柱'} :
+  {...baseLabels, ...(core.value ? {coreWalls:'核心筒墙段'} : {})})
+const paths = computed(() => {
+  const group = selection.value.group
+  if (group === 'coreWalls') return core.value.walls
+  if (group === 'coreColumns') return core.value.columns
+  return model.value?.geometry[group]
+})
+function scope(value) {
+  detail.value = value
+  selection.value = { group:value ? 'coreWalls' : 'outline', index:0 }
+}
 const canAttach = hasPermission('floor:update')
 const tab = ref(tabs[0]), original = ref(false), selection = ref({ group:'outline', index:0 })
 const model = shallowRef(null), archive = shallowRef(null), busy = ref(false), message = ref('')
 const sourceCode = ref(''), pdfUrl = ref(''), sourceError = ref('')
 let epoch = 0, pdfEpoch = 0
-const sources = computed(() => model.value?.sources.filter(s => tab.value === '平面图' ? ['建筑','剖面'].includes(s.group) : s.group === tab.value) || [])
+const sources = computed(() => [...(model.value?.sources || []), ...(core.value ? [core.value.source] : [])].filter(s => tab.value === '平面图' ? ['建筑','剖面'].includes(s.group) : s.group === tab.value) || [])
 const source = computed(() => sources.value.find(s => s.code === sourceCode.value))
 function changeTab(name) { tab.value = name; original.value = false }
 function sheetTitle(s) { return s.name.replace(/^.*?地下二层/, '地下二层').replace(/\.pdf$/i, '') }
@@ -70,17 +95,17 @@ watch([source, original, tab, archive], async () => {
   clearPdf(); sourceError.value = ''
   if (!source.value?.file || !archive.value || (tab.value === '平面图' && !original.value)) return
   try {
-    const url = await openSource(archive.value, source.value)
+    const url = await openSource(source.value.code === 'A401' ? coreArchive.value : archive.value, source.value)
     if (run === pdfEpoch) pdfUrl.value = url
     else URL.revokeObjectURL(url)
   } catch (e) { if (run === pdfEpoch) sourceError.value = e.message }
 })
 async function load() {
   const run = ++epoch
-  busy.value = true; message.value = ''; model.value = null; archive.value = null
+  busy.value = true; message.value = ''; model.value = null; archive.value = null; core.value = null; coreArchive.value = null; coreError.value = ''; scope(false)
   try {
     const data = await readFloorArchive(props.floorId)
-    if (data && run === epoch) { archive.value = data.archive; model.value = data.model }
+    if (data && run === epoch) { archive.value = data.archive; model.value = data.model; core.value = data.core; coreArchive.value = data.coreArchive; coreError.value = data.coreError }
   } catch (e) { if (run === epoch) message.value = e.message || '读取失败' }
   finally { if (run === epoch) busy.value = false }
 }
@@ -91,6 +116,13 @@ async function attach(event) {
   try { await attachFloorArchive(props.floorId, file); await load() }
   catch (e) { message.value = e.message || '关联失败'; busy.value = false }
 }
+async function attachCore(event) {
+  const file = event.target.files[0]
+  if (!file) return
+  busy.value = true
+  try { await attachCoreArchive(props.floorId,file,model.value); await load(); if (core.value) scope(true) }
+  catch (e) { message.value = e.message || '关联失败'; busy.value = false }
+}
 watch(() => props.floorId, load, { immediate:true })
 onBeforeUnmount(() => { epoch++; pdfEpoch++; clearPdf() })
 const specs = computed(() => {
@@ -99,10 +131,10 @@ const specs = computed(() => {
   const {group,index} = selection.value
   const base = [['本层地坪标高', m.elevation.toFixed(3) + ' m'],['B2 至 B1 层高', (m.upperElevation - m.elevation).toFixed(3) + ' m']]
   if (group === 'outline') return [['竣工图面积',m.area + ' ㎡'],...(props.ledgerArea != null ? [['台账登记面积',props.ledgerArea + ' ㎡']] : []),['外包尺寸',m.span.map(n => n.toFixed(2)).join(' × ') + ' m'],['图注实际停车',m.geometry.bays.length + ' 辆'],...base,['标注依据','A101 平面图、A301 1–1 剖面图']]
-  const pts = m.geometry[group][index]
+  const pts = paths.value[index]
   const lengths = pts.map(([x,z],i) => {const b=pts[(i+1)%pts.length]; return Math.hypot(x-b[0],z-b[1])})
   const dimensions = ['平面轮廓四边', lengths.map(n => n.toFixed(2)).join(' / ') + ' m']
-  return [['所选图元',labels[group]+' '+(index+1)],dimensions,['尺寸依据','A101 矢量轮廓量取 · 取至 0.01 m'],...base]
+  return [['所选图元',labels.value[group]+' '+(index+1)],dimensions,['尺寸依据',(group.startsWith('core') ? 'A401 详图' : 'A101 总图') + ' · 矢量量取至 0.01 m'],...base]
 })
 </script>
 
@@ -122,4 +154,22 @@ dt,.note,small {font-size:12px;color:var(--dhic-text-secondary);} dd {margin:4px
 .drawing-index {width:100%; border-collapse:collapse; font-size:13px;}
 .drawing-index th,.drawing-index td {text-align:start;padding:11px 6px;border-bottom:1px solid var(--dhic-border-color-light);}
 .drawing-index th {color:var(--dhic-text-secondary);font-weight:550;}
+.drawing {container-type:inline-size;}
+.views,.scope {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.scope {gap:0;padding:2px;background:#f0f1f2;border-radius:6px;}
+.scope button {background:transparent;border:0;padding:5px 12px;}
+.scope button[aria-pressed="true"] {background:white;box-shadow:0 1px 3px #24292e20;font-weight:600;}
+.upload {position:relative;cursor:pointer;padding:5px 8px;color:var(--dhic-text-regular);}
+.upload input {position:absolute;inset:0;width:100%;opacity:0;cursor:pointer;}
+.upload:focus-within {outline:2px solid var(--dhic-focus-ring);}
+.model-workbench {display:grid;grid-template-columns:minmax(0,1fr) clamp(200px,18%,270px);gap:18px;}
+.properties {border-left:1px solid var(--dhic-border-color-light);padding:6px 0 0 16px;min-width:0;}
+.properties .pickers {align-items:flex-start;margin-top:12px;}
+.properties dl {grid-template-columns:1fr;}
+.properties dl div {border-bottom:1px solid var(--dhic-border-color-light);padding-bottom:7px;}
+@container (max-width:800px) {
+  .model-workbench {grid-template-columns:minmax(0,1fr);gap:10px;}
+  .properties {border:0;padding:0;}
+  .properties dl {grid-template-columns:repeat(auto-fit,minmax(min(145px,100%),1fr));}
+}
 </style>

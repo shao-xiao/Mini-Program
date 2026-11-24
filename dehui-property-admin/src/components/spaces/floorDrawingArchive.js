@@ -30,13 +30,63 @@ export async function parseArchive(file) {
   return { archive, model }
 }
 
+async function download(file) {
+  const fileId = Number(file.fileId || file.id)
+  if (!Number.isSafeInteger(fileId) || fileId < 1) throw Error('模型附件编号无效')
+  return request.get('/files/' + fileId, { responseType: 'blob', silent: true, timeout: 60000 })
+}
+
+async function parseCore(file, model) {
+  if (file.size > maxBytes) throw Error('核心筒图包超过 20 MB')
+  const archive = await JSZip.loadAsync(await file.arrayBuffer())
+  const entry = archive.file('core.json')
+  if (!entry || entry._data.uncompressedSize > 1024 * 1024) throw Error('缺少有效核心筒清单')
+  const core = JSON.parse(await entry.async('string'))
+  const reference = model.sources.find(s => s.code === 'A101')?.sha256
+  if (core.version !== 1 || core.floor !== model.floor || core.buildingCode !== model.buildingCode ||
+      !reference || core.reference !== reference || core.source?.code !== 'A401' || !archive.file('A401.pdf'))
+    throw Error('核心筒详图与当前底图版本不符')
+  for (const key of ['walls','columns','lines']) {
+    if (!Array.isArray(core[key]) || !core[key].length || core[key].length > 2000 ||
+        !core[key].every(path => Array.isArray(path) && (key === 'lines' ? path.length >= 2 && path.length <= 500 : path.length === 4) &&
+          path.every(p => Array.isArray(p) && p.length === 2 && p.every(n => Number.isFinite(n) && Math.abs(n)<500))))
+      throw Error('核心筒轮廓未通过校验')
+  }
+  if (!Array.isArray(core.columnIndices) || core.columnIndices.length !== core.columns.length ||
+      new Set(core.columnIndices).size !== core.columns.length ||
+      !core.columnIndices.every(i => Number.isInteger(i) && model.geometry.columns[i]) ||
+      !Number.isFinite(core.maxErrorMm) || core.maxErrorMm < 0 || core.maxErrorMm > 3)
+    throw Error('详图柱位配准记录异常')
+  return { core, archive }
+}
+
 export async function readFloorArchive(id) {
   const files = normalizeCustomFieldFiles((await values(id))[field])
   if (!files.length) return null
-  const fileId = Number(files[0].fileId || files[0].id)
-  if (!Number.isSafeInteger(fileId) || fileId < 1) throw Error('模型附件编号无效')
-  const blob = await request.get('/files/' + fileId, { responseType: 'blob', silent: true, timeout: 60000 })
-  return parseArchive(blob)
+  const base = await parseArchive(await download(files[0]))
+  if (files.length > 1) {
+    try {
+      const detail = await parseCore(await download(files[1]), base.model)
+      base.core = detail.core
+      base.coreArchive = detail.archive
+    } catch (error) {
+      base.coreError = error.message || '核心筒附件读取失败'
+    }
+  }
+  return base
+}
+
+export async function attachCoreArchive(id, file, model) {
+  const { core, archive } = await parseCore(file, model)
+  const pdf = await openSource(archive, core.source)
+  URL.revokeObjectURL(pdf)
+  const before = normalizeCustomFieldFiles((await values(id))[field])
+  if (before.length !== 1) throw Error('楼层附件已变化，请刷新查看')
+  const uploaded = await uploadCustomFieldAttachment(file, { workspaceKey:'floors', timeout:60000 })
+  const current = await values(id)
+  const files = normalizeCustomFieldFiles(current[field])
+  if (files.length !== 1 || files[0].fileId !== before[0].fileId) throw Error('底图已变化，请刷新查看')
+  await saveCustomFieldValues('floors', id, { ...current, [field]: [...files, { ...uploaded, sortOrder:1 }] })
 }
 
 // The floor workspace saves the entire custom-field record. Initial setup is only

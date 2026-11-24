@@ -30,8 +30,9 @@
     </template>
     <template v-else>
       <div :class="{ 'floor-workspace': hasB2Drawing }">
-        <section class="room-list" aria-label="房间台账">
-          <h3 v-if="hasB2Drawing">房间</h3>
+        <BasementDrawing v-if="hasB2Drawing" :key="floor.id" :floor-id="Number(floor.id)" :ledger-area="floor.totalArea" />
+        <component :is="hasB2Drawing ? 'details' : 'section'" class="room-list" aria-label="房间台账">
+          <summary v-if="hasB2Drawing">房间台账 <small>{{ scope.length }} 间</small></summary>
           <div class="filters" aria-label="筛选房间状态">
             <button :aria-pressed="!filter" @click="filter = ''">全部 {{ scope.length }}</button>
             <button v-for="g in options" :key="g.value" :aria-pressed="filter === g.value" @click="filter = g.value">{{ g.label }} {{ counts[g.value] || 0 }}</button>
@@ -51,8 +52,7 @@
             </div>
           </section>
           <p v-if="!shown.length" class="state">{{ hasB2Drawing && !scope.length ? 'B2 尚无登记房间' : '当前范围内没有符合条件的房间' }}</p>
-        </section>
-        <BasementDrawing v-if="hasB2Drawing" :key="floor.id" :floor-id="Number(floor.id)" :ledger-area="floor.totalArea" />
+        </component>
       </div>
     </template>
     <el-drawer v-model="drawer" title="房间详情" direction="rtl" size="min(420px, 96vw)">
@@ -168,11 +168,8 @@ small,.summary,.rule span,.state {font-size:12px;color:var(--dhic-text-secondary
 .room svg {width:38px;height:34px;color:#747c86;} .room .vacant {color:#38775e;} .room .rented {color:#8b6435;}
 .state {padding:24px 0;text-align:center;} dl div {display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--dhic-border-color-light);}
 dt {color:var(--dhic-text-secondary);}dd {margin:0;text-align:right;overflow-wrap:anywhere;}
-.floor-workspace { display:grid; grid-template-columns:minmax(220px, 0.72fr) minmax(0,1.28fr); gap:clamp(16px,2vw,36px); padding-top:16px; }
-.floor-workspace .room-list {min-width:0; padding-right:16px; border-right:1px solid var(--dhic-border-color-light);}
-.floor-workspace .room-list .state {text-align:start;}
-@container (max-width:760px) {
-  .floor-workspace {grid-template-columns:minmax(0,1fr);}
-  .floor-workspace .room-list {padding:0;border-right:0;border-bottom:1px solid var(--dhic-border-color-light);}
-}
+.floor-workspace {display:grid; grid-template-columns:minmax(0,1fr); gap:16px; padding-top:10px;}
+.floor-workspace .room-list {border-top:1px solid var(--dhic-border-color-light);padding-top:8px;}
+.room-list summary {cursor:pointer;padding:8px 0;font-size:13px;font-weight:600;}
+.room-list summary small {margin-left:6px;font-weight:400;}
 </style>

@@ -15,18 +15,18 @@ import * as T from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { SVGRenderer } from 'three/addons/renderers/SVGRenderer.js'
 
-const props = defineProps({ geometry: { type: Object, required: true }, selection: Object })
+const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean })
 const emit = defineEmits(['select'])
 const stage = ref(null)
 const scene = new T.Scene()
 const camera = new T.OrthographicCamera(-60, 60, 60, -60, 0.1, 1000)
 const meshes = new Map()
-const palette = { outline: 0xdde5e6, walls: 0x849a9f, columns: 0x536e79, bays: 0xb5ccbc }
+const palette = { outline: 0xdde5e6, walls: 0x849a9f, columns: 0x536e79, bays: 0xb5ccbc, coreWalls: 0x9c8366, coreColumns: 0x54737b }
 const resources = new Set()
 const cut = 1.2
 let renderer, controls, observer, highlighted, pointer, frame
 const centre = new T.Vector3()
-let radius
+let bounds, topView = false
 
 function retain(resource) { resources.add(resource); return resource }
 function render() { if (renderer) renderer.render(scene, camera) }
@@ -36,7 +36,7 @@ function surface(points, group, index) {
   const shape = new T.Shape()
   points.forEach(([x,z], i) => i ? shape.lineTo(x, -z) : shape.moveTo(x, -z))
   shape.closePath()
-  const solid = group === 'walls' || group === 'columns'
+  const solid = ['walls','columns','coreWalls','coreColumns'].includes(group)
   const geom = retain(solid
     ? new T.ExtrudeGeometry(shape, { depth: cut, bevelEnabled: false })
     : new T.ShapeGeometry(shape))
@@ -69,7 +69,12 @@ function fit() {
   const w = stage.value.clientWidth, h = stage.value.clientHeight
   if (!w || !h) return
   const aspect = w / h
-  const half = radius / Math.min(1, aspect)
+  const size = bounds.getSize(new T.Vector3())
+  const direction = topView ? new T.Vector3(0,1,.00001) : new T.Vector3(36,110,81).normalize()
+  const right = new T.Vector3().crossVectors(camera.up, direction).normalize()
+  const up = new T.Vector3().crossVectors(direction, right)
+  const extent = v => Math.abs(v.x)*size.x + Math.abs(v.y)*cut + Math.abs(v.z)*size.z
+  const half = Math.max(extent(up), extent(right) / aspect) * .58
   Object.assign(camera, { left: -half * aspect, right: half * aspect, top: half, bottom: -half })
   camera.updateProjectionMatrix()
   renderer.setSize(w, h)
@@ -77,12 +82,13 @@ function fit() {
 }
 function reset(top) {
   if (!controls) return
+  topView = top
   controls.target.copy(centre)
   camera.position.copy(centre).add(top ? new T.Vector3(0,145,.001) : new T.Vector3(36,110,81))
   camera.zoom = 1
   camera.updateProjectionMatrix()
   controls.update()
-  schedule()
+  fit()
 }
 function zoom(factor) {
   camera.zoom = T.MathUtils.clamp(camera.zoom * factor, .5, 10)
@@ -116,12 +122,21 @@ onMounted(() => {
   renderer.setClearColor(new T.Color(0xf3f5f4), 1)
   stage.value.prepend(renderer.domElement)
   const geo = props.geometry
-  surface(geo.outline, 'outline', 0)
-  for (const group of ['bays', 'walls', 'columns']) geo[group].forEach((points, i) => surface(points, group, i))
-  linework(geo.lines)
-  const bounds = new T.Box3().setFromPoints(geo.outline.map(([x,z]) => new T.Vector3(x,0,z)))
+  if (!props.detail) {
+    surface(geo.outline, 'outline', 0)
+    for (const group of ['bays', 'walls', 'columns']) geo[group].forEach((points, i) => surface(points, group, i))
+    linework(geo.lines)
+  }
+  if (props.core) {
+    props.core.walls.forEach((points,i) => surface(points,'coreWalls',i))
+    if (props.detail) {
+      props.core.columns.forEach((points,i) => surface(points,'coreColumns',i))
+      linework(props.core.lines)
+    }
+  }
+  const fitPoints = props.detail ? [...props.core.columns.flat(), ...props.core.walls.flat(), ...props.core.lines.flat()] : geo.outline
+  bounds = new T.Box3().setFromPoints(fitPoints.map(([x,z]) => new T.Vector3(x,0,z)))
   bounds.getCenter(centre)
-  radius = bounds.getSize(new T.Vector3()).length() * .50
   scene.add(new T.AmbientLight(0xffffff, 1.75))
   const sun = new T.DirectionalLight(0xffffff, 1.7)
   sun.position.set(-25,70,30)
@@ -134,7 +149,6 @@ onMounted(() => {
   renderer.domElement.addEventListener('pointerdown', startPoint)
   renderer.domElement.addEventListener('pointerup', selectPoint)
   reset(false)
-  fit()
   highlight()
   observer = new ResizeObserver(fit)
   observer.observe(stage.value)
@@ -151,7 +165,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.model-stage { position: relative; height: clamp(320px, 56vh, 720px); overflow: hidden; border-radius: 6px; background: #f3f5f4; }
+.model-stage { position: relative; height: clamp(320px, 62vh, 800px); overflow: hidden; border-radius: 6px; background: #f3f5f4; }
 .model-stage :deep(canvas), .model-stage :deep(svg) { display: block; touch-action: none; }
 .view-tools { position: absolute; top: 10px; left: 10px; display: flex; gap: 2px; padding: 3px; background: #fff; border: 1px solid #d8dcdc; border-radius: 6px; }
 .view-tools button { min-width: 32px; min-height: 30px; border: 0; background: transparent; cursor: pointer; font: inherit; color: inherit; }
