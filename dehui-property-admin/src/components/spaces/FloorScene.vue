@@ -67,6 +67,14 @@ function linework(paths) {
   geom.setAttribute('position', new T.Float32BufferAttribute(vertices, 3))
   scene.add(new T.LineSegments(geom, edgeMaterial))
 }
+function sizeToViewport() {
+  const element = stage.value
+  if (!element || document.fullscreenElement) return
+  const main = element.closest('#dhic-main')
+  const top = element.getBoundingClientRect().top + (main?.scrollTop ?? window.scrollY)
+  const bottom = Math.min(window.innerHeight, main?.getBoundingClientRect().bottom ?? window.innerHeight)
+  element.style.setProperty('--available-model-height', Math.floor(bottom - top - 12) + 'px')
+}
 function fit() {
   const w = stage.value.clientWidth, h = stage.value.clientHeight
   if (!w || !h) return
@@ -160,12 +168,15 @@ onMounted(() => {
   controls.addEventListener('change', schedule)
   renderer.domElement.addEventListener('pointerdown', startPoint)
   renderer.domElement.addEventListener('pointerup', selectPoint)
+  sizeToViewport()
+  window.addEventListener('resize', sizeToViewport)
   reset(props.traffic || !props.detail)
   highlight()
-  observer = new ResizeObserver(fit)
+  observer = new ResizeObserver(() => { sizeToViewport(); fit() })
   observer.observe(stage.value)
 })
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', sizeToViewport)
   observer?.disconnect()
   controls?.dispose()
   renderer?.domElement.removeEventListener('pointerdown', startPoint)
@@ -177,10 +188,10 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.model-stage { position: relative; width:100%; height:clamp(360px, min(78svh, 96cqw), 1500px); overflow: hidden; border-radius: 6px; background: #f3f5f4; }
+.model-stage { position: relative; width:100%; height:clamp(360px, min(var(--available-model-height, 78svh), 96cqw), 1500px); overflow: hidden; border-radius: 6px; background: #f3f5f4; }
 .model-stage :deep(canvas), .model-stage :deep(svg) { display: block; touch-action: none; }
 .view-tools { position: absolute; top: 10px; left: 10px; display: flex; gap: 2px; padding: 3px; background: #fff; border: 1px solid #d8dcdc; border-radius: 6px; }
 .view-tools button { min-width: 32px; min-height: 30px; border: 0; background: transparent; cursor: pointer; font: inherit; color: inherit; }
 .view-tools button:hover { background: #edf0ef; }
-@container (max-width:800px) { .model-stage {height:clamp(280px, min(75svh, 97cqw), 720px);} }
+@container (max-width:800px) { .model-stage {height:clamp(280px, min(var(--available-model-height, 75svh), 97cqw), 720px);} }
 </style>

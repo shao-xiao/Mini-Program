@@ -1,15 +1,12 @@
 <template>
   <main class="asset-page spaces-page">
-    <header class="asset-page__header">
+    <header v-if="!showModelHeaderActions" class="asset-page__header">
       <div>
         <h1>楼宇空间管理</h1>
         <p>按楼宇和楼层查看房间、入住状态与合同阶段。</p>
       </div>
-      <div class="asset-page__header-actions">
-        <div v-if="canBrowseDirectory" class="layout-switch" aria-label="空间显示方式">
-          <button :aria-pressed="directoryMode" @click="changeLayout(true)">空间目录</button>
-          <button :aria-pressed="!directoryMode" @click="changeLayout(false)">表格</button>
-        </div>
+      <SpaceViewActions :can-browse-directory="canBrowseDirectory" :directory-mode="directoryMode" :loading="loadingSpaces"
+        @layout="changeLayout" @refresh="refreshAll">
         <el-button
           v-if="canViewBuildings && !directoryMode"
           text
@@ -17,17 +14,19 @@
         >
           {{ navigationCollapsed ? '展开空间导航' : '收起空间导航' }}
         </el-button>
-        <el-button :icon="Refresh" :loading="loadingBuildings || loadingFloors || loadingRooms" @click="refreshAll">
-          刷新
-        </el-button>
-      </div>
+      </SpaceViewActions>
     </header>
 
     <RoomDirectory v-if="directoryMode"
       :buildings="buildings" :floors="floors" :rooms="directoryRooms"
-      :building="selectedBuilding" :floor="floors.find(item => Number(item.id) === selectedFloorId) || null"
-      :loading="loadingBuildings || loadingFloors || loadingRooms" :error="buildingError || floorError || roomsError"
-      @building="selectBuilding" @floor="selectFloor" @retry="refreshAll" />
+      :building="selectedBuilding" :floor="selectedFloor" :has-b2-drawing="showModelHeaderActions"
+      :loading="loadingSpaces" :error="buildingError || floorError || roomsError"
+      @building="selectBuilding" @floor="selectFloor" @retry="refreshAll">
+      <template v-if="showModelHeaderActions" #actions>
+        <SpaceViewActions :can-browse-directory="canBrowseDirectory" :directory-mode="directoryMode" :loading="loadingSpaces"
+        @layout="changeLayout" @refresh="refreshAll" />
+      </template>
+    </RoomDirectory>
     <section v-else class="space-explorer" :class="spaceExplorerClass">
       <aside v-if="canViewBuildings && !navigationCollapsed" class="space-column" aria-label="楼宇列表">
         <div class="space-column__header">
@@ -278,7 +277,8 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MoreFilled, Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { MoreFilled, Plus, Search } from '@element-plus/icons-vue'
+import SpaceViewActions from './SpaceViewActions.vue'
 import RoomDirectory from './RoomDirectory.vue'
 import RoomList from '../building/RoomList.vue'
 import request from '../../utils/request'
@@ -344,6 +344,11 @@ const spaceExplorerClass = computed(() => ({
   'space-explorer--single-navigation': visibleNavigationColumns.value === 1
 }))
 const selectedBuilding = computed(() => buildings.value.find(item => Number(item.id) === Number(selectedBuildingId.value)) || null)
+const selectedFloor = computed(() => floors.value.find(item => Number(item.id) === selectedFloorId.value) || null)
+const showModelHeaderActions = computed(() => directoryMode.value &&
+  selectedBuilding.value?.buildingCode === 'BLD-3C5CD7268F55' && Number(selectedFloor.value?.floorNumber) === -2)
+const loadingSpaces = computed(() => loadingBuildings.value || loadingFloors.value || loadingRooms.value)
+
 const filteredBuildings = computed(() => {
   const keyword = buildingKeyword.value.toLowerCase()
   if (!keyword) return buildings.value
@@ -670,10 +675,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.layout-switch { display:inline-flex; padding:2px; background:var(--dhic-surface); border:1px solid var(--dhic-border-color); border-radius:6px; }
-.layout-switch button {padding:5px 10px; background:transparent; border:0; border-radius:4px; color:var(--dhic-text-regular); font:inherit; font-size:13px; cursor:pointer;}
-.layout-switch button[aria-pressed=true] { background:var(--dhic-row-selected); color:var(--dhic-text-primary); font-weight:600; }
-
 .asset-page {
   min-width: 0;
   color: var(--dhic-text-primary);
@@ -705,7 +706,6 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 
-.asset-page__header-actions,
 .range-inputs {
   display: flex;
   align-items: center;

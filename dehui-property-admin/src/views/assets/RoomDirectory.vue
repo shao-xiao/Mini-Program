@@ -11,6 +11,7 @@
         <template v-if="inRooms"><span aria-hidden="true">›</span><h2>{{ floor ? floorName(floor) : '全部房间' }}</h2></template>
       </nav>
       <span v-if="!loading && !error" class="summary">共 <b>{{ scope.length }}</b> 间 · 未入住 {{ counts.VACANT || 0 }} · 已入住 {{ counts.RENTED || 0 }}</span>
+      <slot name="actions" />
     </header>
     <div v-if="loading" class="state" role="status">正在读取空间目录…</div>
     <div v-else-if="error" class="state" role="alert">{{ error }} <el-button @click="emit('retry')">重新加载</el-button></div>
@@ -70,7 +71,7 @@ import { roomStatusOptions, roomTypeOptions, roomContractStageOptions } from '..
 
 const BasementDrawing = defineAsyncComponent(() => import('../../components/spaces/BasementDrawing.vue'))
 const props = defineProps({
-  buildings: Array, floors: Array, rooms: Array, building: Object, floor: Object, loading: Boolean, error: String
+  buildings: Array, floors: Array, rooms: Array, building: Object, floor: Object, hasB2Drawing: Boolean, loading: Boolean, error: String
 })
 const emit = defineEmits(['building', 'floor', 'retry'])
 const allRooms = ref(false)
@@ -86,7 +87,6 @@ const inRooms = computed(() => Boolean(props.building && (props.floor || allRoom
 const scope = computed(() => props.rooms.filter(room =>
   (!props.building || Number(room.buildingId) === Number(props.building.id)) &&
   (!props.floor || Number(room.floorId) === Number(props.floor.id))))
-const hasB2Drawing = computed(() => props.building?.buildingCode === 'BLD-3C5CD7268F55' && Number(props.floor?.floorNumber) === -2)
 const counts = computed(() => {
   const result = {}
   for (const room of scope.value) result[status(room)] = (result[status(room)] || 0) + 1
@@ -150,6 +150,7 @@ watch(selected, room => { if (!room) drawer.value = false })
 <style scoped>
 .directory { container-type:inline-size; background:var(--dhic-surface); color:var(--dhic-text-primary); border:1px solid var(--dhic-border-color); border-radius:8px; padding:6px 18px 20px; }
 .directory-head,.directory-head nav,.rule,.filters,.floor-tools { display:flex; align-items:center; gap:10px; }
+.directory-head .summary {margin-inline-start:auto;}
 .directory-head { flex-wrap:wrap; justify-content:space-between; min-height:48px; border-bottom:1px solid var(--dhic-border-color-light); }
 h2,h3 { margin:0; font-size:15px; } h3 {font-size:13px;}
 button { cursor:pointer; font:inherit; color:inherit; background:none; border:0; }
