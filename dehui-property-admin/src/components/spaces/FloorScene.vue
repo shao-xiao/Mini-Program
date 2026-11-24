@@ -6,6 +6,7 @@
       <button type="button" @click="reset(true)">俯视</button>
       <button type="button" aria-label="放大模型" @click="zoom(1.35)">＋</button>
       <button type="button" aria-label="缩小模型" @click="zoom(1 / 1.35)">−</button>
+      <button v-if="hasMotion" type="button" class="play-control" :aria-pressed="playing" @click="toggleMotion">{{ playing ? '暂停演示' : '播放演示' }}</button>
     </div>
   </div>
 </template>
@@ -13,6 +14,7 @@
 <script setup>
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import * as T from 'three'
+import { createFloorMotion } from './floorMotion'
 import { createFloorLabels } from './floorLabels'
 import { addSpaceCutaway } from './spaceCutaway'
 import { addGarageMarkings, selectionColor, garageColors, rampProfile, rampGeometry, roadLevel } from './garageMarkings'
@@ -36,12 +38,41 @@ const centre = new T.Vector3()
 let bounds
 
 function retain(resource) { resources.add(resource); return resource }
-function render() {
-  if (!renderer) return
-  renderer.render(scene, camera)
-  labels.update(camera,stage.value.clientWidth,stage.value.clientHeight,props.selection)
+const motion = createFloorMotion(retain)
+const hasMotion = ref(false)
+const playing = ref(false)
+let inView=true, labelsDirty=true, previousTime, elapsed=0, visibilityObserver
+const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
+function render(now) {
+  frame=undefined
+  const animate=playing.value && inView && !document.hidden && hasMotion.value
+  // Render motion at 20 fps. Camera motion stays responsive, and labels only
+  // need reprojection when the camera or selection changes.
+  if (labelsDirty || (animate && (previousTime==null || now-previousTime>=50))) {
+    if (animate && previousTime!=null) elapsed+=(now-previousTime)/1000
+    previousTime=animate ? now : undefined
+    motion.update(elapsed)
+    renderer.render(scene,camera)
+    if (labelsDirty) labels.update(camera,stage.value.clientWidth,stage.value.clientHeight,props.selection)
+    labelsDirty=false
+  }
+  if (animate) frame=requestAnimationFrame(render)
 }
-function schedule() { cancelAnimationFrame(frame); frame = requestAnimationFrame(render) }
+function schedule() {
+  labelsDirty=true
+  if (frame==null) frame=requestAnimationFrame(render)
+}
+function resetClock() { previousTime=undefined; schedule() }
+function readMotionPreference() {
+  const stored=sessionStorage.getItem('b2-model-motion')
+  playing.value=stored===null ? !motionPreference.matches : stored==='on'
+  resetClock()
+}
+function toggleMotion() {
+  playing.value=!playing.value
+  sessionStorage.setItem('b2-model-motion',playing.value ? 'on' : 'off')
+  resetClock()
+}
 
 function surface(points, group, index) {
   const shape = new T.Shape()
@@ -61,9 +92,12 @@ function surface(points, group, index) {
   mesh.position.y = { bays:.018, lanes:roadLevel, crossings:.05, parking:.04, rooms:.025 }[group] || 0
   mesh.userData = { group, index }
   pickables.push(mesh)
-  if (room) addSpaceCutaway(mesh,room,props.rooms,retain,pickables)
+  if (room) {
+    addSpaceCutaway(mesh,room,props.rooms,retain,pickables)
+    motion.equipment(mesh,room,pickables)
+  }
   const item = room || (['parking','lanes'].includes(group) && props.garage[group][index])
-  if (item) labels.add(group,index,item.name,points,ramp ? ramp.height : () => room ? 1.25 : .10)
+  if (item) labels.add(group,index,item.name,points,ramp ? ramp.height : () => mesh.userData.hasEquipment ? 2.65 : room ? 1.25 : .10)
   scene.add(mesh)
   meshes.set(group + ':' + index, mesh)
   if (solid || group === 'bays' || group === 'parking') {
@@ -178,7 +212,16 @@ onMounted(() => {
   const fitPoints = props.detail ? [...props.core.columns.flat(), ...props.core.walls.flat(), ...props.core.lines.flat()] : geo.outline
   bounds = new T.Box3().setFromPoints(fitPoints.map(([x,z]) => new T.Vector3(x,0,z)))
   bounds.getCenter(centre)
-  if (props.traffic) addGarageMarkings(scene,props.garage,retain)
+  if (props.traffic) {
+    addGarageMarkings(scene,props.garage,retain)
+    motion.traffic(scene,props.garage)
+  }
+  hasMotion.value=motion.active
+  readMotionPreference()
+  motionPreference.addEventListener('change',readMotionPreference)
+  document.addEventListener('visibilitychange',resetClock)
+  visibilityObserver=new IntersectionObserver(([entry])=>{inView=entry.isIntersecting; resetClock()})
+  visibilityObserver.observe(stage.value)
   scene.add(new T.AmbientLight(0xffffff, 1.75))
   const sun = new T.DirectionalLight(0xffffff, 1.7)
   sun.position.set(-25,70,30)
@@ -200,6 +243,9 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', sizeToViewport)
+  motionPreference.removeEventListener('change',readMotionPreference)
+  document.removeEventListener('visibilitychange',resetClock)
+  visibilityObserver?.disconnect()
   observer?.disconnect()
   controls?.dispose()
   renderer?.domElement.removeEventListener('pointerdown', startPoint)
@@ -220,6 +266,7 @@ onBeforeUnmount(() => {
 .plan-labels :deep(.active) {color:#fff; background:var(--selection-color); border-radius:3px; text-shadow:none; outline:2px solid white;}
 .view-tools { position: absolute; top: 10px; left: 10px; display: flex; gap: 2px; padding: 3px; background: #fff; border: 1px solid #d8dcdc; border-radius: 6px; }
 .view-tools button { min-width: 32px; min-height: 30px; border: 0; background: transparent; cursor: pointer; font: inherit; color: inherit; }
+.view-tools .play-control {border-left:1px solid #d8dcdc; padding:0 8px;}
 .view-tools button:hover { background: #edf0ef; }
 @container (max-width:800px) { .model-stage {height:clamp(280px, min(var(--available-model-height, 75svh), 97cqw), 720px);} }
 </style>
