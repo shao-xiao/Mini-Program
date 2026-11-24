@@ -4,8 +4,9 @@
     <div class="view-tools" aria-label="模型视角">
       <button type="button" @click="reset(false)">轴测</button>
       <button type="button" @click="reset(true)">俯视</button>
-      <button v-if="waterItems" type="button" @click="reset('below')">仰视</button>
-      <button v-if="waterItems" type="button" @click="focusWater">定位构件</button>
+      <button v-if="waterItems || stations" type="button" @click="reset('below')">仰视</button>
+      <button v-if="waterItems || stations" type="button" @click="focusWater">定位构件</button>
+      <button v-if="stations" type="button" @click="focusStation(true)">设备立面</button>
       <button type="button" aria-label="放大模型" @click="zoom(1.35)">＋</button>
       <button type="button" aria-label="缩小模型" @click="zoom(1 / 1.35)">−</button>
       <button v-if="hasMotion" type="button" class="play-control" :aria-pressed="playing" @click="toggleMotion">{{ playing ? '暂停演示' : '播放演示' }}</button>
@@ -16,6 +17,7 @@
 <script setup>
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import * as T from 'three'
+import { addStations } from './stationScene'
 import { addPlumbing } from './plumbingScene'
 import { createFloorMotion } from './floorMotion'
 import { createFloorLabels } from './floorLabels'
@@ -24,12 +26,13 @@ import { addGarageMarkings, selectionColor, garageColors, rampProfile, rampGeome
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { SVGRenderer } from 'three/addons/renderers/SVGRenderer.js'
 
-const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array, waterRooms: Array })
+const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array, waterRooms: Array, stations: Array, startInElevation: Boolean })
 const emit = defineEmits(['select'])
 const stage = ref(null)
 const labelLayer = ref(null)
 const pickables = []
-let labels, plumbingMotion
+let labels, plumbingMotion, stationMotion, elevationView=false
+const backdrop=[]
 const scene = new T.Scene()
 const camera = new T.OrthographicCamera(-60, 60, 60, -60, 0.1, 1000)
 const meshes = new Map()
@@ -54,6 +57,7 @@ function render(now) {
   if (labelsDirty || (animate && (previousTime==null || now-previousTime>=50))) {
     if (animate && previousTime!=null) elapsed+=(now-previousTime)/1000
     previousTime=animate ? now : undefined
+    stationMotion?.update(elapsed)
     plumbingMotion?.update(elapsed)
     motion.update(elapsed)
     renderer.render(scene,camera)
@@ -91,7 +95,7 @@ function surface(points, group, index) {
   const color = group === 'parking' ? garageColors[props.garage.parking[index].zone] : palette[group]
   const room = group === 'rooms' && props.rooms[index]
   const floorColor = room?.name === '电梯厅' ? 0xe6d4aa : room?.name?.includes('电梯井') ? 0x92a7b7 : color
-  const material = retain(new T.MeshLambertMaterial({ color:floorColor, side: props.waterItems && !solid ? T.FrontSide : T.DoubleSide, transparent: Boolean(props.waterItems), opacity: props.waterItems ? (solid ? .20 : .09) : 1, depthWrite: !props.waterItems }))
+  const material = retain(new T.MeshLambertMaterial({ color:floorColor, side: (props.waterItems || props.stations) && !solid ? T.FrontSide : T.DoubleSide, transparent: Boolean(props.waterItems || props.stations), opacity: props.waterItems || props.stations ? (solid ? .20 : .09) : 1, depthWrite: !(props.waterItems || props.stations) }))
   const mesh = new T.Mesh(geom, material)
   mesh.position.y = { bays:.018, lanes:roadLevel, crossings:.05, parking:.04, rooms:.025 }[group] || 0
   mesh.userData = { group, index }
@@ -147,6 +151,7 @@ function fit() {
 }
 function reset(top) {
   if (!controls) return
+  setElevation(false)
   controls.target.copy(centre)
   camera.position.copy(centre).add(top === 'below' ? new T.Vector3(0,-145,.001) : top ? new T.Vector3(0,145,.001) : new T.Vector3(36,110,81))
   camera.zoom = 1
@@ -154,7 +159,28 @@ function reset(top) {
   controls.update()
   fit()
 }
+function setElevation(on) {
+  if (!props.stations) return
+  elevationView=on
+  stationMotion?.isolate(on)
+  backdrop.forEach(object=>{object.visible=!on})
+  labelLayer.value.style.visibility=on?'hidden':''
+}
+function focusStation(front) {
+  const station=props.stations?.[props.selection?.index]
+  if (!station || !controls) return
+  setElevation(front)
+  const [x,z]=station.anchor
+  controls.target.set(x,1.25,z)
+  camera.position.copy(controls.target).add(front?new T.Vector3(0,.01,100):new T.Vector3(28,45,50))
+  controls.update()
+  fit()
+  camera.zoom=T.MathUtils.clamp(Math.min(camera.right-camera.left,camera.top-camera.bottom)/(front?4.8:9),1,36)
+  camera.updateProjectionMatrix()
+  schedule()
+}
 function focusWater() {
+  if (props.stations) { focusStation(false); return }
   const points = props.waterItems?.[props.selection?.index]?.points
   if (!points || !controls) return
   const target = new T.Vector3()
@@ -169,19 +195,20 @@ function focusWater() {
   schedule()
 }
 function zoom(factor) {
-  camera.zoom = T.MathUtils.clamp(camera.zoom * factor, .5, props.waterItems ? 18 : 10)
+  camera.zoom = T.MathUtils.clamp(camera.zoom * factor, .5, props.stations ? 36 : props.waterItems ? 18 : 10)
   camera.updateProjectionMatrix()
   schedule()
 }
 function selectPoint(event) {
   if (!pointer || Math.hypot(event.clientX-pointer.x, event.clientY-pointer.y) > 5) return
   const caption = labels.hit(event.clientX,event.clientY)
-  if (caption && (!props.waterItems || caption.group==='water')) { emit('select',caption); return }
+  if (!elevationView && caption && (props.stations ? caption.group==='station' : !props.waterItems || caption.group==='water')) { emit('select',caption); return }
   const rect = renderer.domElement.getBoundingClientRect()
   const coords = new T.Vector2((event.clientX-rect.left)/rect.width*2-1, 1-(event.clientY-rect.top)/rect.height*2)
   const ray = new T.Raycaster()
   ray.setFromCamera(coords, camera)
-  const hit = ray.intersectObjects(pickables, false)[0]
+  const candidates=elevationView ? pickables.filter(mesh=>mesh.userData.index===props.selection?.index) : pickables
+  const hit = ray.intersectObjects(candidates, false)[0]
   if (hit) {
     const data=hit.object.userData
     emit('select', data.indices ? {group:'water',index:data.indices[hit.instanceId]} : data)
@@ -191,6 +218,12 @@ function startPoint(event) { pointer = { x:event.clientX, y:event.clientY } }
 const selectedMaterial = retain(new T.MeshBasicMaterial({color:selectionColor,side:T.DoubleSide}))
 let previousMaterial
 function highlight() {
+  if (stationMotion) {
+    stationMotion.select(props.selection?.index)
+    if(elevationView) focusStation(true)
+    schedule()
+    return
+  }
   if (plumbingMotion) { plumbingMotion.select(props.selection?.index); schedule(); return }
   if (highlighted && previousMaterial) highlighted.material = previousMaterial
   previousMaterial = null
@@ -215,13 +248,18 @@ onMounted(() => {
   const geo = props.geometry
   if (!props.detail) {
     surface(geo.outline, 'outline', 0)
-    for (const group of (props.traffic || props.waterItems ? ['walls','columns'] : ['bays','walls','columns'])) geo[group].forEach((points, i) => surface(points, group, i))
+    for (const group of (props.traffic || props.waterItems || props.stations ? ['walls','columns'] : ['bays','walls','columns'])) geo[group].forEach((points, i) => surface(points, group, i))
     linework(geo.lines)
 
     if (props.traffic) {
       props.garage.crossings?.forEach((points,i) => surface(points,'crossings',i))
       for (const group of ['lanes','parking']) props.garage[group].forEach((item,i) => surface(item.points,group,i))
     }
+  }
+  if (props.stations) {
+    backdrop.push(...scene.children)
+    pickables.length=0
+    stationMotion=addStations(scene,props.stations,retain,pickables,labels)
   }
   if (props.waterItems) {
     pickables.length=0
@@ -246,7 +284,7 @@ onMounted(() => {
     addGarageMarkings(scene,props.garage,retain)
     motion.traffic(scene,props.garage)
   }
-  hasMotion.value=motion.active || plumbingMotion?.active
+  hasMotion.value=motion.active || plumbingMotion?.active || stationMotion?.active
   readMotionPreference()
   motionPreference.addEventListener('change',readMotionPreference)
   document.addEventListener('visibilitychange',resetClock)
@@ -256,22 +294,23 @@ onMounted(() => {
   const sun = new T.DirectionalLight(0xffffff, 1.7)
   sun.position.set(-25,70,30)
   scene.add(sun)
-  if (props.waterItems) {
+  if (props.waterItems || props.stations) {
     const reflected = new T.DirectionalLight(0xc9e3f4,1.1)
     reflected.position.set(30,-50,20)
     scene.add(reflected)
   }
   controls = new OrbitControls(camera, renderer.domElement)
-  controls.maxPolarAngle = props.waterItems ? Math.PI - .000001 : Math.PI / 2.3
+  controls.maxPolarAngle = props.waterItems || props.stations ? Math.PI - .000001 : Math.PI / 2.3
   controls.minZoom = .5
-  controls.maxZoom = props.waterItems ? 18 : 10
+  controls.maxZoom = props.stations ? 36 : props.waterItems ? 18 : 10
   controls.addEventListener('change', schedule)
   renderer.domElement.addEventListener('pointerdown', startPoint)
   renderer.domElement.addEventListener('pointerup', selectPoint)
   sizeToViewport()
   window.addEventListener('resize', sizeToViewport)
   labels.prepare()
-  reset(Boolean(props.waterItems))
+  reset(Boolean(props.waterItems || props.stations))
+  if (props.startInElevation) focusStation(true)
   highlight()
   observer = new ResizeObserver(() => { sizeToViewport(); fit() })
   observer.observe(stage.value)

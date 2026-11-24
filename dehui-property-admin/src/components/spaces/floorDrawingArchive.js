@@ -95,7 +95,8 @@ async function parseSupplement(file, model) {
   const water = archive.file('plumbing.json')
   if (water) {
     if (water._data.uncompressedSize > 1024*1024) throw Error('给排水清单过大')
-    const data = JSON.parse(await water.async('string'))
+    const bytes = await water.async('uint8array')
+    const data = JSON.parse(new TextDecoder().decode(bytes))
     const codes = ['P202','P203','P204','P301','P302']
     if (data.version === 2) codes.push('P206','P401','P501','P502')
     const systems = Object.keys(waterSystems).filter(key => data.version === 2 || key !== 'sprinkler')
@@ -111,6 +112,12 @@ async function parseSupplement(file, model) {
           (i.kind!=='集水坑' || (typeof i.name==='string' && typeof i.pump==='string' && typeof i.duty==='string' &&
           [i.flow,i.head,i.power].every(Number.isFinite) && Array.isArray(i.levels) && i.levels.length===3 && i.levels.every(Number.isFinite)))))
       throw Error('给排水图包与本层底图或构件规格不匹配')
+    // Room routes refer to numbered CAD strokes in one reviewed extraction.
+    data.extractionDigest = null
+    if (data.version === 2 && globalThis.crypto?.subtle) {
+      const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
+      data.extractionDigest = Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('')
+    }
     return {kind:'plumbing',data,archive}
   }
   const survey = archive.file('spaces.json')

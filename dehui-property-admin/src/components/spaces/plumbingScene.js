@@ -69,7 +69,7 @@ export function addPlumbing(scene, items, retain, pickables, labels, instanced) 
       for (const t of [.08,.92]) part(tube, metal, start.clone().lerp(end,t),vec(radius*1.16,.085,radius*1.16),rotation,index)
     }
     const gas = item.layer === '通气'
-    if (length > .35) media.push({start,delta,rotation,gas,length})
+    if (length > .35) media.push({start,delta,rotation,gas,length,direction:item.direction})
   })
   for (const {geo,mat,entries} of groups.values()) {
     if (instanced) {
@@ -111,9 +111,11 @@ export function addPlumbing(scene, items, retain, pickables, labels, instanced) 
     select, active:streams.length>0 || basins.length>0,
     update(time) {
       for (const {runs,batch,singles} of streams) {
-        runs.forEach(({start,delta,rotation,gas,length},i)=>{
+        runs.forEach(({start,delta,rotation,gas,length,direction},i)=>{
           // Reversible motion on un-oriented CAD runs does not assign a design flow direction.
-          const fraction=.5-.42*Math.cos(time*Math.min(1.8,3.5/length)+i)
+          const progress=(time/Math.max(1.2,length/2)+i*.13)%1
+          const fraction=direction ? (direction>0 ? progress : 1-progress)
+            : .5-.42*Math.cos(time*Math.min(1.8,3.5/length)+i)
           marker.position.copy(start).addScaledVector(delta,fraction)
           marker.quaternion.copy(rotation)
           marker.scale.set(.09,gas ? .105 : Math.min(.85,length*.14),.09)

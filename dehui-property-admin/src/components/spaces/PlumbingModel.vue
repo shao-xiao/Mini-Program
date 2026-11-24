@@ -16,12 +16,16 @@
           <li>图示出口 {{ selected.connection.outlet }}</li>
         </ol>
       </section>
+      <section v-if="selected.stationName" class="route">
+        <h4>关联设备</h4><span>{{ selected.stationName }}</span>
+        <button @click="$emit('station',selected.stationName)">查看设备立面与流向</button>
+      </section>
       <dl aria-live="polite"><div v-for="[key,value] in fields" :key="key"><dt>{{ key }}</dt><dd>{{ value }}</dd></div></dl>
       <p class="reference">{{ waterSystems[system].reference }}</p>
       <h4>图层图例</h4>
       <div class="legend"><span v-for="layer in layers" :key="layer"><i :style="{background:pipeLayers[layer][1]}"></i>{{ pipeLayers[layer][0] }}</span></div>
       <p>{{ selected.kind==='集水坑' ? '水面循环演示蓄水与抽排，节奏为示意。水位按图中相对基准 H 标注。' : '水平位置按图配准，管线粗细与显示高度用于辨识。' }}</p>
-      <p>管内亮带演示水流，通气管内浅色气泡演示空气。速度、往复方向和安装高度为显示参数。消防系统按试水场景展示。</p>
+      <p>管内亮带演示水流，通气管内浅色气泡演示空气。已核管段按排水或冲洗方向流动，其余管段以往复亮带示意。速度和安装高度为显示参数。消防系统按试水场景展示。</p>
       <button @click="$emit('source',plan)">核对平面 · {{ plan }}</button>
       <button @click="$emit('source',systemSheet)">核对原理 · {{ systemSheet }}</button>
       <button v-if="detailSheet" @click="$emit('source',detailSheet)">泵房大样 · {{ detailSheet }}</button>
@@ -31,11 +35,30 @@
 <script setup>
 import {computed,ref,watch} from 'vue'
 import FloorScene from './FloorScene.vue'
+import {buildStations} from './plumbingStations'
 import {pipeLayers,waterSystems} from './plumbingCatalog'
 import {selectionColor as highlight} from './garageMarkings'
 const props = defineProps({geometry:Object, model:Object, system:String, rooms:{type:Array,default:()=>[]}})
-defineEmits(['source'])
-const systemItems = computed(()=>props.model.items.filter(item=>item.system===props.system))
+defineEmits(['source','station'])
+const systemItems = computed(() => {
+  const links = new Map()
+  for (const station of buildStations(props.model, props.rooms)) {
+    for (const run of station.runs) {
+      const item = props.model.items[run.id]
+      const direction = run.medium === '通气' ? 0 : (run.points[0] === item.points[0] ? 1 : -1)
+      links.set(item, { direction, stationName: station.name })
+    }
+    for (const outlet of station.outlets) {
+      const item = props.model.items[outlet.id]
+      links.set(item, { direction: outlet.medium === '排水' ? 1 : 0, stationName: station.name })
+    }
+    if (station.kind === '集水坑') links.set(station.name, { stationName: station.name })
+  }
+  return props.model.items.filter(item => item.system === props.system).map(item => {
+    const link = links.get(item) || links.get(item.name)
+    return link ? { ...item, ...link } : item
+  })
+})
 const layer=ref('')
 const items=computed(()=>systemItems.value.filter(item=>!layer.value || item.layer===layer.value))
 const plan=computed(()=>waterSystems[props.system].plan || 'P301')

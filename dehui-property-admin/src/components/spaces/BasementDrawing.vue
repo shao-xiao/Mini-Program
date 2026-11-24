@@ -14,6 +14,7 @@
         <div v-if="tab === '给排水'" class="views">
           <template v-if="plumbing">
             <div v-if="!original" class="scope" aria-label="给排水模型分类">
+              <button v-if="hasStationSurvey(plumbing)" :aria-pressed="waterSystem==='stations'" @click="openStation()">设备间与流向</button>
               <button v-for="(info,key) in availableWaterSystems" :key="key" :aria-pressed="waterSystem===key" @click="waterSystem=key">{{ info.name }}</button>
             </div>
             <button v-if="!original && fullscreenAvailable" @click="toggleFull">{{ full ? '退出全屏' : '全屏' }}</button>
@@ -57,7 +58,8 @@
         </aside>
         </div>
       </template>
-      <PlumbingModel v-if="tab === '给排水' && plumbing" v-show="!original" :key="waterSystem" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" :system="waterSystem" @source="code=>{sourceCode=code;original=true}"/>
+      <PlumbingRoomModel v-if="tab === '给排水' && waterSystem === 'stations' && hasStationSurvey(plumbing)" v-show="!original" :initial-name="stationName" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" @source="code=>{sourceCode=code;original=true}" />
+      <PlumbingModel @station="openStation" v-else-if="tab === '给排水' && plumbing" v-show="!original" :key="waterSystem" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" :system="waterSystem" @source="code=>{sourceCode=code;original=true}"/>
       <table v-else-if="!original && tab !== '平面图'" class="drawing-index">
         <thead><tr><th>图号</th><th>图名</th><th>核对状态</th></tr></thead>
         <tbody><tr v-for="s in sources" :key="s.code"><td>{{ s.code }}</td><td>{{ sheetTitle(s) }}</td><td><button v-if="s.code==='P401' && availableWaterSystems.sprinkler" @click="changeTab('给排水'); waterSystem='sprinkler'">查看自动喷淋模型</button><template v-else>已核对图签 · 未建模</template></td></tr></tbody>
@@ -83,6 +85,13 @@ import { selectionColor } from './garageMarkings'
 import { hasPermission } from '../../utils/permission'
 import { readFloorArchive, attachFloorArchive, attachSupplement, openSource } from './floorDrawingArchive'
 import { waterSystems } from './plumbingCatalog'
+import { hasStationSurvey } from './plumbingStations'
+const PlumbingRoomModel = defineAsyncComponent(() => import('./PlumbingRoomModel.vue'))
+const stationName = ref('')
+function openStation(name = '') {
+  stationName.value = name
+  waterSystem.value = 'stations'
+}
 const PlumbingModel = defineAsyncComponent(() => import('./PlumbingModel.vue'))
 const FloorScene = defineAsyncComponent(() => import('./FloorScene.vue'))
 const props = defineProps({ floorId: { type: Number, required: true }, ledgerArea: [String, Number] })
@@ -94,7 +103,7 @@ const plumbing = shallowRef(null), plumbingArchive = shallowRef(null), waterSyst
 const availableWaterSystems = computed(() => Object.fromEntries(Object.entries(waterSystems).filter(([key]) =>
   plumbing.value?.items.some(item => item.system === key))))
 function toggleWaterSource() {
-  if (!original.value) sourceCode.value = waterSystems[waterSystem.value].plan || 'P301'
+  if (!original.value) sourceCode.value = waterSystems[waterSystem.value]?.plan || 'P301'
   original.value = !original.value
 }
 const survey = shallowRef(null)
