@@ -21,6 +21,7 @@ export function objectSpecs(group,index,{core,garage,room,points,label}) {
   const {sides,area} = measurements(points)
   if (group === 'rooms') return [
     ['所选空间',room.name],...(room.fields || []),
+    ['模型表达',room.name.includes('电梯井') ? '图上井道轮廓与开顶轿厢示意，运行状态未接入' : '图上空间轮廓，按 1.20 m 展示剖切'],
     ...(!room.fields?.length ? [['核对状态','图上名称已核对，详细注记待关联']] : []),
     ['标注依据',room.source === 'A401' ? 'A401 地下二层核心筒放大平面' : 'A101 地下二层平面图']
   ]
@@ -36,7 +37,7 @@ export function objectSpecs(group,index,{core,garage,room,points,label}) {
     ]
     const arrows = [...new Set(item.arrows.map(a=>a[2]))]
     const symbol = {0:'→',90:'↓',180:'←','-90':'↑'}
-    return [['所选车道',item.name],['图面箭头',arrows.map(a=>symbol[a] || a+'°').join('  ')],
+    return [['所选车道',item.name],...(item.name.includes('坡道') ? [['坡道详图',item.name.startsWith('北侧') ? 'A409 · 6–6 剖面' : 'A410 · 7–7 剖面'],['起坡段','3.60 m，7.5%'],['主坡段','15%'],['模型范围','交通图配准范围内的 B2 可见段']] : []),['图面箭头',arrows.map(a=>symbol[a] || a+'°').join('  ')],
       ['标线',item.centerline ? '图示黄色中心线' : '模型未记录中心线'],
       ['所选显示段长 × 宽（扫描图估算）','约 '+size],['标注依据','地下二层停车场交通设施图 · 原第 5 页']]
   }

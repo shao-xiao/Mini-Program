@@ -1,5 +1,6 @@
 <template>
   <div ref="stage" class="model-stage" aria-label="楼层模型，拖动旋转，滚轮或双指缩放">
+    <div ref="labelLayer" class="plan-labels" aria-hidden="true"></div>
     <div class="view-tools" aria-label="模型视角">
       <button type="button" @click="reset(false)">轴测</button>
       <button type="button" @click="reset(true)">俯视</button>
@@ -12,13 +13,18 @@
 <script setup>
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import * as T from 'three'
-import { addGarageMarkings, selectionColor, garageColors } from './garageMarkings'
+import { createFloorLabels } from './floorLabels'
+import { addSpaceCutaway } from './spaceCutaway'
+import { addGarageMarkings, selectionColor, garageColors, rampProfile, rampGeometry, roadLevel } from './garageMarkings'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { SVGRenderer } from 'three/addons/renderers/SVGRenderer.js'
 
 const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean })
 const emit = defineEmits(['select'])
 const stage = ref(null)
+const labelLayer = ref(null)
+const pickables = []
+let labels
 const scene = new T.Scene()
 const camera = new T.OrthographicCamera(-60, 60, 60, -60, 0.1, 1000)
 const meshes = new Map()
@@ -30,7 +36,11 @@ const centre = new T.Vector3()
 let bounds
 
 function retain(resource) { resources.add(resource); return resource }
-function render() { if (renderer) renderer.render(scene, camera) }
+function render() {
+  if (!renderer) return
+  renderer.render(scene, camera)
+  labels.update(camera,stage.value.clientWidth,stage.value.clientHeight,props.selection)
+}
 function schedule() { cancelAnimationFrame(frame); frame = requestAnimationFrame(render) }
 
 function surface(points, group, index) {
@@ -38,15 +48,22 @@ function surface(points, group, index) {
   points.forEach(([x,z], i) => i ? shape.lineTo(x, -z) : shape.moveTo(x, -z))
   shape.closePath()
   const solid = ['walls','columns','coreWalls','coreColumns'].includes(group)
-  const geom = retain(solid
+  const ramp = group === 'lanes' && rampProfile(props.garage.lanes[index])
+  const geom = ramp ? retain(rampGeometry(ramp)) : retain(solid
     ? new T.ExtrudeGeometry(shape, { depth: cut, bevelEnabled: false })
     : new T.ShapeGeometry(shape))
-  geom.rotateX(-Math.PI / 2)
+  if (!ramp) geom.rotateX(-Math.PI / 2)
   const color = group === 'parking' ? garageColors[props.garage.parking[index].zone] : palette[group]
-  const material = retain(new T.MeshLambertMaterial({ color, side: T.DoubleSide }))
+  const room = group === 'rooms' && props.rooms[index]
+  const floorColor = room?.name === '电梯厅' ? 0xe6d4aa : room?.name?.includes('电梯井') ? 0x92a7b7 : color
+  const material = retain(new T.MeshLambertMaterial({ color:floorColor, side: T.DoubleSide }))
   const mesh = new T.Mesh(geom, material)
-  mesh.position.y = { bays:.018, lanes:.014, crossings:.05, parking:.04, rooms:.025 }[group] || 0
+  mesh.position.y = { bays:.018, lanes:roadLevel, crossings:.05, parking:.04, rooms:.025 }[group] || 0
   mesh.userData = { group, index }
+  pickables.push(mesh)
+  if (room) addSpaceCutaway(mesh,room,props.rooms,retain,pickables)
+  const item = room || (['parking','lanes'].includes(group) && props.garage[group][index])
+  if (item) labels.add(group,index,item.name,points,ramp ? ramp.height : () => room ? 1.25 : .10)
   scene.add(mesh)
   meshes.set(group + ':' + index, mesh)
   if (solid || group === 'bays' || group === 'parking') {
@@ -106,11 +123,13 @@ function zoom(factor) {
 }
 function selectPoint(event) {
   if (!pointer || Math.hypot(event.clientX-pointer.x, event.clientY-pointer.y) > 5) return
+  const caption = labels.hit(event.clientX,event.clientY)
+  if (caption) { emit('select',caption); return }
   const rect = renderer.domElement.getBoundingClientRect()
   const coords = new T.Vector2((event.clientX-rect.left)/rect.width*2-1, 1-(event.clientY-rect.top)/rect.height*2)
   const ray = new T.Raycaster()
   ray.setFromCamera(coords, camera)
-  const hit = ray.intersectObjects([...meshes.values()], false)[0]
+  const hit = ray.intersectObjects(pickables, false)[0]
   if (hit) emit('select', hit.object.userData)
 }
 function startPoint(event) { pointer = { x:event.clientX, y:event.clientY } }
@@ -136,6 +155,7 @@ onMounted(() => {
   }
   renderer.setClearColor(new T.Color(0xf3f5f4), 1)
   stage.value.prepend(renderer.domElement)
+  labels = createFloorLabels(labelLayer.value)
   const geo = props.geometry
   if (!props.detail) {
     surface(geo.outline, 'outline', 0)
@@ -158,7 +178,7 @@ onMounted(() => {
   const fitPoints = props.detail ? [...props.core.columns.flat(), ...props.core.walls.flat(), ...props.core.lines.flat()] : geo.outline
   bounds = new T.Box3().setFromPoints(fitPoints.map(([x,z]) => new T.Vector3(x,0,z)))
   bounds.getCenter(centre)
-  if (props.traffic) addGarageMarkings(scene,props.garage,bounds,retain)
+  if (props.traffic) addGarageMarkings(scene,props.garage,retain)
   scene.add(new T.AmbientLight(0xffffff, 1.75))
   const sun = new T.DirectionalLight(0xffffff, 1.7)
   sun.position.set(-25,70,30)
@@ -172,7 +192,8 @@ onMounted(() => {
   renderer.domElement.addEventListener('pointerup', selectPoint)
   sizeToViewport()
   window.addEventListener('resize', sizeToViewport)
-  reset(props.traffic || !props.detail)
+  labels.prepare()
+  reset(false)
   highlight()
   observer = new ResizeObserver(() => { sizeToViewport(); fit() })
   observer.observe(stage.value)
@@ -192,6 +213,11 @@ onBeforeUnmount(() => {
 <style scoped>
 .model-stage { position: relative; width:100%; height:clamp(360px, min(var(--available-model-height, 78svh), 96cqw), 1500px); overflow: hidden; border-radius: 6px; background: #f3f5f4; }
 .model-stage :deep(canvas), .model-stage :deep(svg) { display: block; touch-action: none; }
+.plan-labels { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+.plan-labels :deep(.plan-label) { position:absolute; top:0; left:0; white-space:nowrap; font:600 11px/16px system-ui,sans-serif; color:#243744; text-shadow:0 0 3px white; }
+.plan-labels :deep(.rooms), .plan-labels :deep(.lanes) { padding:0 4px; background:#fffc; border-radius:3px; }
+.plan-labels :deep(.lanes) {font-weight:500;}
+.plan-labels :deep(.active) {color:#fff; background:var(--selection-color); border-radius:3px; text-shadow:none; outline:2px solid white;}
 .view-tools { position: absolute; top: 10px; left: 10px; display: flex; gap: 2px; padding: 3px; background: #fff; border: 1px solid #d8dcdc; border-radius: 6px; }
 .view-tools button { min-width: 32px; min-height: 30px; border: 0; background: transparent; cursor: pointer; font: inherit; color: inherit; }
 .view-tools button:hover { background: #edf0ef; }
