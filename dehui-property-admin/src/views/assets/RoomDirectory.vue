@@ -20,7 +20,7 @@
         <header class="rule"><h3>{{ section.label }}</h3><i></i><span>{{ section.items.length }} {{ building ? '层' : '栋' }}</span></header>
         <div class="folders">
           <button v-for="item in section.items" :key="item.id" class="tile" @click="building ? emit('floor', item.id) : emit('building', item.id)">
-            <span class="folder" aria-hidden="true"><b>{{ building ? floorName(item) : '楼' }}</b></span>
+            <SpaceDirectoryIcon :kind="item.iconKind" />
             <strong>{{ building ? floorName(item) : item.buildingName }}</strong>
             <small>{{ item.rooms.length }} 间 · 已入住 {{ item.occupied }}</small>
           </button>
@@ -59,6 +59,7 @@
 </template>
 <script setup>
 import { computed, ref, watch } from 'vue'
+import SpaceDirectoryIcon from './SpaceDirectoryIcon.vue'
 import { roomStatusOptions, roomTypeOptions, roomContractStageOptions } from '../../workspaceConfigs/buildingWorkspaceConfig.js'
 
 const props = defineProps({
@@ -90,6 +91,10 @@ const collator = new Intl.Collator('zh-CN', {numeric: true})
 const shown = computed(() => options.value.filter(group => counts.value[group.value] && (!filter.value || group.value === filter.value))
   .map(group => ({ ...group, rooms: scope.value.filter(room => status(room) === group.value)
     .sort((a,b) => collator.compare(a.roomNumber || a.roomCode || '', b.roomNumber || b.roomCode || '') || a.id-b.id) })))
+function floorIconKind(floor) {
+  if (/屋面|屋顶/.test(floor.floorName || '')) return 'roof'
+  return floor.floorNumber < 0 ? 'basement' : 'floor'
+}
 const folderSections = computed(() => {
   const byId = new Map()
   for (const room of scope.value) {
@@ -99,13 +104,14 @@ const folderSections = computed(() => {
   }
   const items = (props.building ? props.floors : props.buildings).map(item => {
     const rooms = byId.get(Number(item.id)) || []
-    return { ...item, rooms, occupied: rooms.filter(room => status(room) === 'RENTED').length }
+    const iconKind = props.building ? floorIconKind(item) : 'building'
+    return { ...item, iconKind, rooms, occupied: rooms.filter(room => status(room) === 'RENTED').length }
   })
   if (!props.building) return items.length ? [{ label:'在册楼宇', items }] : []
   const upper = [], lower = [], basement = [], roofs = [], other = []
   for (const item of items) {
     const number = Number(item.floorNumber)
-    if (/屋面|屋顶/.test(item.floorName || '')) roofs.push(item)
+    if (item.iconKind === 'roof') roofs.push(item)
     else if (number >= 6) upper.push(item)
     else if (number >= 1) lower.push(item)
     else if (number < 0) basement.push(item)
@@ -150,11 +156,6 @@ small,.summary,.rule span,.state {font-size:12px;color:var(--dhic-text-secondary
 .tile {display:flex; flex-direction:column;align-items:center;gap:4px;border-radius:6px;padding:10px 4px;}
 .tile strong {font-size:13px;overflow-wrap:anywhere;} .tile:hover {background:var(--dhic-row-hover);}
 .tile:active,.filters button[aria-pressed=true] {background:var(--dhic-row-selected);}
-.folder {position:relative;isolation:isolate;display:grid;place-items:center;width:66px;height:48px;margin-bottom:3px;}
-.folder::before,.folder::after {content:'';position:absolute;z-index:-1;border-radius:4px;}
-.folder::before {inset:0 1px 1px;background:#dea93c;clip-path:polygon(0 0,34% 0,43% 13%,100% 13%,100% 100%,0 100%);}
-.folder::after {inset:10px 0 0;background:linear-gradient(#ffe59b,#ffca55);border:1px solid #d3a13d;}
-.folder b {font-size:17px;color:#765519;padding-top:8px;max-width:90%;overflow:hidden;white-space:nowrap;}
 .filters {flex-wrap:wrap;gap:6px;margin-top:12px;}.filters button {border-radius:5px;padding:6px 12px;font-size:13px;}
 .room svg {width:38px;height:34px;color:#747c86;} .room .vacant {color:#38775e;} .room .rented {color:#8b6435;}
 .state {padding:24px 0;text-align:center;} dl div {display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--dhic-border-color-light);}
