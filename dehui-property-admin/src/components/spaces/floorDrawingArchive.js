@@ -69,6 +69,7 @@ export async function readFloorArchive(id) {
   for (const result of results) {
     if (result.status === 'rejected') { errors.push(result.reason.message); continue }
     const { kind, data, archive } = result.value
+    if (kind === 'plumbing' && base.plumbing?.version >= data.version) continue
     base[kind] = data
     base[kind + 'Archive'] = archive
   }
@@ -96,14 +97,16 @@ async function parseSupplement(file, model) {
     if (water._data.uncompressedSize > 1024*1024) throw Error('给排水清单过大')
     const data = JSON.parse(await water.async('string'))
     const codes = ['P202','P203','P204','P301','P302']
-    if (data.version !== 1 || data.floor !== model.floor || data.buildingCode !== model.buildingCode ||
+    if (data.version === 2) codes.push('P206','P401','P501','P502')
+    const systems = Object.keys(waterSystems).filter(key => data.version === 2 || key !== 'sprinkler')
+    if (![1,2].includes(data.version) || data.floor !== model.floor || data.buildingCode !== model.buildingCode ||
         !data.reference || data.reference !== model.sources.find(s=>s.code==='A101')?.sha256 ||
         !Array.isArray(data.sources) || data.sources.length !== codes.length ||
         !codes.every(code=>data.sources.some(s=>s.code===code && s.file===code+'.pdf' && archive.file(s.file) && /^[0-9a-f]{64}$/.test(s.sha256))) ||
         !Array.isArray(data.items) || !data.items.length || data.items.length>4000 ||
-        !Object.keys(waterSystems).every(key=>data.items.some(i=>i.system===key)) ||
-        !data.items.every(i=>Object.hasOwn(waterSystems,i.system) && Object.hasOwn(pipeLayers,i.layer) &&
-          ['管段','立管','集水坑'].includes(i.kind) && Array.isArray(i.points) &&
+        !systems.every(key=>data.items.some(i=>i.system===key)) ||
+        !data.items.every(i=>systems.includes(i.system) && Object.hasOwn(pipeLayers,i.layer) &&
+          ['管段','立管','集水坑','喷头'].includes(i.kind) && Array.isArray(i.points) &&
           i.points.length===(i.kind==='管段'?2:1) && i.points.every(validPoint) &&
           (i.kind!=='集水坑' || (typeof i.name==='string' && typeof i.pump==='string' && typeof i.duty==='string' &&
           [i.flow,i.head,i.power].every(Number.isFinite) && Array.isArray(i.levels) && i.levels.length===3 && i.levels.every(Number.isFinite)))))
@@ -167,7 +170,7 @@ export async function attachSupplement(id, file, model, kind) {
   if (!before.length) throw Error('请先关联底图')
   for (const item of before.slice(1)) {
     const existing = await parseSupplement(await download(item),model)
-    if (existing.kind === kind) throw Error('该详图已关联，请刷新查看')
+    if (existing.kind === kind && !(kind === 'plumbing' && existing.data.version < result.data.version)) throw Error('该详图已关联，请刷新查看')
   }
   const uploaded = await uploadCustomFieldAttachment(file, { workspaceKey:'floors', timeout:60000 })
   const current = await values(id)

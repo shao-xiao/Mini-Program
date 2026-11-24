@@ -1,63 +1,132 @@
 import * as T from 'three'
+import { pipeLayers } from './plumbingCatalog'
+import { selectionColor } from './garageMarkings'
 
-import {pipeLayers} from './plumbingCatalog'
-
-export function addPlumbing(scene, items, retain, pickables, meshes, labels) {
-  const materials = new Map()
-  const basins = []
-  function material(color) {
-    if (!materials.has(color)) materials.set(color, retain(new T.MeshLambertMaterial({color})))
-    return materials.get(color)
+// The PDF fixes the plan coordinates. Vertical separation, fittings and fluid
+// markers are display geometry, not measured elevations or a hydraulic solver.
+export function addPlumbing(scene, items, retain, pickables, labels, instanced) {
+  const tube = retain(new T.CylinderGeometry(1, 1, 1, 12))
+  const shell = retain(new T.CylinderGeometry(1, 1, 1, 16, 1, true))
+  const box = retain(new T.BoxGeometry())
+  const ball = retain(new T.SphereGeometry(1, 8, 6))
+  const head = retain(new T.CylinderGeometry(.45, 1, 1, 10))
+  const up = new T.Vector3(0, 1, 0)
+  const axis = new T.Quaternion()
+  const groups = new Map(), parts = [], media = [], basins = []
+  const colors = new Map()
+  function material(color, opacity = 1) {
+    const key = color + '/' + opacity
+    if (!colors.has(key)) colors.set(key, retain(new T.MeshPhongMaterial({
+      color, shininess:65, specular:0x9aabb3, opacity, transparent:opacity < 1, depthWrite:opacity === 1
+    })))
+    return colors.get(key)
   }
-  const tube = retain(new T.CylinderGeometry(1,1,1,10))
-  const cube = retain(new T.BoxGeometry(1,1,1))
-  const up = new T.Vector3(0,1,0)
-  items.forEach((item,index) => {
+  function part(geo, mat, position, scale, rotation, index) {
+    const matrix = new T.Matrix4().compose(position, rotation, scale)
+    const key = geo.uuid + mat.uuid
+    if (!groups.has(key)) groups.set(key, {geo, mat, entries:[]})
+    groups.get(key).entries.push({matrix, index})
+    return {geo, matrix}
+  }
+  const glass = material('#c62936', .86)
+  const metal = material('#576974'), brass = material('#b98a4c')
+  const vec = (x,y,z) => new T.Vector3(x,y,z)
+  items.forEach((item, index) => {
     const [x,z] = item.points[0]
-    const mesh = new T.Mesh(item.kind==='集水坑' ? cube : tube, material(pipeLayers[item.layer][1]))
-    mesh.userData = {group:'water',index}
-    if (item.kind==='管段') {
-      const [endX,endZ] = item.points[1]
-      const delta = new T.Vector3(endX-x,0,endZ-z)
-      mesh.position.set((x+endX)/2,1.45,(z+endZ)/2)
-      mesh.scale.set(.115,delta.length(),.115)
-      mesh.quaternion.setFromUnitVectors(up,delta.normalize())
-    } else if (item.kind==='立管') {
-      mesh.position.set(x,1.2,z)
-      mesh.scale.set(.23,2.4,.23)
-    } else {
-      mesh.position.set(x,.24,z)
-      mesh.scale.set(1.9,.45,1.9)
-      const water = new T.Mesh(cube,material('#65c9ce'))
-      water.position.set(x,.65,z)
-      water.scale.set(1.58,.6,1.58)
-      water.userData=mesh.userData
-      pickables.push(water)
-      scene.add(water)
+    const color = pipeLayers[item.layer][1]
+    if (item.kind === '集水坑') {
+      parts[index] = part(box, metal, vec(x,.12,z), vec(1.9,.24,1.9), axis, index)
+      const water = new T.Mesh(box, material('#49aec0',.62))
+      water.position.set(x,.4,z)
+      water.scale.set(1.62,.32,1.62)
+      water.userData = {group:'water',index}
+      scene.add(water); pickables.push(water); basins.push(water)
       for (const dx of [-.43,.43]) {
-        const pump = new T.Mesh(tube,material('#384e5c'))
-        pump.position.set(x+dx,1.05,z)
-        pump.scale.set(.25,1.45,.25)
-        pump.userData=mesh.userData
-        pickables.push(pump)
-        scene.add(pump)
+        part(tube, metal, vec(x+dx,.92,z), vec(.23,1.36,.23), axis, index)
+        part(tube, brass, vec(x+dx,1.55,z), vec(.26,.13,.26), axis, index)
       }
-      basins.push(water)
-      labels.add('water',index,item.name,[[x-.5,z],[x+.5,z],[x,z+.3]],()=>2.5)
+      labels.add('water',index,item.name,[[x-.5,z],[x+.5,z],[x,z+.3]],()=>2.4)
+      return
     }
-    meshes.set('water:'+index,mesh)
-    pickables.push(mesh)
-    scene.add(mesh)
+    const y = item.system === 'sprinkler' ? 2.75 : 1.65
+    if (item.kind === '喷头') {
+      parts[index] = part(head, brass, vec(x,y-.09,z), vec(.14,.18,.14), axis, index)
+      for (const side of [-1,1]) {
+        part(box, brass, vec(x+side*.10,y-.25,z), vec(.035,.25,.05), axis, index)
+      }
+      part(ball, glass, vec(x,y-.25,z), vec(.05,.13,.05), axis, index)
+      part(tube, metal, vec(x,y-.39,z), vec(.18,.04,.18), axis, index)
+      return
+    }
+    const start = vec(x,item.kind === '立管' ? .1 : y,z)
+    const end = item.kind === '立管' ? vec(x,3.15,z) : vec(item.points[1][0],y,item.points[1][1])
+    const delta = end.clone().sub(start)
+    const length = delta.length()
+    const rotation = new T.Quaternion().setFromUnitVectors(up,delta.clone().normalize())
+    const radius = item.kind === '立管' ? .19 : .13
+    parts[index] = part(shell, material(color,.50), start.clone().lerp(end,.5), vec(radius,length,radius), rotation, index)
+    if (length > .65) {
+      for (const t of [.08,.92]) part(tube, metal, start.clone().lerp(end,t),vec(radius*1.16,.085,radius*1.16),rotation,index)
+    }
+    const gas = item.layer === '通气'
+    if (length > .35) media.push({start,delta,rotation,gas,length})
   })
+  for (const {geo,mat,entries} of groups.values()) {
+    if (instanced) {
+      const mesh = retain(new T.InstancedMesh(geo,mat,entries.length))
+      entries.forEach(({matrix},i)=>mesh.setMatrixAt(i,matrix))
+      mesh.userData = {group:'water', indices:entries.map(entry=>entry.index)}
+      scene.add(mesh); pickables.push(mesh)
+    } else {
+      for (const {matrix,index} of entries) {
+        const mesh = new T.Mesh(geo,mat)
+        mesh.applyMatrix4(matrix); mesh.userData={group:'water',index}
+        scene.add(mesh); pickables.push(mesh)
+      }
+    }
+  }
+  const marker = new T.Object3D()
+  const streams = [false,true].map(gas=>{
+    const runs = media.filter(run=>run.gas===gas)
+    if (!runs.length) return null
+    const mat = material(gas ? '#e7e1a8' : '#46cadd')
+    const geo = gas ? ball : tube
+    const batch = instanced ? retain(new T.InstancedMesh(geo,mat,runs.length)) : null
+    const singles = batch ? [] : runs.map(()=>new T.Mesh(geo,mat))
+    if (batch) { batch.frustumCulled=false; batch.instanceMatrix.setUsage(T.DynamicDrawUsage); scene.add(batch) }
+    else singles.forEach(mesh=>scene.add(mesh))
+    return {runs,batch,singles}
+  }).filter(Boolean)
+  const selected = new T.Mesh(box,material(selectionColor,.78))
+  selected.visible=false; scene.add(selected)
+  function select(index) {
+    const p = parts[index]
+    selected.visible=Boolean(p)
+    if (!p) return
+    selected.geometry=p.geo
+    p.matrix.decompose(selected.position,selected.quaternion,selected.scale)
+    selected.scale.multiplyScalar(1.07)
+  }
   return {
-    active:basins.length>0,
+    select, active:streams.length>0 || basins.length>0,
     update(time) {
-      // A teaching cycle only. Hydraulic velocity and elapsed seconds are illustrative.
-      const phase = time % 8 / 8
-      const level = phase < .62 ? phase/.62 : (1-phase)/.38
+      for (const {runs,batch,singles} of streams) {
+        runs.forEach(({start,delta,rotation,gas,length},i)=>{
+          // Reversible motion on un-oriented CAD runs does not assign a design flow direction.
+          const fraction=.5-.42*Math.cos(time*Math.min(1.8,3.5/length)+i)
+          marker.position.copy(start).addScaledVector(delta,fraction)
+          marker.quaternion.copy(rotation)
+          marker.scale.set(.09,gas ? .105 : Math.min(.85,length*.14),.09)
+          marker.updateMatrix()
+          if (batch) batch.setMatrixAt(i,marker.matrix)
+          else { singles[i].matrixAutoUpdate=false; singles[i].matrix.copy(marker.matrix); singles[i].matrixWorldNeedsUpdate=true }
+        })
+        if (batch) batch.instanceMatrix.needsUpdate=true
+      }
+      const phase=time%8/8
       for (const basin of basins) {
-        basin.scale.y=.15+.95*level
-        basin.position.y=.45+basin.scale.y/2
+        basin.scale.y=.15+.95*(phase<.62 ? phase/.62 : (1-phase)/.38)
+        basin.position.y=.24+basin.scale.y/2
       }
     }
   }

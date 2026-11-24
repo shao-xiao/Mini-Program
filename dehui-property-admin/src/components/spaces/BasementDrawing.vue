@@ -14,10 +14,11 @@
         <div v-if="tab === '给排水'" class="views">
           <template v-if="plumbing">
             <div v-if="!original" class="scope" aria-label="给排水模型分类">
-              <button v-for="(info,key) in waterSystems" :key="key" :aria-pressed="waterSystem===key" @click="waterSystem=key">{{ info.name }}</button>
+              <button v-for="(info,key) in availableWaterSystems" :key="key" :aria-pressed="waterSystem===key" @click="waterSystem=key">{{ info.name }}</button>
             </div>
             <button v-if="!original && fullscreenAvailable" @click="toggleFull">{{ full ? '退出全屏' : '全屏' }}</button>
-            <button @click="original=!original">{{ original ? '返回给排水模型' : '核对专业原图' }}</button>
+            <label v-if="canAttach && plumbing.version < 2" class="upload">关联深化图包<input type="file" accept=".zip" @change="attachDetail($event,'plumbing')"></label>
+            <button @click="toggleWaterSource">{{ original ? '返回给排水模型' : '核对专业原图' }}</button>
           </template>
           <label v-else-if="canAttach" class="upload">关联给排水图包<input type="file" accept=".zip" @change="attachDetail($event,'plumbing')"></label>
         </div>
@@ -56,17 +57,17 @@
         </aside>
         </div>
       </template>
-      <PlumbingModel v-else-if="tab === '给排水' && plumbing && !original" :model="plumbing" :geometry="model.geometry" :system="waterSystem" @source="code=>{sourceCode=code;original=true}"/>
+      <PlumbingModel v-if="tab === '给排水' && plumbing" v-show="!original" :key="waterSystem" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" :system="waterSystem" @source="code=>{sourceCode=code;original=true}"/>
       <table v-else-if="!original && tab !== '平面图'" class="drawing-index">
         <thead><tr><th>图号</th><th>图名</th><th>核对状态</th></tr></thead>
-        <tbody><tr v-for="s in sources" :key="s.code"><td>{{ s.code }}</td><td>{{ sheetTitle(s) }}</td><td>已核对图签 · 未建模</td></tr></tbody>
+        <tbody><tr v-for="s in sources" :key="s.code"><td>{{ s.code }}</td><td>{{ sheetTitle(s) }}</td><td><button v-if="s.code==='P401' && availableWaterSystems.sprinkler" @click="changeTab('给排水'); waterSystem='sprinkler'">查看自动喷淋模型</button><template v-else>已核对图签 · 未建模</template></td></tr></tbody>
       </table>
-      <div v-else class="sources">
+      <div v-if="original" class="sources">
         <label>图纸<select v-model="sourceCode"><option v-for="s in sources" :key="s.code" :value="s.code">{{ s.code }} · {{ sheetTitle(s) }}</option></select></label>
         <p v-if="sourceError" role="status">{{ sourceError }}</p>
         <template v-else-if="pdfUrl">
           <a :href="pdfUrl" target="_blank" rel="noopener">在新窗口核对原图 ↗</a>
-          <object :data="pdfUrl" type="application/pdf" :aria-label="source?.name">请在新窗口查看 PDF。</object>
+          <object :key="pdfUrl" :data="pdfUrl" type="application/pdf" :aria-label="source?.name">请在新窗口查看 PDF。</object>
         </template>
         <p v-else role="status">{{ source?.file ? '正在校验原图…' : '已核对图号和文件名称，原图尚未关联。' }}</p>
         <small v-if="source">{{ source.name }}</small>
@@ -90,6 +91,12 @@ const baseLabels = { outline:'楼层轮廓', bays:'车位', columns:'柱', walls
 const core = shallowRef(null), coreArchive = shallowRef(null), mode = ref('building'), coreError = ref('')
 const garage = shallowRef(null), garageArchive = shallowRef(null)
 const plumbing = shallowRef(null), plumbingArchive = shallowRef(null), waterSystem = ref('drain')
+const availableWaterSystems = computed(() => Object.fromEntries(Object.entries(waterSystems).filter(([key]) =>
+  plumbing.value?.items.some(item => item.system === key))))
+function toggleWaterSource() {
+  if (!original.value) sourceCode.value = waterSystems[waterSystem.value].plan || 'P301'
+  original.value = !original.value
+}
 const survey = shallowRef(null)
 const visibleRooms = computed(() => {
   const all = survey.value?.rooms || garage.value?.rooms || []
@@ -136,7 +143,7 @@ const buildingSources = computed(() => [...(model.value?.sources || []), ...(cor
 const sources = computed(() => tab.value === '给排水' && plumbing.value ? plumbing.value.sources : buildingSources.value.filter(s => tab.value === '平面图' ? ['建筑','剖面'].includes(s.group) : s.group === tab.value) || [])
 const source = computed(() => sources.value.find(s => s.code === sourceCode.value))
 function changeTab(name) { tab.value = name; original.value = false }
-function sheetTitle(s) { return s.name.replace(/^.*?地下二层/, '地下二层').replace(/\.pdf$/i, '') }
+function sheetTitle(s) { if (s.code === 'P302') return '地下一层给排水消防平面图（跨层对照）'; return s.name.replace(/\.pdf$/i, '') }
 function clearPdf() { if (pdfUrl.value) URL.revokeObjectURL(pdfUrl.value); pdfUrl.value = '' }
 watch(sources, list => { sourceCode.value = list[0]?.code || '' }, { immediate:true })
 watch([source, original, tab, archive], async () => {
@@ -151,7 +158,7 @@ watch([source, original, tab, archive], async () => {
 })
 async function load() {
   const run = ++epoch
-  plumbing.value = null; plumbingArchive.value = null
+  waterSystem.value = 'drain'; plumbing.value = null; plumbingArchive.value = null
   busy.value = true; message.value = ''; model.value = null; archive.value = null; core.value = null; coreArchive.value = null; coreError.value = ''; garage.value = null; garageArchive.value = null; scope('building')
   try {
     const data = await readFloorArchive(props.floorId)

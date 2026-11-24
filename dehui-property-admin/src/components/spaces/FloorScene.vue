@@ -4,6 +4,8 @@
     <div class="view-tools" aria-label="模型视角">
       <button type="button" @click="reset(false)">轴测</button>
       <button type="button" @click="reset(true)">俯视</button>
+      <button v-if="waterItems" type="button" @click="reset('below')">仰视</button>
+      <button v-if="waterItems" type="button" @click="focusWater">定位构件</button>
       <button type="button" aria-label="放大模型" @click="zoom(1.35)">＋</button>
       <button type="button" aria-label="缩小模型" @click="zoom(1 / 1.35)">−</button>
       <button v-if="hasMotion" type="button" class="play-control" :aria-pressed="playing" @click="toggleMotion">{{ playing ? '暂停演示' : '播放演示' }}</button>
@@ -22,7 +24,7 @@ import { addGarageMarkings, selectionColor, garageColors, rampProfile, rampGeome
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { SVGRenderer } from 'three/addons/renderers/SVGRenderer.js'
 
-const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array })
+const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array, waterRooms: Array })
 const emit = defineEmits(['select'])
 const stage = ref(null)
 const labelLayer = ref(null)
@@ -89,7 +91,7 @@ function surface(points, group, index) {
   const color = group === 'parking' ? garageColors[props.garage.parking[index].zone] : palette[group]
   const room = group === 'rooms' && props.rooms[index]
   const floorColor = room?.name === '电梯厅' ? 0xe6d4aa : room?.name?.includes('电梯井') ? 0x92a7b7 : color
-  const material = retain(new T.MeshLambertMaterial({ color:floorColor, side: T.DoubleSide }))
+  const material = retain(new T.MeshLambertMaterial({ color:floorColor, side: props.waterItems && !solid ? T.FrontSide : T.DoubleSide, transparent: Boolean(props.waterItems), opacity: props.waterItems ? (solid ? .20 : .09) : 1, depthWrite: !props.waterItems }))
   const mesh = new T.Mesh(geom, material)
   mesh.position.y = { bays:.018, lanes:roadLevel, crossings:.05, parking:.04, rooms:.025 }[group] || 0
   mesh.userData = { group, index }
@@ -146,32 +148,50 @@ function fit() {
 function reset(top) {
   if (!controls) return
   controls.target.copy(centre)
-  camera.position.copy(centre).add(top ? new T.Vector3(0,145,.001) : new T.Vector3(36,110,81))
+  camera.position.copy(centre).add(top === 'below' ? new T.Vector3(0,-145,.001) : top ? new T.Vector3(0,145,.001) : new T.Vector3(36,110,81))
   camera.zoom = 1
   camera.updateProjectionMatrix()
   controls.update()
   fit()
 }
+function focusWater() {
+  const points = props.waterItems?.[props.selection?.index]?.points
+  if (!points || !controls) return
+  const target = new T.Vector3()
+  for (const [x,z] of points) target.add(new T.Vector3(x,1.6,z))
+  target.divideScalar(points.length)
+  camera.position.add(target.clone().sub(controls.target))
+  controls.target.copy(target)
+  const span = points.length===2 ? Math.hypot(points[1][0]-points[0][0], points[1][1]-points[0][1]) : 0
+  camera.zoom=T.MathUtils.clamp(Math.min(camera.right-camera.left,camera.top-camera.bottom)/(span+5),1,15)
+  camera.updateProjectionMatrix()
+  controls.update()
+  schedule()
+}
 function zoom(factor) {
-  camera.zoom = T.MathUtils.clamp(camera.zoom * factor, .5, 10)
+  camera.zoom = T.MathUtils.clamp(camera.zoom * factor, .5, props.waterItems ? 18 : 10)
   camera.updateProjectionMatrix()
   schedule()
 }
 function selectPoint(event) {
   if (!pointer || Math.hypot(event.clientX-pointer.x, event.clientY-pointer.y) > 5) return
   const caption = labels.hit(event.clientX,event.clientY)
-  if (caption) { emit('select',caption); return }
+  if (caption && (!props.waterItems || caption.group==='water')) { emit('select',caption); return }
   const rect = renderer.domElement.getBoundingClientRect()
   const coords = new T.Vector2((event.clientX-rect.left)/rect.width*2-1, 1-(event.clientY-rect.top)/rect.height*2)
   const ray = new T.Raycaster()
   ray.setFromCamera(coords, camera)
   const hit = ray.intersectObjects(pickables, false)[0]
-  if (hit) emit('select', hit.object.userData)
+  if (hit) {
+    const data=hit.object.userData
+    emit('select', data.indices ? {group:'water',index:data.indices[hit.instanceId]} : data)
+  }
 }
 function startPoint(event) { pointer = { x:event.clientX, y:event.clientY } }
 const selectedMaterial = retain(new T.MeshBasicMaterial({color:selectionColor,side:T.DoubleSide}))
 let previousMaterial
 function highlight() {
+  if (plumbingMotion) { plumbingMotion.select(props.selection?.index); schedule(); return }
   if (highlighted && previousMaterial) highlighted.material = previousMaterial
   previousMaterial = null
   highlighted = meshes.get(props.selection?.group + ':' + props.selection?.index)
@@ -205,7 +225,11 @@ onMounted(() => {
   }
   if (props.waterItems) {
     pickables.length=0
-    plumbingMotion=addPlumbing(scene,props.waterItems,retain,pickables,meshes,labels)
+    for (const [i,room] of (props.waterRooms || []).entries()) {
+      linework([[...room.points,room.points[0]]])
+      labels.add('water-room',i,room.name,room.points,()=>.06)
+    }
+    plumbingMotion=addPlumbing(scene,props.waterItems,retain,pickables,labels,Boolean(renderer.isWebGLRenderer))
   }
   props.rooms?.forEach((item,i) => surface(item.points,'rooms',i))
   if (props.core) {
@@ -232,10 +256,15 @@ onMounted(() => {
   const sun = new T.DirectionalLight(0xffffff, 1.7)
   sun.position.set(-25,70,30)
   scene.add(sun)
+  if (props.waterItems) {
+    const reflected = new T.DirectionalLight(0xc9e3f4,1.1)
+    reflected.position.set(30,-50,20)
+    scene.add(reflected)
+  }
   controls = new OrbitControls(camera, renderer.domElement)
-  controls.maxPolarAngle = Math.PI / 2.3
+  controls.maxPolarAngle = props.waterItems ? Math.PI - .000001 : Math.PI / 2.3
   controls.minZoom = .5
-  controls.maxZoom = 10
+  controls.maxZoom = props.waterItems ? 18 : 10
   controls.addEventListener('change', schedule)
   renderer.domElement.addEventListener('pointerdown', startPoint)
   renderer.domElement.addEventListener('pointerup', selectPoint)
@@ -270,7 +299,7 @@ onBeforeUnmount(() => {
 .plan-labels :deep(.rooms), .plan-labels :deep(.lanes) { padding:0 4px; background:#fffc; border-radius:3px; }
 .plan-labels :deep(.lanes) {font-weight:500;}
 .plan-labels :deep(.active) {color:#fff; background:var(--selection-color); border-radius:3px; text-shadow:none; outline:2px solid white;}
-.view-tools { position: absolute; top: 10px; left: 10px; display: flex; gap: 2px; padding: 3px; background: #fff; border: 1px solid #d8dcdc; border-radius: 6px; }
+.view-tools { position: absolute; top: 10px; left: 10px; max-width:calc(100% - 20px); flex-wrap:wrap; display: flex; gap: 2px; padding: 3px; background: #fff; border: 1px solid #d8dcdc; border-radius: 6px; }
 .view-tools button { min-width: 32px; min-height: 30px; border: 0; background: transparent; cursor: pointer; font: inherit; color: inherit; }
 .view-tools .play-control {border-left:1px solid #d8dcdc; padding:0 8px;}
 .view-tools button:hover { background: #edf0ef; }
