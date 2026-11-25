@@ -3,8 +3,9 @@
     <div class="tools">
       <button @click="fit">适合窗口</button>
       <button @click="view('front')">正视</button><button @click="view('top')">俯视</button>
-      <button v-if="clips.length" :aria-pressed="playing" @click="toggle">{{ playing ? '暂停演示' : '演示动作' }}</button>
+      <button v-if="clips.length || demoCaption" :aria-pressed="playing" @click="toggle">{{ playing ? '暂停演示' : '演示动作' }}</button>
     </div>
+    <p v-if="demoCaption" class="demo-caption">{{ demoCaption }} · {{ demoState || '构件局部演示' }}</p>
     <p v-if="failure" role="alert">{{ failure }}</p>
     <p v-else-if="Number.isFinite(floorOffset)" class="datum">网格为本处完成地面 · 0.000 m</p>
   </div>
@@ -12,12 +13,14 @@
 <script setup>
 import {onBeforeUnmount,onMounted,ref} from 'vue'
 import * as T from 'three'
+import {componentSimulation} from './componentSimulation'
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js'
-const props=defineProps({object:Object, clips:Array, floorOffset:Number})
+const props=defineProps({object:Object, clips:Array, floorOffset:Number, demoName:String})
 const stage=ref(null), playing=ref(false), failure=ref('')
 let renderer, camera, controls, observer, mixer, frame, last, datum
 const world=new T.Scene(), box=new T.Box3(), middle=new T.Vector3()
-let distance=1
+const demoCaption=ref(''),demoState=ref('')
+let demo,elapsed=0,distance=1
 function fit() { view('iso') }
 function view(angle) {
   if (!controls) return
@@ -40,7 +43,10 @@ function resize() {
 }
 function draw(){renderer.render(world,camera)}
 function tick(now) {
-  mixer.update(last ? Math.min((now-last)/1000,.08) : 0)
+  const delta=last ? Math.min((now-last)/1000,.08) : 0
+  elapsed+=delta
+  demoState.value=demo?.update(elapsed) || ''
+  mixer?.update(delta)
   last=now; draw()
   if (playing.value) frame=requestAnimationFrame(tick)
 }
@@ -56,6 +62,8 @@ onMounted(()=>{
   world.background=new T.Color(0xf0f3f3)
   world.add(new T.HemisphereLight(0xffffff,0xb3bec2,2))
   const light=new T.DirectionalLight(0xfffcf3,2);light.position.set(4,8,5);world.add(light)
+  demo=props.demoName && componentSimulation(props.object,props.demoName)
+  demoCaption.value=demo?.caption || ''
   box.setFromObject(props.object)
   if (Number.isFinite(props.floorOffset)) {
     const size = box.getSize(new T.Vector3())
@@ -78,12 +86,13 @@ onMounted(()=>{
     props.clips.forEach(clip=>mixer.clipAction(clip).play())
   }
   resize();fit()
+  if(demo && !matchMedia('(prefers-reduced-motion: reduce)').matches) toggle()
   observer=new ResizeObserver(resize);observer.observe(stage.value)
 })
 onBeforeUnmount(()=>{
   cancelAnimationFrame(frame);observer?.disconnect();controls?.dispose()
   mixer?.stopAllAction();mixer?.uncacheRoot(props.object)
-  world.remove(props.object)
+  demo?.dispose();world.remove(props.object)
   datum?.dispose()
   renderer?.dispose()
 })
@@ -91,7 +100,7 @@ onBeforeUnmount(()=>{
 <style scoped>
 .object-stage{position:relative;min-width:0;height:clamp(330px,66vh,840px);overflow:hidden;border-radius:6px}
 .tools{position:absolute;top:10px;left:10px;display:flex;flex-wrap:wrap;gap:2px;background:white;padding:3px;border:1px solid #d6dcdd;border-radius:5px}
-.datum{position:absolute;bottom:8px;left:10px;margin:0;padding:3px 7px;background:#fffffff0;color:#405057;font-size:12px;pointer-events:none}
+.demo-caption{position:absolute;bottom:8px;right:10px;background:#fffffff0;padding:3px 7px;font-size:12px;margin:0}.datum{position:absolute;bottom:8px;left:10px;margin:0;padding:3px 7px;background:#fffffff0;color:#405057;font-size:12px;pointer-events:none}
 button{font:inherit;font-size:13px;color:inherit;cursor:pointer;background:white;border:0;padding:6px}
 .object-stage :deep(canvas){display:block;touch-action:none;width:100%}
 @container(max-width:800px){.object-stage{height:clamp(280px,90cqw,500px)}}

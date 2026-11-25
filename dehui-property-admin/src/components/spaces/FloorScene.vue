@@ -8,10 +8,7 @@
       <button v-if="overlay && !projected" type="button" @click="reset('below')">{{ waterItems || stations ? '运行示意 · 仰视' : '仰视' }}</button>
       <button v-if="waterItems || stations" type="button" @click="focusWater">定位构件</button>
       <button v-if="disciplineScene && (!projected || inPlan)" type="button" :disabled="selection?.index < 0" @click="focusLayer">定位图层</button>
-      <button v-if="placedAsset" type="button" :aria-pressed="projected ? !inPlan : undefined" @click="showAsset">定位实体</button>
-      <button v-if="placedAsset && locatedHeights" type="button" @click="showElevation">侧视标高</button>
       <button v-if="inPlan && planSegments?.some(s=>s.id===selectedPlanId)" type="button" @click="locateSegment">定位此图段</button>
-      <button v-if="disciplineScene" type="button" :aria-pressed="showReference" @click="toggleReference">建筑参照</button>
       <button v-if="stations" type="button" @click="focusStation(true)">设备立面示意</button>
       <button type="button" aria-label="放大模型" @click="zoom(1.35)">＋</button>
       <button type="button" aria-label="缩小模型" @click="zoom(1 / 1.35)">−</button>
@@ -40,14 +37,14 @@ import { addGarageMarkings, selectionColor, garageColors, rampProfile, rampGeome
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { SVGRenderer } from 'three/addons/renderers/SVGRenderer.js'
 
-const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array, plumbing: Object, floorElevation: Number, stations: Array, disciplineScene: Object, placedAsset: Object, locatedHeights: Boolean, planSegments: Array, selectedPlanId: String, roomLabels: Array, startInElevation: Boolean })
+const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array, plumbing: Object, floorElevation: Number, stations: Array, disciplineScene: Object, placedAsset: Object, systemOnly: Boolean, planSegments: Array, selectedPlanId: String, roomLabels: Array, startInElevation: Boolean })
 const emit = defineEmits(['select','inspect-segment','inspect-instance'])
 const stage = ref(null)
 const labelLayer = ref(null)
 const pickables = []
 let labels, plumbingMotion, stationMotion, elevationView=false
 const backdrop=[]
-const showReference=ref(true)
+const systemOnly=Boolean(props.systemOnly || props.stations || props.waterItems)
 const metadata = props.disciplineScene?.children[0]?.userData
 const projected = metadata?.registered === true && Number.isInteger(metadata.sourceSegments)
 const constrainedPlan = Boolean(projected || props.waterItems || props.stations)
@@ -58,7 +55,7 @@ const placed = new T.Group()
 const viewNote = computed(() => {
   if (props.stations) return inPlan.value ? 'P301 平面定位 · 圆点为设备位置，线段为图面流路' : '设备运行示意 · 管路高差、泵体外形与动画速度为显示参数'
   if (inPlan.value) return '平面定位 · 安装标高待核'
-  return projected ? '实体视图 · 仅显示已定位模型与建筑参照' : '运行示意 · 管线高差与管径为显示参数'
+  return projected ? '实体视图 · 按图定位的专业构件' : '运行示意 · 管线高差与管径为显示参数'
 })
 const overlay = Boolean(props.disciplineScene || props.stations || props.waterItems)
 const scene = new T.Scene()
@@ -294,12 +291,6 @@ function focusStation(front, below=false) {
   camera.updateProjectionMatrix()
   schedule()
 }
-function toggleReference() {
-  showReference.value = !showReference.value
-  backdrop.forEach(object => { object.visible = showReference.value })
-  labelLayer.value.hidden = !showReference.value
-  schedule()
-}
 function focusLayer() {
   const mesh = meshes.get('discipline:' + props.selection?.index)
   if (mesh) focusObject(mesh)
@@ -325,25 +316,6 @@ function focusInstance(id) {
   controls.update()
   const size=box.applyMatrix4(camera.matrixWorldInverse).getSize(new T.Vector3())
   camera.zoom=T.MathUtils.clamp(.85*Math.min((camera.right-camera.left)/size.x,(camera.top-camera.bottom)/size.y),.5,controls.maxZoom)
-  camera.updateProjectionMatrix()
-  schedule()
-}
-function showElevation() {
-  if (!props.placedAsset || !controls) return
-  if (projected && inPlan.value) reset(false)
-  const box = new T.Box3().setFromObject(props.placedAsset)
-  if (box.isEmpty()) return
-  const middle = box.getCenter(new T.Vector3())
-  box.expandByPoint(new T.Vector3(middle.x,0,middle.z))
-  box.getCenter(middle)
-  const size = box.getSize(new T.Vector3())
-  const eye = size.x >= size.z ? new T.Vector3(0,.04,1) : new T.Vector3(1,.04,0)
-  controls.target.copy(middle)
-  camera.position.copy(middle).addScaledVector(eye,145)
-  controls.update()
-  const visible = box.applyMatrix4(camera.matrixWorldInverse).getSize(new T.Vector3())
-  camera.zoom = T.MathUtils.clamp(.85*Math.min((camera.right-camera.left)/Math.max(2,visible.x),
-    (camera.top-camera.bottom)/Math.max(2,visible.y)),.5,controls.maxZoom)
   camera.updateProjectionMatrix()
   schedule()
 }
@@ -435,7 +407,7 @@ async function exportSelectedStation() {
   if (!room) throw Error('需要关联房间轮廓后才能导出')
   return exportRoom(room)
 }
-defineExpose({exportSelectedRoom,exportSelectedStation,showAsset,focusInstance})
+defineExpose({exportSelectedRoom,exportSelectedStation,showAsset,focusInstance,showPlan:()=>reset(true)})
 function startPoint(event) { pointer = { x:event.clientX, y:event.clientY } }
 const selectedMaterial = retain(new T.MeshBasicMaterial({color:selectionColor,side:T.DoubleSide}))
 let previousMaterial
@@ -486,7 +458,7 @@ onMounted(() => {
   const coreStrokes=props.core ? [...geo.lines,...props.core.lines] : geo.lines
   roomDefinitions=rooms.map(room=>defineRoomModule(room,rooms,lifts.get(room.name),props.floorElevation,
     room.inCore ? coreStrokes : geo.lines))
-  if (!props.detail) {
+  if (!props.detail && !systemOnly) {
     surface(geo.outline, 'outline', 0)
     for (const group of (props.traffic || overlay ? ['walls','columns'] : ['bays','walls','columns'])) geo[group].forEach((points, i) => surface(points, group, i))
     linework(geo.lines)
@@ -500,6 +472,7 @@ onMounted(() => {
   const parts=createStationParts(retain)
   roomDefinitions.forEach((module,index)=>{
     const room=props.rooms[index]
+    if (systemOnly && !props.stations?.some(s=>s.name===room.name)) return
     const instance=createRoomInstance(module,{retain,motion,parts})
     roomInstances.set(room.name,instance)
     scene.add(instance.root)
@@ -514,7 +487,7 @@ onMounted(() => {
         ()=>module.origin[1]+(instance.root.userData.hasEquipment?2.65:1.25))
     }
   })
-  if (props.core) {
+  if (props.core && !systemOnly) {
     props.core.walls.forEach((points,i) => surface(points,'coreWalls',i))
     if (props.detail) {
       props.core.columns.forEach((points,i) => surface(points,'coreColumns',i))
@@ -554,7 +527,7 @@ onMounted(() => {
   if (props.disciplineScene) {
     backdrop.push(...scene.children)
     pickables.length = 0
-    for (const [index, room] of (props.roomLabels || []).entries())
+    for (const [index, room] of (systemOnly ? [] : props.roomLabels || []).entries())
       labels.add('water-room', index, room.name, room.points, () => 1.25)
     scene.add(props.disciplineScene)
     props.disciplineScene.traverse(mesh => {

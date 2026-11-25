@@ -6,7 +6,7 @@
         <button type="button" :aria-pressed="sectionOpen" :disabled="!pitRecord" @click="sectionOpen=true">坑体剖切</button>
       </div>
       <template v-if="sectionOpen && pitRecord">
-        <ObjectInspection v-if="sectionAsset" :key="pitRecord.sha256" :object="sectionAsset.scene" :clips="sectionAsset.animations" :floor-offset="0" />
+        <ObjectInspection v-if="sectionAsset" :key="pitRecord.sha256" :demo-name="pitRecord.name" :object="sectionAsset.scene" :clips="sectionAsset.animations" :floor-offset="0" />
         <div v-else-if="geometryError" role="alert">{{ geometryError }} <button @click="retry++">重试</button></div>
         <p v-else role="status">正在读取坑体剖切模型…</p>
       </template>
