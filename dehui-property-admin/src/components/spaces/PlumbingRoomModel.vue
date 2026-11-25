@@ -88,7 +88,7 @@ const isPit=computed(()=>station.value?.kind==='集水坑')
 const pitRecord=computed(()=>isPit.value && props.objects?.find(r=>
   r.kind==='room' && r.verticalExtentVerified===true && r.name===station.value.name))
 const sectionOpen=ref(false), sectionAsset=shallowRef(null), geometryError=ref(''), retry=ref(0)
-watch(pitRecord,record=>{sectionOpen.value=Boolean(record);exportError.value=''}, {immediate:true})
+watch(pitRecord,record=>{sectionOpen.value=false;exportError.value=''}, {immediate:true})
 watch([pitRecord,sectionOpen,()=>props.objectArchive,retry], async ([record,open,archive],_,onCleanup)=>{
   let current=true
   const resources=new Set()
@@ -108,7 +108,7 @@ watch([pitRecord,sectionOpen,()=>props.objectArchive,retry], async ([record,open
     else resources.forEach(r=>r.dispose())
   } catch (error) { if(current) geometryError.value=error.message || '坑体模型读取失败' }
 })
-function selectStation(i){index.value=i;sectionOpen.value=Boolean(pitRecord.value)}
+function selectStation(i){index.value=i;sectionOpen.value=false}
 function changeFilter(value){filter.value=value;selectStation(0)}
 </script>
 <style scoped>

@@ -1,7 +1,8 @@
 <template>
   <div class="water-layout">
-    <FloorScene :core="core" :floor-elevation="floorElevation" :plumbing="model" :rooms="rooms" :key="system+layer" :geometry="geometry" :water-items="items" :selection="selection" @select="index=$event.index"/>
+    <FloorScene :core="core" :floor-elevation="floorElevation" :plumbing="model" :rooms="rooms" :key="system+layer+sections.size" :pit-sections="sections" :geometry="geometry" :water-items="items" :selection="selection" @select="index=$event.index"/>
     <aside aria-label="给排水构件规格">
+      <p v-if="failure" role="alert">{{ failure }}</p>
       <h3><i :style="{background:highlight}"></i>{{ selected.name || pipeLayers[selected.layer][0] }}</h3>
       <label>显示图层<select :value="layer" @change="setLayer($event.target.value)">
         <option value="">全部图层</option><option v-for="name in layers" :key="name" :value="name">{{ pipeLayers[name][0] }}</option>
@@ -34,12 +35,14 @@
 </template>
 <script setup>
 import {computed,ref,watch} from 'vue'
+import {useFloorPitSections} from './floorPitSections'
 import FloorScene from './FloorScene.vue'
 import {buildStations} from './plumbingStations'
 import {pipeLayers,waterSystems} from './plumbingCatalog'
 import {selectionColor as highlight} from './garageMarkings'
-const props = defineProps({core:Object, floorElevation:Number, geometry:Object, model:Object, system:String, rooms:{type:Array,default:()=>[]}})
+const props = defineProps({core:Object, floorElevation:Number, geometry:Object, model:Object, system:String, objects:Array, objectArchive:Object, rooms:{type:Array,default:()=>[]}})
 defineEmits(['source','station'])
+const {sections,failure}=useFloorPitSections(props)
 const systemItems = computed(() => {
   const links = new Map()
   for (const station of buildStations(props.model, props.rooms)) {
@@ -97,6 +100,7 @@ const fields=computed(()=>{
   const s=selected.value
   const result=[['所属系统',waterSystems[props.system].name],['图纸图层',pipeLayers[s.layer][0]]]
   if(s.kind==='集水坑'){
+    if (sections.value.has(s.name)) result.push(['坑体依据','P301 平面定位 · P202 坑深及启停水位'])
     result.push(['水泵配置',s.pump+' · '+s.duty],['图注单泵参数',s.flow+' T/h · '+s.head+' m · '+s.power+' kW'])
     const levelLabels=['起泵水位','停泵水位','报警水位']
     levelLabels.forEach((label,i)=>result.push([label,'H − '+Math.abs(s.levels[i]).toFixed(3)+' m']))

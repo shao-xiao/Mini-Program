@@ -1,3 +1,6 @@
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js'
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js'
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
 import { BufferGeometry, Float32BufferAttribute, LineBasicMaterial, LineSegments } from 'three'
 
 // The r1 exporter encodes each CAD stroke as two sloping faces sharing a ridge.
@@ -33,4 +36,18 @@ export function createDisciplineInk(mesh, retain) {
   ink.renderOrder = 1
   ink.userData = { group: 'discipline', index: mesh.userData.index }
   return ink
+}
+
+// A screen-space stroke stays legible from the whole floor down to a single room.
+// Keep the source line for picking. Both strokes share the selection color.
+export function addDiagramStroke(ink, retain, color) {
+  const geometry=retain(new LineSegmentsGeometry())
+  geometry.setPositions(ink.geometry.attributes.position.array)
+  ink.material.color.setHex(color)
+  const material=retain(new LineMaterial({linewidth:1.55,transparent:true,depthTest:false,depthWrite:false}))
+  material.uniforms.diffuse.value=ink.material.color
+  const stroke=new LineSegments2(geometry,material)
+  stroke.renderOrder=4
+  ink.visible=false
+  return stroke
 }

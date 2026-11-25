@@ -48,7 +48,7 @@
       </header>
       <small v-if="loadingDetails" role="status">正在载入专业详图…</small>
       <p v-if="message || coreError" role="alert">{{ message || coreError }}</p>
-      <DisciplineModel :installation-packs="objects?.installationPacks" v-if="activeModel" v-show="!original" :objects="objects?.objects || []" :object-archive="objectArchive" :item="activeModel" :title="modelTitle(activeModel)" :sheet-filter="emergencyOnly ? 'E301' : ''" :archive="disciplineArchive" :geometry="model.geometry" :room-labels="survey?.rooms || garage?.rooms || []" :sheets="catalogSheets" @source="code=>{sourceCode=code;original=true}" />
+      <DisciplineModel :key="activeModel.id + tab" :profession="tab" :plumbing="plumbing" :core="core" :installation-packs="objects?.installationPacks" v-if="activeModel" v-show="!original" :objects="objects?.objects || []" :object-archive="objectArchive" :item="activeModel" :title="modelTitle(activeModel)" :sheet-filter="emergencyOnly ? 'E301' : ''" :archive="disciplineArchive" :geometry="model.geometry" :room-labels="survey?.rooms || garage?.rooms || []" :sheets="catalogSheets" @source="code=>{sourceCode=code;original=true}" />
       <template v-if="!activeModel && tab === '平面图' && !original">
         <div class="model-workbench">
         <FloorScene ref="floorScene" :floor-elevation="model.elevation" :plumbing="plumbing" :key="mode + (loadingDetails ? '-base' : '')" :rooms="visibleRooms" :garage="garage" :traffic="mode === 'traffic'" :core="core" :detail="detail" :geometry="model.geometry" :selection="selection" @select="selection = $event" />
@@ -72,7 +72,7 @@
         </div>
       </template>
       <PlumbingRoomModel :objects="objects?.objects || []" :object-archive="objectArchive" :core="core" :floor-elevation="model.elevation" v-if="waterView && waterSystem === 'stations' && hasStationSurvey(plumbing)" v-show="!original" :initial-name="stationName" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" @source="code=>{sourceCode=code;original=true}" />
-      <PlumbingModel :core="core" :floor-elevation="model.elevation" @station="openStation" v-else-if="waterView" v-show="!original" :key="waterSystem" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" :system="waterSystem" @source="code=>{sourceCode=code;original=true}"/>
+      <PlumbingModel :objects="objects?.objects" :object-archive="objectArchive" :core="core" :floor-elevation="model.elevation" @station="openStation" v-else-if="waterView" v-show="!original" :key="waterSystem" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" :system="waterSystem" @source="code=>{sourceCode=code;original=true}"/>
       <table v-else-if="!activeModel && !original && tab !== '平面图'" class="drawing-index">
         <thead><tr><th>图号</th><th>图名</th><th>核对状态</th></tr></thead>
         <tbody><tr v-for="s in sources" :key="s.code"><td>{{ s.code }}</td><td>{{ sheetTitle(s) }}</td><td>已登记图纸 · 待关联专业模型</td></tr>

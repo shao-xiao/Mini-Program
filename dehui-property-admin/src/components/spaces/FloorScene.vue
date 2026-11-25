@@ -1,11 +1,11 @@
 <template>
-  <div ref="stage" class="model-stage" :class="{schematic: (waterItems || stations) && !inPlan}"
+  <div ref="stage" class="model-stage" :class="{schematic: stations && !inPlan}"
        :aria-label="inPlan ? '正交平面，拖动平移，滚轮或双指缩放' : '楼层模型，拖动旋转，滚轮或双指缩放'">
     <div ref="labelLayer" class="plan-labels" aria-hidden="true"></div>
     <div class="view-tools" aria-label="模型视角">
-      <button v-if="!projected" type="button" @click="reset(false)">{{ waterItems || stations ? '运行示意 · 轴测' : '轴测' }}</button>
-      <button type="button" :aria-pressed="constrainedPlan ? inPlan : undefined" @click="reset(true)">{{ constrainedPlan ? '专业平面' : '俯视' }}</button>
-      <button v-if="overlay && !projected" type="button" @click="reset('below')">{{ waterItems || stations ? '运行示意 · 仰视' : '仰视' }}</button>
+      <button v-if="!projected || systemDiagram" type="button" @click="reset(false)">{{ waterItems || stations ? '运行示意 · 轴测' : '轴测' }}</button>
+      <button type="button" :aria-pressed="constrainedPlan ? inPlan : undefined" @click="reset(true)">{{ systemDiagram ? '俯视' : constrainedPlan ? '专业平面' : '俯视' }}</button>
+      <button v-if="overlay && (!projected || systemDiagram)" type="button" @click="reset('below')">{{ waterItems || stations ? '运行示意 · 仰视' : '仰视' }}</button>
       <button v-if="waterItems || stations" type="button" @click="focusWater">定位构件</button>
       <button v-if="disciplineScene && (!projected || inPlan)" type="button" :disabled="selection?.index < 0" @click="focusLayer">定位图层</button>
       <button v-if="inPlan && planSegments?.some(s=>s.id===selectedPlanId)" type="button" @click="locateSegment">定位此图段</button>
@@ -14,10 +14,11 @@
       <button type="button" aria-label="缩小模型" @click="zoom(1 / 1.35)">−</button>
       <button v-if="hasMotion && !(stations && inPlan)" type="button" class="play-control" :aria-pressed="playing" @click="toggleMotion">{{ playing ? '暂停演示' : '播放演示' }}</button>
     </div>
-    <div v-if="professionalMotion && !inPlan" class="sim-tools">
+    <div v-if="professionalMotion && !systemDiagram && !inPlan" class="sim-tools">
       <button type="button" :aria-pressed="simulationPlaying" @click="toggleSimulation">{{ simulationPlaying ? '暂停仿真' : '播放仿真' }}</button>
       <span>设备运行示意</span>
     </div>
+    <p v-if="systemDiagram && phaseTitles?.[activePhase]" class="phase-caption">{{ phaseTitles[activePhase] }}</p>
     <p v-if="constrainedPlan" class="view-note" role="status">{{ viewNote }}</p>
   </div>
 </template>
@@ -26,7 +27,9 @@
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import * as T from 'three'
 import { addStations } from './stationScene'
-import { createDisciplineInk } from './disciplineInk'
+import { terminalFlow } from './terminalFlow'
+import { componentSimulation } from './componentSimulation'
+import { createDisciplineInk, addDiagramStroke } from './disciplineInk'
 import { addPlumbing } from './plumbingScene'
 import { createFloorMotion } from './floorMotion'
 import { createFloorLabels } from './floorLabels'
@@ -37,14 +40,14 @@ import { addGarageMarkings, selectionColor, garageColors, rampProfile, rampGeome
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { SVGRenderer } from 'three/addons/renderers/SVGRenderer.js'
 
-const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array, plumbing: Object, floorElevation: Number, stations: Array, disciplineScene: Object, placedAsset: Object, systemOnly: Boolean, planSegments: Array, selectedPlanId: String, roomLabels: Array, startInElevation: Boolean })
+const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array, pitSections: Map, plumbing: Object, floorElevation: Number, stations: Array, disciplineScene: Object, placedAsset: Object, systemDiagram: Boolean, inkColor: Number, phaseIndices: Array, phaseTitles:Object, selectedInstanceId: String, planSegments: Array, selectedPlanId: String, roomLabels: Array, startInElevation: Boolean })
 const emit = defineEmits(['select','inspect-segment','inspect-instance'])
 const stage = ref(null)
 const labelLayer = ref(null)
 const pickables = []
 let labels, plumbingMotion, stationMotion, elevationView=false
 const backdrop=[]
-const systemOnly=Boolean(props.systemOnly || props.stations || props.waterItems)
+const floorDiagram = Boolean(props.systemDiagram || props.waterItems)
 const metadata = props.disciplineScene?.children[0]?.userData
 const projected = metadata?.registered === true && Number.isInteger(metadata.sourceSegments)
 const constrainedPlan = Boolean(projected || props.waterItems || props.stations)
@@ -54,6 +57,7 @@ const inPlan = ref(constrainedPlan)
 const placed = new T.Group()
 const viewNote = computed(() => {
   if (props.stations) return inPlan.value ? 'P301 平面定位 · 圆点为设备位置，线段为图面流路' : '设备运行示意 · 管路高差、泵体外形与动画速度为显示参数'
+  if (props.systemDiagram) return '管线走向按原图投影；安装标高见所选构件。'
   if (inPlan.value) return '平面定位 · 安装标高待核'
   return projected ? '实体视图 · 按图定位的专业构件' : '运行示意 · 管线高差与管径为显示参数'
 })
@@ -109,6 +113,10 @@ const playing = ref(false)
 let inView=true, labelsDirty=true, previousTime, elapsed=0, visibilityObserver
 const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
 let mixers=[]
+let localActions=[]
+const phaseColors=new Map()
+const phaseLight=new T.Color(0x12c7a1)
+const activePhase=ref(-1)
 const professionalMotion=ref(false)
 const simulationPlaying=ref(!motionPreference.matches)
 function bindSimulation(group) {
@@ -117,6 +125,20 @@ function bindSimulation(group) {
     mixer.uncacheRoot(mixer.getRoot())
   }
   mixers=[]
+  for (const action of localActions) action.dispose()
+  localActions=[]
+  if (props.systemDiagram) for (const instance of group?.children || []) {
+    const outlet=terminalFlow(instance)
+    if(outlet) localActions.push({
+      update:time=>outlet.update(time,props.selectedInstanceId===instance.userData.instanceId ||
+        props.phaseTitles?.[activePhase.value]==='补风风管送风'),
+      dispose:outlet.dispose
+    })
+    if (instance.userData.verticalExtentVerified) {
+      const action=componentSimulation(instance,instance.userData.recordName)
+      if(action) localActions.push(action)
+    }
+  }
   if (props.disciplineScene) for (const instance of group?.children || []) {
     if (!instance.animations.length) continue
     const mixer=new T.AnimationMixer(instance)
@@ -132,7 +154,7 @@ function toggleSimulation() {
 }
 function render(now) {
   frame=undefined
-  const simulate=professionalMotion.value && simulationPlaying.value && !inPlan.value
+  const simulate=professionalMotion.value && (props.systemDiagram ? playing.value : simulationPlaying.value && !inPlan.value)
   const animate=inView && !document.hidden && (simulate || (playing.value && hasMotion.value && !(props.stations && inPlan.value)))
   // Render motion at 20 fps. Camera motion stays responsive, and labels only
   // need reprojection when the camera or selection changes.
@@ -146,6 +168,16 @@ function render(now) {
     stationMotion?.update(elapsed)
     plumbingMotion?.update(elapsed)
     motion.update(elapsed)
+    if (props.systemDiagram) {
+      const steps=props.phaseIndices || []
+      activePhase.value=steps.length ? steps[Math.floor(elapsed/2.4)%steps.length] : -1
+      localActions.forEach(action=>action.update(elapsed))
+      for (const [index,{ink,color}] of phaseColors) {
+        if (index===props.selection?.index) ink.material.color.set(selectionColor)
+        else if (index===activePhase.value) ink.material.color.copy(color).lerp(phaseLight,.45+.35*Math.sin(elapsed*4))
+        else ink.material.color.copy(color)
+      }
+    }
     renderer.render(scene,camera)
     if (labelsDirty) labels.update(camera,stage.value.clientWidth,stage.value.clientHeight,props.selection)
     labelsDirty=false
@@ -185,7 +217,7 @@ function surface(points, group, index) {
     ? new T.ExtrudeGeometry(shape, { depth: cut, bevelEnabled: false })
     : new T.ShapeGeometry(shape))
   if (!ramp) geom.rotateX(-Math.PI / 2)
-  const color = group === 'parking' ? garageColors[props.garage.parking[index].zone] : palette[group]
+  const color = group==='roomContext' ? 0x7aa79a : group === 'parking' ? garageColors[props.garage.parking[index].zone] : palette[group]
   const material = retain(new T.MeshLambertMaterial({ color, side: overlay && !solid ? T.FrontSide : T.DoubleSide, transparent: overlay, opacity: overlay ? (solid ? .20 : .09) : 1, depthWrite: !overlay }))
   const mesh = new T.Mesh(geom, material)
   mesh.position.y = { bays:.018, lanes:roadLevel, crossings:.05, parking:.04, rooms:.025 }[group] || 0
@@ -200,6 +232,7 @@ function surface(points, group, index) {
     outline.position.y = .008
     mesh.add(outline)
   }
+  return mesh
 }
 const edgeMaterial = retain(new T.LineBasicMaterial({ color: props.disciplineScene ? 0xabbbbe : 0x62747a }))
 function linework(paths) {
@@ -244,16 +277,16 @@ function reset(top) {
     controls.mouseButtons.LEFT = inPlan.value ? T.MOUSE.PAN : T.MOUSE.ROTATE
     controls.touches.ONE = inPlan.value ? T.TOUCH.PAN : T.TOUCH.ROTATE
     if (projected) {
-      props.disciplineScene.visible = inPlan.value
-      placed.visible = !inPlan.value
-      planFootprints.visible = inPlan.value
+      props.disciplineScene.visible = props.systemDiagram || inPlan.value
+      placed.visible = props.systemDiagram || !inPlan.value
+      planFootprints.visible = props.systemDiagram || inPlan.value
     }
-    if (props.waterItems) backdrop.forEach(object => { object.visible = inPlan.value })
+
   }
   setElevation(false)
   if (props.stations && !inPlan.value) { focusStation(false,top === 'below'); return }
   controls.target.copy(centre)
-  camera.position.copy(centre).add(top === 'below' ? new T.Vector3(0,-145,.001) : top ? new T.Vector3(0,145,.001) : new T.Vector3(36,110,81))
+  camera.position.copy(centre).add(top === 'below' ? new T.Vector3(0,-145,.001) : top ? new T.Vector3(0,145,.001) : floorDiagram ? new T.Vector3(0,123,44) : new T.Vector3(36,110,81))
   camera.zoom = 1
   camera.updateProjectionMatrix()
   controls.update()
@@ -365,13 +398,32 @@ function selectPoint(event) {
   const ray = new T.Raycaster()
   ray.setFromCamera(coords, camera)
   ray.params.Line.threshold = 2.5 * (camera.top - camera.bottom) / (camera.zoom * rect.height)
+  let roomHit
   if (placed.visible && props.placedAsset) {
-    let object = ray.intersectObject(props.placedAsset, true)[0]?.object
-    while (object && object!==placed && !object.userData.instanceId) object=object.parent
-    if (object?.userData.instanceId) { emit('inspect-instance',object.userData.instanceId); return }
+    if (props.systemDiagram) {
+      // A side-wall outlet presents a very narrow edge when viewed from above.
+      let nearest=7, terminal
+      const screen=new T.Vector3()
+      for (const instance of props.placedAsset.children) {
+        const face=instance.children.find(child=>child.userData.module?.facingLocal==='+Z')
+        if (!face) continue
+        face.localToWorld(screen.set(0,face.userData.module.heightM/2,0)).project(camera)
+        const distance=Math.hypot((screen.x-coords.x)*rect.width/2,(screen.y-coords.y)*rect.height/2)
+        if (distance<nearest) { nearest=distance;terminal=instance }
+      }
+      if (terminal) {emit('inspect-instance',terminal.userData.instanceId);return}
+    }
+    for (const hit of ray.intersectObject(props.placedAsset,true)) {
+      let object=hit.object
+      while (object && object!==placed && !object.userData.instanceId) object=object.parent
+      if (!object?.userData.instanceId) continue
+      if (props.systemDiagram && object.userData.kind==='room' && !object.userData.verticalExtentVerified) {
+        roomHit ||= object.userData.instanceId
+      } else {emit('inspect-instance',object.userData.instanceId);return}
+    }
   }
-  if (projected && !inPlan.value) return
-  if (inPlan.value && planFootprints.children.length) {
+  if (projected && !props.systemDiagram && !inPlan.value) return
+  if ((props.systemDiagram || inPlan.value) && planFootprints.children.length) {
     const footprint = ray.intersectObjects(planFootprints.children, false)[0]
     if (footprint) { emit('inspect-segment',footprint.object.userData.recordId); return }
   }
@@ -386,8 +438,12 @@ function selectPoint(event) {
       if (offset < nearest) { hit = candidate; nearest = offset }
     }
   }
+  if (!hit && roomHit) {emit('inspect-instance',roomHit);return}
   if (hit) {
     const data=hit.object.userData
+    if (props.systemDiagram && data.group==='discipline') {
+      emit('select',{group:'discipline',index:data.index,location:[hit.point.x,hit.point.z]});return
+    }
     emit('select', data.indices ? {group:'water',index:data.indices[hit.instanceId]} : data)
   }
 }
@@ -423,7 +479,8 @@ function highlight() {
   if (plumbingMotion) { plumbingMotion.select(props.selection?.index); schedule(); return }
   if (highlighted && previousMaterial) {
     highlighted.material = previousMaterial
-    disciplineInk.get(highlighted)?.material.color.copy(previousMaterial.color)
+    const ink=disciplineInk.get(highlighted)
+    ink?.material.color.copy(phaseColors.get(highlighted.userData.index)?.color || previousMaterial.color)
   }
   previousMaterial = null
   highlighted = meshes.get(props.selection?.group + ':' + props.selection?.index)
@@ -434,12 +491,34 @@ function highlight() {
   }
   schedule()
 }
+let instanceFrame
+function markInstance() {
+  if (instanceFrame) { scene.remove(instanceFrame);instanceFrame.dispose();instanceFrame=null }
+  const instance=props.placedAsset?.children.find(node=>node.userData.instanceId===props.selectedInstanceId)
+  if (props.systemDiagram && instance) {
+    instanceFrame=new T.BoxHelper(instance,selectionColor)
+    instanceFrame.material.depthTest=false
+    instanceFrame.renderOrder=5
+    scene.add(instanceFrame)
+  }
+  if (renderer) schedule()
+}
+watch(() => props.selectedInstanceId,markInstance)
+watch(() => props.selectedPlanId,id=>{
+  for (const mark of planFootprints.children) {
+    const active=mark.userData.recordId===id
+    mark.material.color.set(active ? selectionColor : mark.isLine ? 0x287e81 : 0xae7331)
+    if (mark.isMesh) mark.material.opacity=active ? .8 : .25
+  }
+  if (renderer) schedule()
+})
 watch(() => props.selection, highlight)
 watch(() => props.placedAsset, (asset, previous) => {
   bindSimulation(asset)
   if (previous) placed.remove(previous)
   if (asset) placed.add(asset)
-  else if (projected && !inPlan.value) reset(true)
+  else if (projected && !props.systemDiagram && !inPlan.value) reset(true)
+  markInstance()
   if (renderer) schedule()
 })
 onMounted(() => {
@@ -458,7 +537,7 @@ onMounted(() => {
   const coreStrokes=props.core ? [...geo.lines,...props.core.lines] : geo.lines
   roomDefinitions=rooms.map(room=>defineRoomModule(room,rooms,lifts.get(room.name),props.floorElevation,
     room.inCore ? coreStrokes : geo.lines))
-  if (!props.detail && !systemOnly) {
+  if (!props.detail) {
     surface(geo.outline, 'outline', 0)
     for (const group of (props.traffic || overlay ? ['walls','columns'] : ['bays','walls','columns'])) geo[group].forEach((points, i) => surface(points, group, i))
     linework(geo.lines)
@@ -472,7 +551,6 @@ onMounted(() => {
   const parts=createStationParts(retain)
   roomDefinitions.forEach((module,index)=>{
     const room=props.rooms[index]
-    if (systemOnly && !props.stations?.some(s=>s.name===room.name)) return
     const instance=createRoomInstance(module,{retain,motion,parts})
     roomInstances.set(room.name,instance)
     scene.add(instance.root)
@@ -487,9 +565,9 @@ onMounted(() => {
         ()=>module.origin[1]+(instance.root.userData.hasEquipment?2.65:1.25))
     }
   })
-  if (props.core && !systemOnly) {
+  if (props.core) {
     props.core.walls.forEach((points,i) => surface(points,'coreWalls',i))
-    if (props.detail) {
+    if (props.detail || floorDiagram) {
       props.core.columns.forEach((points,i) => surface(points,'coreColumns',i))
       linework(props.core.lines)
     }
@@ -520,15 +598,21 @@ onMounted(() => {
     scene.add(stationPlan, stationSchematic)
   }
   if (props.waterItems) {
-    backdrop.push(...scene.children)
     pickables.length=0
-    plumbingMotion=addPlumbing(scene,props.waterItems,retain,pickables,labels,Boolean(renderer.isWebGLRenderer))
+    plumbingMotion=addPlumbing(scene,props.waterItems,retain,pickables,labels,Boolean(renderer.isWebGLRenderer),props.pitSections)
   }
   if (props.disciplineScene) {
     backdrop.push(...scene.children)
     pickables.length = 0
-    for (const [index, room] of (systemOnly ? [] : props.roomLabels || []).entries())
+    for (const [index, room] of (props.roomLabels || []).entries()) {
+      if (props.systemDiagram) {
+        const footprint = surface(room.points,'roomContext',index)
+        footprint.material.opacity=.22
+        footprint.position.y=.012
+      }
       labels.add('water-room', index, room.name, room.points, () => 1.25)
+    }
+    pickables.length=0
     scene.add(props.disciplineScene)
     props.disciplineScene.traverse(mesh => {
       if (!mesh.isMesh) return
@@ -543,9 +627,12 @@ onMounted(() => {
     for (const mesh of pickables) {
       const ink = createDisciplineInk(mesh, retain)
       if (ink) {
+        if (props.systemDiagram) { ink.material.depthTest=false;ink.renderOrder=3 }
+        if (props.systemDiagram && renderer.isWebGLRenderer) mesh.add(addDiagramStroke(ink,retain,props.inkColor))
         mesh.layers.set(1)
         mesh.add(ink)
         disciplineInk.set(mesh, ink)
+        if (props.systemDiagram) phaseColors.set(mesh.userData.index,{ink,color:ink.material.color.clone()})
       }
     }
     addPlanFootprints()
@@ -559,7 +646,7 @@ onMounted(() => {
     addGarageMarkings(scene,props.garage,retain)
     motion.traffic(scene,props.garage)
   }
-  hasMotion.value=motion.active || plumbingMotion?.active || stationMotion?.active
+  hasMotion.value=props.systemDiagram || motion.active || plumbingMotion?.active || stationMotion?.active
   readMotionPreference()
   motionPreference.addEventListener('change',readMotionPreference)
   document.addEventListener('visibilitychange',resetClock)
@@ -584,7 +671,7 @@ onMounted(() => {
   sizeToViewport()
   window.addEventListener('resize', sizeToViewport)
   labels.prepare()
-  reset(overlay)
+  reset(overlay && !floorDiagram)
   if (props.startInElevation) focusStation(true)
   highlight()
   observer = new ResizeObserver(() => { sizeToViewport(); fit() })
@@ -601,6 +688,8 @@ onBeforeUnmount(() => {
   renderer?.domElement.removeEventListener('pointerup', selectPoint)
   cancelAnimationFrame(frame)
   for (const [mesh, ink] of disciplineInk) { mesh.layers.enable(0); mesh.layers.disable(1); ink.removeFromParent() }
+  plumbingMotion?.dispose()
+  instanceFrame?.dispose()
   bindSimulation(null)
   if (props.placedAsset) placed.remove(props.placedAsset)
   if (projected) props.disciplineScene.visible = true
@@ -611,7 +700,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.sim-tools{position:absolute;bottom:10px;right:10px;padding:4px 7px;background:#fffffff0;border-radius:4px;display:flex;gap:7px;align-items:center;font-size:12px}.sim-tools button{font:inherit;cursor:pointer;padding:3px 7px;border:1px solid #cbd4d6;background:white;border-radius:4px}
+.phase-caption{position:absolute;bottom:8px;right:10px;margin:0;padding:3px 7px;color:#185b50;background:#fffffff0;border-radius:3px;font-size:12px}.sim-tools{position:absolute;bottom:10px;right:10px;padding:4px 7px;background:#fffffff0;border-radius:4px;display:flex;gap:7px;align-items:center;font-size:12px}.sim-tools button{font:inherit;cursor:pointer;padding:3px 7px;border:1px solid #cbd4d6;background:white;border-radius:4px}
 .model-stage { position: relative; width:100%; height:clamp(360px, min(var(--available-model-height, 78svh), 96cqw), 1500px); overflow: hidden; border-radius: 6px; background: #f3f5f4; }
 .model-stage :deep(canvas), .model-stage :deep(svg) { display: block; touch-action: none; }
 .plan-labels { position:absolute; inset:0; pointer-events:none; overflow:hidden; }

@@ -1,18 +1,20 @@
 <template>
   <div class="system-layout">
-    <ObjectInspection v-if="closeup && asset" :key="selectedAsset.id" :object="asset.scene" :clips="asset.animations" :demo-name="item.name!=='承重结构' && (selectedAsset.kind==='family' || selectedAsset.verticalExtentVerified) ? selectedAsset.name : undefined"
+    <ObjectInspection v-if="!diagram && closeup && asset" :key="selectedAsset.id" :object="asset.scene" :clips="asset.animations" :demo-name="item.name!=='承重结构' && (selectedAsset.kind==='family' || selectedAsset.verticalExtentVerified) ? selectedAsset.name : undefined"
       :floor-offset="selectedAsset.kind==='installed' || selectedAsset.verticalExtentVerified ? -selectedAsset.origin[1] : undefined" />
-    <FloorScene v-else-if="scene" ref="floorScene" :key="item.id" :geometry="geometry" :discipline-scene="scene" :placed-asset="running ? null : combined || placed"
-      :system-only="item.name!=='承重结构'"
-      :room-labels="roomLabels" :plan-segments="running ? [] : planSegments" :selected-plan-id="assetId" :selection="selection"
-      @select="!running && (selection=$event)" @inspect-segment="assetId=$event;closeup=true" @inspect-instance="inspectInstance" />
+    <FloorScene v-else-if="scene" ref="floorScene" :key="item.id" :geometry="geometry" :discipline-scene="scene" :placed-asset="combined || placed" :core="diagram ? core : undefined" :phase-indices="steps.map(s=>s.index)" :phase-titles="Object.fromEntries(steps.map(s=>[s.index,s.title]))" :selected-instance-id="diagram ? focusedId : undefined"
+      :system-diagram="diagram" :ink-color="inkColor"
+      :room-labels="roomLabels" :plan-segments="planSegments" :selected-plan-id="diagram ? focusedId : assetId" :selection="selection"
+      @select="selectOnFloor" @inspect-segment="diagram ? inspectInstance($event) : (assetId=$event)" @inspect-instance="inspectInstance" />
     <div v-else class="pending" role="status">{{ error || '正在读取专业模型…' }} <button v-if="error" @click="retry++">重试</button></div>
-    <aside aria-label="专业模型详情">
+    <DiagramDetails v-if="diagram" :title="title" :record="focusedRecord" :rooms="roomLabels" :objects="diagramObjects"
+      :connection="connection" :steps="steps" :layers="layers" :selection="selection" :sources="sourceCodes" :drawings="sheetFilter || item.drawings"
+      :purpose="purposes[item.name]" :loading="combining" :error="combinedError" @object="inspectInstance"
+      @layer="selectOnFloor({group:'discipline',index:$event})" @source="$emit('source',$event)" @retry="showInstallations"/>
+    <aside v-else aria-label="专业模型详情">
       <h3>{{ title }}</h3>
       <p class="purpose">{{ purposes[item.name] }}</p>
-      <button v-if="steps.length && !running" @click="startRun">系统工况仿真</button>
-      <SystemRun v-if="running && steps.length" :steps="steps" @phase="selectedIndex=$event" @object="id=>{stopRun();assetId=id}" @close="stopRun"/>
-      <section v-if="available.length && !running" class="inspect">
+      <section v-if="available.length" class="inspect">
         <button v-if="installations.length || simRooms.length" @click="showInstallations" :disabled="combining">{{ installations.length ? "查看已核标高 · "+installations.length+" 件" : "查看设备间" }}</button>
         <div v-if="combined && nearbyObjects.length" class="local-views">
           <button v-for="r in nearbyObjects" :key="r.id" @click="inspectInstance(r.id)">{{ r.name }}</button>
@@ -51,7 +53,7 @@
           </dl>
         </template>
       </section>
-      <label v-if="layers.length && !closeup && !running">专业图层
+      <label v-if="layers.length && !closeup">专业图层
         <select v-model.number="selectedIndex" aria-label="专业图层">
           <option :value="-1">全部图层</option>
           <option v-for="(name, i) in layers" :key="i" :value="i">{{ name }}</option>
@@ -74,11 +76,11 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { BufferGeometry, Group, Line, LineBasicMaterial, Vector3 } from 'three'
 import JSZip from 'jszip'
 import FloorScene from './FloorScene.vue'
-import SystemRun from './SystemRun.vue'
+import DiagramDetails from './DiagramDetails.vue'
 import {systemRuns} from './systemRuns'
 import ObjectInspection from './ObjectInspection.vue'
 import {checkedEntry, purposes} from './b2Disciplines'
-const props = defineProps({title:String, sheetFilter:String, item:Object, objects:Array, installationPacks:Object, objectArchive:Object, archive:Object, geometry:Object, sheets:Array, roomLabels:Array})
+const props = defineProps({title:String, sheetFilter:String, item:Object, objects:Array, installationPacks:Object, objectArchive:Object, archive:Object, geometry:Object, core:Object, profession:String, plumbing:Object, sheets:Array, roomLabels:Array})
 defineEmits(['source'])
 const scene=shallowRef(null), layers=ref([]), notes=ref(''), error=ref(''), retry=ref(0)
 const assetId=ref(''), closeup=ref(false), assetRetry=ref(0), assetError=ref('')
@@ -90,22 +92,16 @@ const planSegments=computed(()=>available.value.filter(r=>r.placement?.endpoints
 const objectGroups=computed(()=>[['installed','图纸已核安装位置'],['segment','图注尺寸管段'],['room','楼层已定位空间'],['family','构件参考样件']].map(([kind,label])=>({
   kind,label,items:available.value.filter(r=>r.kind===kind)
 })).filter(g=>g.items.length))
-const running=ref(false)
+const diagram=computed(()=>props.item.name!=='承重结构')
+const inkColor=computed(()=>({给排水:0x197485,暖通:0x21765f,强电:0x9b5a16,消防:0xb64535,弱电:0x465f9d})[props.profession])
+const diagramObjects=computed(()=>available.value.filter(record=>record.origin || record.planXZ || record.planLine || record.placement?.endpointsXZ))
 const steps=computed(()=>{
   const profile=systemRuns[props.sheetFilter==='E301'?'应急照明':props.item.name] || []
-  return profile.flatMap(([title,name,objectName])=>{
+  return profile.flatMap(([title,name])=>{
     const index=layers.value.findIndex(layer=>layer===name || layer.endsWith(' · '+name))
-    const record=available.value.find(r=>r.name===objectName)
-    return index<0 ? [] : [{title,index,layer:layers.value[index],objectName,object:record?.id}]
+    return index<0 ? [] : [{title,index}]
   })
 })
-async function startRun(){
-  running.value=true;closeup.value=false;assetId.value=''
-  await nextTick()
-  floorScene.value?.showPlan()
-}
-function stopRun(){running.value=false;selectedIndex.value=-1}
-watch([()=>props.item.id,()=>props.sheetFilter],()=>{running.value=false})
 const selectedAsset=computed(()=>available.value.find(r=>r.id===assetId.value))
 const installations=computed(()=>available.value.filter(r=>r.kind==='installed' || r.verticalExtentVerified))
 const combineRequest=ref(0),combined=shallowRef(null),combining=ref(false),combinedError=ref('')
@@ -117,7 +113,19 @@ watch([scene,()=>props.objectArchive,()=>installations.value.length || simRooms.
 },{flush:'post'})
 const focusedId=ref('')
 const focusedRecord=computed(()=>available.value.find(r=>r.id===focusedId.value))
+const connection=computed(()=>props.profession==='给排水' && focusedRecord.value
+  ? props.plumbing?.items.find(item=>item.name===focusedRecord.value.name && item.connection)?.connection
+  : null)
+function selectOnFloor(hit) {
+  if (diagram.value) focusedId.value=''
+  selection.value=hit
+}
 function inspectInstance(id) {
+  if (diagram.value) {
+    focusedId.value=id
+    selectedIndex.value=-1
+    return
+  }
   if (!combined.value) {assetId.value=id;return}
   focusedId.value=id
   floorScene.value?.focusInstance(id)
@@ -125,7 +133,7 @@ function inspectInstance(id) {
 async function showInstallations() {
   assetId.value=''
   closeup.value=false
-  if (combined.value) { focusedId.value=''; floorScene.value?.showAsset(); return }
+  if (combined.value) { focusedId.value=''; if (!diagram.value) floorScene.value?.showAsset(); return }
   combineRequest.value++
 }
 defineExpose({showInstallations})
@@ -134,7 +142,7 @@ watch([combineRequest,()=>props.item.id,assetId,()=>props.objectArchive], async 
   const resources=new Set()
   onCleanup(()=>{current=false;resources.forEach(r=>r.dispose())})
   combined.value=null; combining.value=false; combinedError.value=''
-  if (!request || selected || !archive || request===old[0]) return
+  if (!request || selected || !archive || (!diagram.value && request===old[0])) return
   combining.value=true
   try {
     const group=new Group()
@@ -153,6 +161,9 @@ watch([combineRequest,()=>props.item.id,assetId,()=>props.objectArchive], async 
       })
       if (!current) {resources.forEach(r=>r.dispose());return}
       scene.userData.instanceId=record.id
+      scene.userData.kind=record.kind
+      scene.userData.recordName=record.name
+      scene.userData.verticalExtentVerified=record.verticalExtentVerified
       scene.position.fromArray(record.origin)
       if (record.planLine) {
         // Keep the documented lower edge pickable on a whole-floor display.
@@ -166,7 +177,7 @@ watch([combineRequest,()=>props.item.id,assetId,()=>props.objectArchive], async 
     }
     combined.value=group
     await nextTick()
-    if (current && !running.value) {
+    if (current && !diagram.value) {
       floorScene.value?.showAsset()
       const animated=group.children.find(child=>child.animations.length)
       const first=available.value.find(record=>animated && record.id===animated.userData.instanceId) || installations.value[0]
@@ -175,7 +186,7 @@ watch([combineRequest,()=>props.item.id,assetId,()=>props.objectArchive], async 
   } catch (e) {if (current) combinedError.value=e.message || '已核标高模型装配失败'}
   finally {if (current) combining.value=false}
 })
-const sourceCodes=computed(()=>[...new Set([...((selectedAsset.value || (combined.value && focusedRecord.value))?.sourceCodes || []),...props.sheets.map(s=>s.code)])])
+const sourceCodes=computed(()=>[...new Set([...((selectedAsset.value || focusedRecord.value)?.sourceCodes || []),...props.sheets.map(s=>s.code)])])
 const placementNote=computed(()=>{
   if (selectedAsset.value?.kind==='installed') return '可在楼层中查看本件的安装位置。标高的基准和图注见下方。'
   if (selectedAsset.value?.kind==='family') return '可旋转查看目录原型。对应的现场实例和安装位置待核。'
@@ -219,7 +230,7 @@ watch([()=>props.item,()=>props.archive,()=>props.sheetFilter,retry], async ([it
   let active=true
   const resources=new Set()
   onCleanup(()=>{ active=false; resources.forEach(r=>r.dispose()) })
-  scene.value=null; layers.value=[]; notes.value=''; error.value=''; selectedIndex.value=-1
+  scene.value=null; focusedId.value=''; layers.value=[]; notes.value=''; error.value=''; selectedIndex.value=-1
   try {
     const bytes=await checkedEntry(archive,item.file,item.sha256,8*1024*1024)
     if (!active) return

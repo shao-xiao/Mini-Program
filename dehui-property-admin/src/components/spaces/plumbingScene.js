@@ -1,10 +1,11 @@
 import * as T from 'three'
+import { componentSimulation } from './componentSimulation'
 import { pipeLayers } from './plumbingCatalog'
 import { selectionColor } from './garageMarkings'
 
 // The PDF fixes the plan coordinates. Vertical separation, fittings and fluid
 // markers are display geometry, not measured elevations or a hydraulic solver.
-export function addPlumbing(scene, items, retain, pickables, labels, instanced) {
+export function addPlumbing(scene, items, retain, pickables, labels, instanced, sections) {
   const tube = retain(new T.CylinderGeometry(1, 1, 1, 12))
   const shell = retain(new T.CylinderGeometry(1, 1, 1, 16, 1, true))
   const box = retain(new T.BoxGeometry())
@@ -13,6 +14,7 @@ export function addPlumbing(scene, items, retain, pickables, labels, instanced) 
   const up = new T.Vector3(0, 1, 0)
   const axis = new T.Quaternion()
   const groups = new Map(), parts = [], media = [], basins = []
+  const pitActions=[], pitFrames=new Map()
   const colors = new Map()
   function material(color, opacity = 1) {
     const key = color + '/' + opacity
@@ -35,6 +37,24 @@ export function addPlumbing(scene, items, retain, pickables, labels, instanced) 
     const [x,z] = item.points[0]
     const color = pipeLayers[item.layer][1]
     if (item.kind === '集水坑') {
+      labels.add('water',index,item.name,[[x-.5,z],[x+.5,z],[x,z+.3]],()=>2.4)
+      const section=sections?.get(item.name)
+      if(section) {
+        const instance=section.clone(true)
+        scene.add(instance)
+        const action=componentSimulation(instance,item.name)
+        if(action) pitActions.push(action)
+        instance.traverse(node=>{
+          if(node.isMesh || node.isLine) {node.userData.group='water';node.userData.index=index;pickables.push(node)}
+        })
+        const frame=new T.BoxHelper(instance,selectionColor)
+        frame.material.depthTest=false
+        frame.renderOrder=4
+        frame.visible=false
+        scene.add(frame)
+        pitFrames.set(index,frame)
+        return
+      }
       parts[index] = part(box, metal, vec(x,.12,z), vec(1.9,.24,1.9), axis, index)
       const water = new T.Mesh(box, material('#49aec0',.62))
       water.position.set(x,.4,z)
@@ -45,7 +65,7 @@ export function addPlumbing(scene, items, retain, pickables, labels, instanced) 
         part(tube, metal, vec(x+dx,.92,z), vec(.23,1.36,.23), axis, index)
         part(tube, brass, vec(x+dx,1.55,z), vec(.26,.13,.26), axis, index)
       }
-      labels.add('water',index,item.name,[[x-.5,z],[x+.5,z],[x,z+.3]],()=>2.4)
+
       return
     }
     const y = item.system === 'sprinkler' ? 2.75 : 1.65
@@ -99,7 +119,31 @@ export function addPlumbing(scene, items, retain, pickables, labels, instanced) 
   }).filter(Boolean)
   const selected = new T.Mesh(box,material(selectionColor,.78))
   selected.visible=false; scene.add(selected)
+  const routes=new Map()
+  items.forEach((item,i)=>{
+    if(!item.stationName || !parts[i] || !['立管','管段'].includes(item.kind)) return
+    if(!routes.has(item.stationName)) routes.set(item.stationName,[])
+    routes.get(item.stationName).push(parts[i])
+  })
+  const routeMarks=[]
+  const routeMaterial=material(selectionColor,.42)
+  const longest=Math.max(0,...Array.from(routes.values(),route=>route.length))
+  for(let i=0;i<longest;i++){
+    const mark=new T.Mesh(tube,routeMaterial)
+    mark.visible=false
+    scene.add(mark)
+    routeMarks.push(mark)
+  }
   function select(index) {
+    const route=routes.get(items[index]?.stationName) || []
+    routeMarks.forEach((mark,i)=>{
+      mark.visible=i<route.length
+      if(!mark.visible) return
+      route[i].matrix.decompose(mark.position,mark.quaternion,mark.scale)
+      mark.scale.x*=1.08
+      mark.scale.z*=1.08
+    })
+    for (const [i,frame] of pitFrames) frame.visible=i===index
     const p = parts[index]
     selected.visible=Boolean(p)
     if (!p) return
@@ -108,8 +152,10 @@ export function addPlumbing(scene, items, retain, pickables, labels, instanced) 
     selected.scale.multiplyScalar(1.07)
   }
   return {
-    select, active:streams.length>0 || basins.length>0,
+    select, active:streams.length>0 || basins.length>0 || pitActions.length>0,
+    dispose(){pitActions.forEach(action=>action.dispose());pitFrames.forEach(frame=>frame.dispose())},
     update(time) {
+      pitActions.forEach(action=>action.update(time))
       for (const {runs,batch,singles} of streams) {
         runs.forEach(({start,delta,rotation,gas,length,direction},i)=>{
           // Reversible motion on un-oriented CAD runs does not assign a design flow direction.
