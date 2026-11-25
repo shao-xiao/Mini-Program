@@ -1,5 +1,5 @@
 import JSZip from 'jszip'
-import {checkedEntry, parseDisciplines} from './b2Disciplines'
+import {checkedEntry, objectIndexDigests, parseDisciplines} from './b2Disciplines'
 import {readModelAttachment} from './floorArchiveReader'
 import { pipeLayers, waterSystems } from './plumbingCatalog'
 import { normalizeCustomFieldFiles } from '../../utils/customFieldValues'
@@ -73,7 +73,7 @@ export async function readFloorArchive(id, onBaseReady) {
   for (const result of results) {
     if (result.status === 'rejected') { errors.push(result.reason.message); continue }
     const { kind, data, archive } = result.value
-    if (kind === 'plumbing' && base.plumbing?.version >= data.version) continue
+    if (['plumbing','objects'].includes(kind) && base[kind]?.version >= data.version) continue
     base[kind] = data
     base[kind + 'Archive'] = archive
   }
@@ -92,6 +92,13 @@ function validPoint(p) {
 async function parseSupplement(file, model) {
   if (file.size > maxBytes) throw Error('详图包超过 20 MB')
   const archive = file.archive || await JSZip.loadAsync(await file.arrayBuffer())
+  if (archive.file('objects.json')) {
+    const bytes = await checkedEntry(archive, 'objects.json', objectIndexDigests, 256 * 1024)
+    const data = JSON.parse(new TextDecoder().decode(bytes))
+    if (data.floor !== model.floor || data.reference !== model.sources.find(s => s.code === 'A101')?.sha256)
+      throw Error('实体图包与楼层底图不匹配')
+    return {kind:'objects', data, archive}
+  }
   if (archive.file('disciplines.json')) return parseDisciplines(archive, model)
   if (archive.file('core.json')) {
     const result = await parseCore(archive, model)
@@ -169,8 +176,8 @@ async function parseSupplement(file, model) {
 export async function attachSupplement(id, file, model, kind) {
   const result = await parseSupplement(file, model)
   if (result.kind !== kind) throw Error('请选择对应的详图包')
-  if (kind === 'disciplines') {
-    for (const item of [...result.data.models, ...result.data.sources])
+  if (kind === 'disciplines' || kind === 'objects') {
+    for (const item of [...(result.data.objects || result.data.models), ...(result.data.sources || []), ...Object.values(result.data.installationPacks || {})])
       await checkedEntry(result.archive, item.file, item.sha256, maxBytes)
   } else if (kind === 'survey') {
     if (result.data.detailReference !== model.sources.find(s => s.code === 'A401')?.sha256)
@@ -185,7 +192,7 @@ export async function attachSupplement(id, file, model, kind) {
   if (!before.length) throw Error('请先关联底图')
   for (const item of before.slice(1)) {
     const existing = await parseSupplement(await download(item),model)
-    if (existing.kind === kind && !(kind === 'plumbing' && existing.data.version < result.data.version)) throw Error('该详图已关联，请刷新查看')
+    if (existing.kind === kind && !(['plumbing','objects'].includes(kind) && existing.data.version < result.data.version)) throw Error('该详图已关联，请刷新查看')
   }
   const uploaded = await uploadCustomFieldAttachment(file, { workspaceKey:'floors', timeout:60000 })
   const current = await values(id)

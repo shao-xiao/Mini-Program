@@ -44,10 +44,11 @@
           <button v-if="!activeModel && tab === '平面图'" type="button" @click="original = !original">{{ original ? '返回三维模型' : '核对建筑原图' }}</button>
         </div>
         <label v-if="!loadingDetails && !disciplines && canAttach" class="upload">关联 B2 专业模型<input type="file" accept=".zip" @change="attachDetail($event,'disciplines')"></label>
+        <label v-if="disciplines && !loadingDetails && (!objects || objects.version < objectPackVersion) && canAttach" class="upload">{{ objects ? '更新 B2 实体图包' : '关联 B2 实体图包' }}<input type="file" accept=".zip" @change="attachDetail($event,'objects')"></label>
       </header>
       <small v-if="loadingDetails" role="status">正在载入专业详图…</small>
       <p v-if="message || coreError" role="alert">{{ message || coreError }}</p>
-      <DisciplineModel v-if="activeModel" v-show="!original" :item="activeModel" :title="modelTitle(activeModel)" :sheet-filter="emergencyOnly ? 'E301' : ''" :archive="disciplineArchive" :geometry="model.geometry" :room-labels="survey?.rooms || garage?.rooms || []" :sheets="catalogSheets" @source="code=>{sourceCode=code;original=true}" />
+      <DisciplineModel :installation-packs="objects?.installationPacks" v-if="activeModel" v-show="!original" :objects="objects?.objects || []" :object-archive="objectArchive" :item="activeModel" :title="modelTitle(activeModel)" :sheet-filter="emergencyOnly ? 'E301' : ''" :archive="disciplineArchive" :geometry="model.geometry" :room-labels="survey?.rooms || garage?.rooms || []" :sheets="catalogSheets" @source="code=>{sourceCode=code;original=true}" />
       <template v-if="!activeModel && tab === '平面图' && !original">
         <div class="model-workbench">
         <FloorScene ref="floorScene" :floor-elevation="model.elevation" :plumbing="plumbing" :key="mode + (loadingDetails ? '-base' : '')" :rooms="visibleRooms" :garage="garage" :traffic="mode === 'traffic'" :core="core" :detail="detail" :geometry="model.geometry" :selection="selection" @select="selection = $event" />
@@ -70,7 +71,7 @@
         </aside>
         </div>
       </template>
-      <PlumbingRoomModel :core="core" :floor-elevation="model.elevation" v-if="waterView && waterSystem === 'stations' && hasStationSurvey(plumbing)" v-show="!original" :initial-name="stationName" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" @source="code=>{sourceCode=code;original=true}" />
+      <PlumbingRoomModel :objects="objects?.objects || []" :object-archive="objectArchive" :core="core" :floor-elevation="model.elevation" v-if="waterView && waterSystem === 'stations' && hasStationSurvey(plumbing)" v-show="!original" :initial-name="stationName" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" @source="code=>{sourceCode=code;original=true}" />
       <PlumbingModel :core="core" :floor-elevation="model.elevation" @station="openStation" v-else-if="waterView" v-show="!original" :key="waterSystem" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" :system="waterSystem" @source="code=>{sourceCode=code;original=true}"/>
       <table v-else-if="!activeModel && !original && tab !== '平面图'" class="drawing-index">
         <thead><tr><th>图号</th><th>图名</th><th>核对状态</th></tr></thead>
@@ -97,7 +98,7 @@ import { objectSpecs } from './floorDrawingSpecs'
 import { selectionColor } from './garageMarkings'
 import { hasPermission } from '../../utils/permission'
 import { readFloorArchive, attachFloorArchive, attachSupplement, openSource } from './floorDrawingArchive'
-import { disciplineModels } from './b2Disciplines'
+import { disciplineModels, objectPackVersion } from './b2Disciplines'
 import { waterSystems } from './plumbingCatalog'
 import { buildStations, hasStationSurvey } from './plumbingStations'
 const PlumbingRoomModel = defineAsyncComponent(() => import('./PlumbingRoomModel.vue'))
@@ -126,6 +127,7 @@ const garage = shallowRef(null), garageArchive = shallowRef(null)
 const plumbing = shallowRef(null), plumbingArchive = shallowRef(null), waterSystem = ref('drain')
 const availableWaterSystems = computed(() => Object.fromEntries(Object.entries(waterSystems).filter(([key]) =>
   plumbing.value?.items.some(item => item.system === key))))
+const objects = shallowRef(null), objectArchive = shallowRef(null)
 const disciplines = shallowRef(null), disciplineArchive = shallowRef(null), catalogName = ref('')
 const catalogChoices = computed(()=>disciplineModels[tab.value].map(name=>disciplines.value?.models.find(m=>m.name===name)).filter(Boolean))
 const activeModel = computed(()=>catalogChoices.value.find(m=>m.name===catalogName.value))
@@ -200,7 +202,20 @@ const model = shallowRef(null), archive = shallowRef(null), busy = ref(false), m
 const sourceCode = ref(''), pdfUrl = ref(''), sourceError = ref('')
 let epoch = 0, pdfEpoch = 0
 const buildingSources = computed(() => [...(model.value?.sources || []), ...(core.value ? [core.value.source] : []), ...(garage.value ? [garage.value.source] : [])])
-const sources = computed(() => activeModel.value ? catalogSheets.value : waterView.value ? plumbing.value.sources : buildingSources.value.filter(s => tab.value === '平面图' ? ['建筑','剖面'].includes(s.group) : s.group === tab.value) || [])
+const modelSheets = computed(() => {
+  const sheets = [...catalogSheets.value]
+  const available = [...(disciplines.value?.sources || []), ...(objects.value?.sources || [])]
+  for (const record of objects.value?.objects || []) {
+    if (!record.views.includes(activeModel.value?.name) ||
+        (emergencyOnly.value && record.sheetCodes && !record.sheetCodes.includes('E301'))) continue
+    for (const code of record.sourceCodes || []) {
+      const sheet = available.find(s => s.code === code)
+      if (sheet && !sheets.some(s => s.code === code)) sheets.push(sheet)
+    }
+  }
+  return sheets
+})
+const sources = computed(() => activeModel.value ? modelSheets.value : waterView.value ? plumbing.value.sources : buildingSources.value.filter(s => tab.value === '平面图' ? ['建筑','剖面'].includes(s.group) : s.group === tab.value) || [])
 const source = computed(() => sources.value.find(s => s.code === sourceCode.value))
 function changeTab(name) {
   tab.value = name
@@ -220,13 +235,15 @@ watch([source, original, tab, archive], async () => {
   clearPdf(); sourceError.value = ''
   if (!source.value?.file || !archive.value || !original.value) return
   try {
-    const url = await openSource(activeModel.value ? disciplineArchive.value : waterView.value ? plumbingArchive.value : source.value.code === 'A401' ? coreArchive.value : source.value.code === 'B2交通' ? garageArchive.value : archive.value, source.value)
+    const modelArchive = objects.value?.sources?.includes(source.value) ? objectArchive.value : disciplineArchive.value
+    const url = await openSource(activeModel.value ? modelArchive : waterView.value ? plumbingArchive.value : source.value.code === 'A401' ? coreArchive.value : source.value.code === 'B2交通' ? garageArchive.value : archive.value, source.value)
     if (run === pdfEpoch) pdfUrl.value = url
     else URL.revokeObjectURL(url)
   } catch (e) { if (run === pdfEpoch) sourceError.value = e.message }
 })
 async function load() {
   const run = ++epoch
+  objects.value=null; objectArchive.value=null
   disciplines.value=null; disciplineArchive.value=null
   let preview
   loadingDetails.value = false; survey.value = null
@@ -255,6 +272,8 @@ async function load() {
       garage.value = data.garage
       garageArchive.value = data.garageArchive
       if (garage.value) scope('traffic')
+      objects.value = data.objects
+      objectArchive.value = data.objectsArchive
       disciplines.value = data.disciplines
       disciplineArchive.value = data.disciplinesArchive
       changeTab(tab.value)

@@ -1,25 +1,31 @@
 <template>
-  <div ref="stage" class="model-stage" aria-label="楼层模型，拖动旋转，滚轮或双指缩放">
+  <div ref="stage" class="model-stage" :class="{schematic: (waterItems || stations) && !inPlan}"
+       :aria-label="inPlan ? '正交平面，拖动平移，滚轮或双指缩放' : '楼层模型，拖动旋转，滚轮或双指缩放'">
     <div ref="labelLayer" class="plan-labels" aria-hidden="true"></div>
     <div class="view-tools" aria-label="模型视角">
-      <button type="button" @click="reset(false)">轴测</button>
-      <button type="button" @click="reset(true)">俯视</button>
-      <button v-if="overlay" type="button" @click="reset('below')">仰视</button>
+      <button v-if="!projected" type="button" @click="reset(false)">{{ waterItems || stations ? '运行示意 · 轴测' : '轴测' }}</button>
+      <button type="button" :aria-pressed="constrainedPlan ? inPlan : undefined" @click="reset(true)">{{ constrainedPlan ? '专业平面' : '俯视' }}</button>
+      <button v-if="overlay && !projected" type="button" @click="reset('below')">{{ waterItems || stations ? '运行示意 · 仰视' : '仰视' }}</button>
       <button v-if="waterItems || stations" type="button" @click="focusWater">定位构件</button>
-      <button v-if="disciplineScene" type="button" :disabled="selection?.index < 0" @click="focusLayer">定位图层</button>
+      <button v-if="disciplineScene && (!projected || inPlan)" type="button" :disabled="selection?.index < 0" @click="focusLayer">定位图层</button>
+      <button v-if="placedAsset" type="button" :aria-pressed="projected ? !inPlan : undefined" @click="showAsset">定位实体</button>
+      <button v-if="placedAsset && locatedHeights" type="button" @click="showElevation">侧视标高</button>
+      <button v-if="inPlan && planSegments?.some(s=>s.id===selectedPlanId)" type="button" @click="locateSegment">定位此图段</button>
       <button v-if="disciplineScene" type="button" :aria-pressed="showReference" @click="toggleReference">建筑参照</button>
-      <button v-if="stations" type="button" @click="focusStation(true)">设备立面</button>
+      <button v-if="stations" type="button" @click="focusStation(true)">设备立面示意</button>
       <button type="button" aria-label="放大模型" @click="zoom(1.35)">＋</button>
       <button type="button" aria-label="缩小模型" @click="zoom(1 / 1.35)">−</button>
-      <button v-if="hasMotion" type="button" class="play-control" :aria-pressed="playing" @click="toggleMotion">{{ playing ? '暂停演示' : '播放演示' }}</button>
+      <button v-if="hasMotion && !(stations && inPlan)" type="button" class="play-control" :aria-pressed="playing" @click="toggleMotion">{{ playing ? '暂停演示' : '播放演示' }}</button>
     </div>
+    <p v-if="constrainedPlan" class="view-note" role="status">{{ viewNote }}</p>
   </div>
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import * as T from 'three'
 import { addStations } from './stationScene'
+import { createDisciplineInk } from './disciplineInk'
 import { addPlumbing } from './plumbingScene'
 import { createFloorMotion } from './floorMotion'
 import { createFloorLabels } from './floorLabels'
@@ -30,18 +36,62 @@ import { addGarageMarkings, selectionColor, garageColors, rampProfile, rampGeome
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { SVGRenderer } from 'three/addons/renderers/SVGRenderer.js'
 
-const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array, plumbing: Object, floorElevation: Number, stations: Array, disciplineScene: Object, roomLabels: Array, startInElevation: Boolean })
-const emit = defineEmits(['select'])
+const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array, plumbing: Object, floorElevation: Number, stations: Array, disciplineScene: Object, placedAsset: Object, locatedHeights: Boolean, planSegments: Array, selectedPlanId: String, roomLabels: Array, startInElevation: Boolean })
+const emit = defineEmits(['select','inspect-segment','inspect-instance'])
 const stage = ref(null)
 const labelLayer = ref(null)
 const pickables = []
 let labels, plumbingMotion, stationMotion, elevationView=false
 const backdrop=[]
 const showReference=ref(true)
+const metadata = props.disciplineScene?.children[0]?.userData
+const projected = metadata?.registered === true && Number.isInteger(metadata.sourceSegments)
+const constrainedPlan = Boolean(projected || props.waterItems || props.stations)
+const stationSchematic = new T.Group()
+const stationPlan = new T.Group()
+const inPlan = ref(constrainedPlan)
+const placed = new T.Group()
+const viewNote = computed(() => {
+  if (props.stations) return inPlan.value ? 'P301 平面定位 · 圆点为设备位置，线段为图面流路' : '设备运行示意 · 管路高差、泵体外形与动画速度为显示参数'
+  if (inPlan.value) return '平面定位 · 安装标高待核'
+  return projected ? '实体视图 · 仅显示已定位模型与建筑参照' : '运行示意 · 管线高差与管径为显示参数'
+})
 const overlay = Boolean(props.disciplineScene || props.stations || props.waterItems)
 const scene = new T.Scene()
 const camera = new T.OrthographicCamera(-60, 60, 60, -60, 0.1, 1000)
 const meshes = new Map()
+const disciplineInk = new Map()
+const planFootprints = new T.Group()
+function locateSegment() {
+  focusObject(planFootprints.children.find(node => node.userData.recordId === props.selectedPlanId))
+}
+function addPlanFootprints() {
+  for (const record of props.planSegments || []) {
+    const active = record.id === props.selectedPlanId
+    if (record.planLine) {
+      const path = retain(new T.BufferGeometry().setFromPoints(record.planLine.map(([x,z])=>new T.Vector3(x,0,z))))
+      const line = new T.Line(path, retain(new T.LineBasicMaterial({color:active ? selectionColor : 0x287e81, depthTest:false})))
+      line.userData.recordId=record.id
+      line.renderOrder=3
+      planFootprints.add(line)
+      continue
+    }
+    const [[x1,z1],[x2,z2]] = record.placement.endpointsXZ
+    const dx=x2-x1, dz=z2-z1
+    const shape = retain(new T.PlaneGeometry(Math.hypot(dx,dz), record.placement.nominalSizeMm[0]/1000))
+    shape.rotateX(-Math.PI/2)
+    const material = retain(new T.MeshBasicMaterial({color: active ? selectionColor : 0xae7331,
+      transparent:true, opacity:active ? .8 : .25, depthTest:false, depthWrite:false}))
+    const mark = new T.Mesh(shape, material)
+    // This overlay is pickable only in orthographic plan; its Y has no installation meaning.
+    mark.position.set((x1+x2)/2,0,(z1+z2)/2)
+    mark.rotation.y=-Math.atan2(dz,dx)
+    mark.userData.recordId=record.id
+    mark.renderOrder=3
+    planFootprints.add(mark)
+  }
+  scene.add(planFootprints)
+}
 const roomInstances=new Map()
 let roomDefinitions=[]
 const palette = { outline: 0xdde5e6, walls: 0x849a9f, columns: 0x536e79, bays: 0xb5ccbc, coreWalls: 0x9c8366, coreColumns: 0x54737b, ...garageColors, crossings:garageColors.lanes }
@@ -59,7 +109,7 @@ let inView=true, labelsDirty=true, previousTime, elapsed=0, visibilityObserver
 const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
 function render(now) {
   frame=undefined
-  const animate=playing.value && inView && !document.hidden && hasMotion.value
+  const animate=playing.value && inView && !document.hidden && hasMotion.value && !(props.stations && inPlan.value)
   // Render motion at 20 fps. Camera motion stays responsive, and labels only
   // need reprojection when the camera or selection changes.
   if (labelsDirty || (animate && (previousTime==null || now-previousTime>=50))) {
@@ -123,7 +173,7 @@ function surface(points, group, index) {
     mesh.add(outline)
   }
 }
-const edgeMaterial = retain(new T.LineBasicMaterial({ color: 0x62747a }))
+const edgeMaterial = retain(new T.LineBasicMaterial({ color: props.disciplineScene ? 0xabbbbe : 0x62747a }))
 function linework(paths) {
   const vertices = []
   for (const points of paths) {
@@ -160,7 +210,20 @@ function fit() {
 }
 function reset(top) {
   if (!controls) return
+  if (constrainedPlan) {
+    inPlan.value = top === true
+    controls.enableRotate = !inPlan.value
+    controls.mouseButtons.LEFT = inPlan.value ? T.MOUSE.PAN : T.MOUSE.ROTATE
+    controls.touches.ONE = inPlan.value ? T.TOUCH.PAN : T.TOUCH.ROTATE
+    if (projected) {
+      props.disciplineScene.visible = inPlan.value
+      placed.visible = !inPlan.value
+      planFootprints.visible = inPlan.value
+    }
+    if (props.waterItems) backdrop.forEach(object => { object.visible = inPlan.value })
+  }
   setElevation(false)
+  if (props.stations && !inPlan.value) { focusStation(false,top === 'below'); return }
   controls.target.copy(centre)
   camera.position.copy(centre).add(top === 'below' ? new T.Vector3(0,-145,.001) : top ? new T.Vector3(0,145,.001) : new T.Vector3(36,110,81))
   camera.zoom = 1
@@ -171,17 +234,29 @@ function reset(top) {
 function setElevation(on) {
   if (!props.stations) return
   elevationView=on
-  stationMotion?.isolate(on)
-  backdrop.forEach(object=>{object.visible=!on})
-  labelLayer.value.style.visibility=on?'hidden':''
+  const schematic=!inPlan.value
+  stationPlan.visible=!schematic
+  stationSchematic.visible=schematic
+  stationMotion?.isolate(schematic)
+  backdrop.forEach(object=>{object.visible=!schematic})
+  roomInstances.forEach(({root,assembly})=>{
+    if (assembly) root.children.forEach(child=>{child.visible=!schematic || child===assembly.equipment})
+  })
+  labelLayer.value.style.visibility=schematic?'hidden':''
 }
-function focusStation(front) {
+function focusStation(front, below=false) {
   const station=props.stations?.[props.selection?.index]
   if (!station || !controls) return
+  if (front && inPlan.value) reset(false)
   setElevation(front)
   const [x,z]=station.anchor
+  if (inPlan.value) {
+    const marker=stationPlan.children.find(obj=>obj.isMesh && obj.userData.index===props.selection?.index)
+    focusObject(marker)
+    return
+  }
   controls.target.set(x,1.25,z)
-  camera.position.copy(controls.target).add(front?new T.Vector3(0,.01,100):new T.Vector3(28,45,50))
+  camera.position.copy(controls.target).add(front?new T.Vector3(0,.01,100):below?new T.Vector3(0,-100,.001):new T.Vector3(28,45,50))
   controls.update()
   fit()
   camera.zoom=T.MathUtils.clamp(Math.min(camera.right-camera.left,camera.top-camera.bottom)/(front?4.8:9),1,36)
@@ -196,8 +271,35 @@ function toggleReference() {
 }
 function focusLayer() {
   const mesh = meshes.get('discipline:' + props.selection?.index)
-  if (!mesh || !controls) return
-  const box = new T.Box3().setFromObject(mesh)
+  if (mesh) focusObject(mesh)
+}
+function showAsset() {
+  if (!props.placedAsset) return
+  if (projected && inPlan.value) reset(false)
+  focusObject(props.placedAsset)
+}
+function showElevation() {
+  if (!props.placedAsset || !controls) return
+  if (projected && inPlan.value) reset(false)
+  const box = new T.Box3().setFromObject(props.placedAsset)
+  if (box.isEmpty()) return
+  const middle = box.getCenter(new T.Vector3())
+  box.expandByPoint(new T.Vector3(middle.x,0,middle.z))
+  box.getCenter(middle)
+  const size = box.getSize(new T.Vector3())
+  const eye = size.x >= size.z ? new T.Vector3(0,.04,1) : new T.Vector3(1,.04,0)
+  controls.target.copy(middle)
+  camera.position.copy(middle).addScaledVector(eye,145)
+  controls.update()
+  const visible = box.applyMatrix4(camera.matrixWorldInverse).getSize(new T.Vector3())
+  camera.zoom = T.MathUtils.clamp(.85*Math.min((camera.right-camera.left)/Math.max(2,visible.x),
+    (camera.top-camera.bottom)/Math.max(2,visible.y)),.5,controls.maxZoom)
+  camera.updateProjectionMatrix()
+  schedule()
+}
+function focusObject(object) {
+  if (!object || !controls) return
+  const box = new T.Box3().setFromObject(object)
   if (box.isEmpty()) return
   const middle = box.getCenter(new T.Vector3())
   camera.position.add(middle.clone().sub(controls.target))
@@ -232,6 +334,7 @@ function zoom(factor) {
   schedule()
 }
 function selectPoint(event) {
+  if (props.stations && !inPlan.value) return
   if (!pointer || Math.hypot(event.clientX-pointer.x, event.clientY-pointer.y) > 5) return
   const caption = labels.hit(event.clientX,event.clientY)
   if (!props.disciplineScene && !elevationView && caption && (props.stations ? caption.group==='station' : !props.waterItems || caption.group==='water')) { emit('select',caption); return }
@@ -239,8 +342,28 @@ function selectPoint(event) {
   const coords = new T.Vector2((event.clientX-rect.left)/rect.width*2-1, 1-(event.clientY-rect.top)/rect.height*2)
   const ray = new T.Raycaster()
   ray.setFromCamera(coords, camera)
-  const candidates=elevationView ? pickables.filter(mesh=>mesh.userData.index===props.selection?.index) : pickables
-  const hit = ray.intersectObjects(candidates, false)[0]
+  ray.params.Line.threshold = 2.5 * (camera.top - camera.bottom) / (camera.zoom * rect.height)
+  if (placed.visible && props.placedAsset) {
+    let object = ray.intersectObject(props.placedAsset, true)[0]?.object
+    while (object && object!==placed && !object.userData.instanceId) object=object.parent
+    if (object?.userData.instanceId) { emit('inspect-instance',object.userData.instanceId); return }
+  }
+  if (projected && !inPlan.value) return
+  if (inPlan.value && planFootprints.children.length) {
+    const footprint = ray.intersectObjects(planFootprints.children, false)[0]
+    if (footprint) { emit('inspect-segment',footprint.object.userData.recordId); return }
+  }
+  const candidates=props.stations ? stationPlan.children : pickables
+  if (props.stations) ray.params.Line.threshold = 3 * (camera.top-camera.bottom)/(camera.zoom*rect.height)
+  let hit = ray.intersectObjects(candidates, false)[0]
+  if (!hit && disciplineInk.size) {
+    // Hit tolerance in screen pixels, independent of zoom and viewport size.
+    let nearest = Infinity
+    for (const candidate of ray.intersectObjects([...disciplineInk.values()], false)) {
+      const offset = ray.ray.distanceSqToPoint(candidate.point)
+      if (offset < nearest) { hit = candidate; nearest = offset }
+    }
+  }
   if (hit) {
     const data=hit.object.userData
     emit('select', data.indices ? {group:'water',index:data.indices[hit.instanceId]} : data)
@@ -256,34 +379,46 @@ async function exportSelectedRoom() {
 async function exportSelectedStation() {
   const station=props.stations?.[props.selection?.index]
   if (!station) throw Error('请先选择设备位置')
-  const {exportRoom,exportSump}=await import('./roomExport')
-  if (station.kind==='集水坑') return exportSump(station)
+  if (station.kind==='集水坑') throw Error('集水坑须从核验图包导出')
+  const {exportRoom}=await import('./roomExport')
   const room=roomDefinitions.find(r=>r.name===station.name)
   if (!room) throw Error('需要关联房间轮廓后才能导出')
   return exportRoom(room)
 }
-defineExpose({exportSelectedRoom,exportSelectedStation})
+defineExpose({exportSelectedRoom,exportSelectedStation,showAsset})
 function startPoint(event) { pointer = { x:event.clientX, y:event.clientY } }
 const selectedMaterial = retain(new T.MeshBasicMaterial({color:selectionColor,side:T.DoubleSide}))
 let previousMaterial
 function highlight() {
   if (stationMotion) {
     stationMotion.select(props.selection?.index)
-    if(elevationView) focusStation(true)
+    for(const item of stationPlan.children)
+      item.material.color.set(item.userData.index===props.selection?.index ? selectionColor : 0x247a83)
+    if(!inPlan.value) focusStation(elevationView)
     schedule()
     return
   }
   if (plumbingMotion) { plumbingMotion.select(props.selection?.index); schedule(); return }
-  if (highlighted && previousMaterial) highlighted.material = previousMaterial
+  if (highlighted && previousMaterial) {
+    highlighted.material = previousMaterial
+    disciplineInk.get(highlighted)?.material.color.copy(previousMaterial.color)
+  }
   previousMaterial = null
   highlighted = meshes.get(props.selection?.group + ':' + props.selection?.index)
   if (highlighted && highlighted.userData.group !== 'outline') {
     previousMaterial = highlighted.material
     highlighted.material = selectedMaterial
+    disciplineInk.get(highlighted)?.material.color.set(selectionColor)
   }
   schedule()
 }
 watch(() => props.selection, highlight)
+watch(() => props.placedAsset, (asset, previous) => {
+  if (previous) placed.remove(previous)
+  if (asset) placed.add(asset)
+  else if (projected && !inPlan.value) reset(true)
+  if (renderer) schedule()
+})
 onMounted(() => {
   try {
     renderer = new T.WebGLRenderer({ antialias: true, alpha: false })
@@ -339,9 +474,29 @@ onMounted(() => {
     const activeRooms=new Set(props.stations.map(s=>roomInstances.get(s.name)?.root))
     backdrop.push(...scene.children.filter(object=>!activeRooms.has(object)))
     pickables.length=0
-    stationMotion=addStations(scene,props.stations,retain,pickables,labels,roomInstances,parts)
+    // Keep the surveyed XY locations separate from the illustrative pumps,
+    // offsets and riser heights used by the stand-alone operating diagram.
+    const symbol=retain(new T.CircleGeometry(.45,20))
+    symbol.rotateX(-Math.PI/2)
+    props.stations.forEach((station,index)=>{
+      const marker=new T.Mesh(symbol,retain(new T.MeshBasicMaterial({color:0x247a83,depthTest:false})))
+      marker.position.set(station.anchor[0],0,station.anchor[1])
+      marker.renderOrder=4
+      marker.userData={group:'station',index}
+      stationPlan.add(marker)
+      const coordinates=station.runs.flatMap(run=>run.points.flatMap(([x,z])=>[x,0,z]))
+      const lineGeometry=retain(new T.BufferGeometry())
+      lineGeometry.setAttribute('position',new T.Float32BufferAttribute(coordinates,3))
+      const lines=new T.LineSegments(lineGeometry,retain(new T.LineBasicMaterial({color:0x247a83,depthTest:false})))
+      lines.renderOrder=3
+      lines.userData={group:'station',index}
+      stationPlan.add(lines)
+    })
+    stationMotion=addStations(stationSchematic,props.stations,retain,pickables,labels,roomInstances,parts)
+    scene.add(stationPlan, stationSchematic)
   }
   if (props.waterItems) {
+    backdrop.push(...scene.children)
     pickables.length=0
     plumbingMotion=addPlumbing(scene,props.waterItems,retain,pickables,labels,Boolean(renderer.isWebGLRenderer))
   }
@@ -359,6 +514,18 @@ onMounted(() => {
       pickables.push(mesh)
       meshes.set('discipline:' + index, mesh)
     })
+    // Add the readable stroke after traversal; keep source meshes pickable and
+    // keep the original metric width at detail zoom.
+    for (const mesh of pickables) {
+      const ink = createDisciplineInk(mesh, retain)
+      if (ink) {
+        mesh.add(ink)
+        disciplineInk.set(mesh, ink)
+      }
+    }
+    addPlanFootprints()
+    scene.add(placed)
+    if (props.placedAsset) placed.add(props.placedAsset)
   }
   const fitPoints = props.detail ? [...props.core.columns.flat(), ...props.core.walls.flat(), ...props.core.lines.flat()] : geo.outline
   bounds = new T.Box3().setFromPoints(fitPoints.map(([x,z]) => new T.Vector3(x,0,z)))
@@ -408,6 +575,10 @@ onBeforeUnmount(() => {
   renderer?.domElement.removeEventListener('pointerdown', startPoint)
   renderer?.domElement.removeEventListener('pointerup', selectPoint)
   cancelAnimationFrame(frame)
+  for (const ink of disciplineInk.values()) ink.removeFromParent()
+  if (props.placedAsset) placed.remove(props.placedAsset)
+  if (projected) props.disciplineScene.visible = true
+  if (highlighted && previousMaterial) highlighted.material = previousMaterial
   resources.forEach(resource => resource.dispose())
   renderer?.dispose?.()
 })
@@ -421,6 +592,8 @@ onBeforeUnmount(() => {
 .plan-labels :deep(.rooms), .plan-labels :deep(.lanes) { padding:0 4px; background:#fffc; border-radius:3px; }
 .plan-labels :deep(.lanes) {font-weight:500;}
 .plan-labels :deep(.active) {color:#fff; background:var(--selection-color); border-radius:3px; text-shadow:none; outline:2px solid white;}
+.view-note {position:absolute;bottom:8px;left:10px;right:auto;max-width:calc(100% - 20px);margin:0;padding:3px 7px;background:#fffffff0;color:#405057;font:12px/1.5 system-ui,sans-serif;border-radius:3px;pointer-events:none;}
+.schematic :deep(.water-room) {display:none;}
 .view-tools { position: absolute; top: 10px; left: 10px; max-width:calc(100% - 20px); flex-wrap:wrap; display: flex; gap: 2px; padding: 3px; background: #fff; border: 1px solid #d8dcdc; border-radius: 6px; }
 .view-tools button { min-width: 32px; min-height: 30px; border: 0; background: transparent; cursor: pointer; font: inherit; color: inherit; }
 .view-tools .play-control {border-left:1px solid #d8dcdc; padding:0 8px;}

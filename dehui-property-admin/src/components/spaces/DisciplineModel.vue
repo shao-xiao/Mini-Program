@@ -1,10 +1,45 @@
 <template>
   <div class="system-layout">
-    <FloorScene v-if="scene" :key="item.id" :geometry="geometry" :discipline-scene="scene" :room-labels="roomLabels" :selection="selection" @select="selection=$event" />
+    <ObjectInspection v-if="closeup && asset" :key="selectedAsset.id" :object="asset.scene" :clips="asset.animations"
+      :floor-offset="selectedAsset.kind==='installed' || selectedAsset.verticalExtentVerified ? -selectedAsset.origin[1] : undefined" />
+    <FloorScene v-else-if="scene" ref="floorScene" :key="item.id" :geometry="geometry" :discipline-scene="scene" :placed-asset="combined || placed"
+      :located-heights="Boolean(combined || selectedAsset?.verticalExtentVerified || selectedAsset?.kind==='installed')"
+      :room-labels="viewLabels" :plan-segments="planSegments" :selected-plan-id="assetId" :selection="selection"
+      @select="selection=$event" @inspect-segment="assetId=$event;closeup=true" @inspect-instance="assetId=$event" />
     <div v-else class="pending" role="status">{{ error || '正在读取专业模型…' }} <button v-if="error" @click="retry++">重试</button></div>
     <aside aria-label="专业模型详情">
       <h3>{{ title }}</h3>
-      <label v-if="layers.length">图层
+      <p class="purpose">{{ purposes[item.name] }}</p>
+      <section v-if="available.length" class="inspect">
+        <button v-if="installations.length" @click="showInstallations" :disabled="combining">查看已核标高 · {{ installations.length }} 件</button>
+        <p v-if="combining" role="status">正在装配本层已核标高的构件…</p>
+        <p v-if="combinedError" role="alert">{{ combinedError }}</p>
+        <label>查看对象<select v-model="assetId" aria-label="查看实体对象">
+          <option value="">楼层专业图</option>
+          <optgroup v-for="group in objectGroups" :key="group.kind" :label="group.label">
+            <option v-for="record in group.items" :key="record.id" :value="record.id">{{ record.name }}</option>
+          </optgroup>
+        </select></label>
+        <p v-if="assetError" role="alert">{{ assetError }} <button @click="assetRetry++">重试</button></p>
+        <p v-else-if="assetId && !asset" role="status">正在读取实体 GLB…</p>
+        <template v-if="asset && selectedAsset">
+          <div><button :aria-pressed="closeup" @click="closeup=true">实体近看</button>
+            <button :aria-pressed="!closeup" @click="closeup=false">返回楼层</button>
+            <button v-if="(selectedAsset.kind==='installed' || selectedAsset.verticalExtentVerified) && placed" @click="locateInstallation">{{ selectedAsset.verticalExtentVerified ? '看坑体位置' : '看安装位置' }}</button></div>
+          <p>{{ placementNote }}</p>
+          <dl><dt>实体 GLB</dt><dd>{{ selectedAsset.id }} · {{ selectedAsset.name }}</dd>
+            <template v-if="selectedAsset.kind==='segment' && selectedAsset.placement">
+              <dt>截面（宽 × 高）</dt><dd>{{ selectedAsset.placement.nominalSizeMm.join(' × ') }} mm</dd>
+              <dt>图面直段长</dt><dd>约 {{ selectedAsset.placement.lengthM.toFixed(3) }} m</dd>
+              <dt>图注安装要求</dt><dd>{{ selectedAsset.placement.relativeMount }}</dd>
+              <dt>安装标高</dt><dd>待核 · 支承梁底标高及测量基点待确定</dd>
+            </template>
+            <template v-for="[label,value] in selectedAsset.fields" :key="label"><dt>{{ label }}</dt><dd>{{ value }}</dd></template>
+            <dt>图纸依据</dt><dd>{{ selectedAsset.drawings }}</dd><dt>模型表达</dt><dd>{{ selectedAsset.basis }}</dd>
+          </dl>
+        </template>
+      </section>
+      <label v-if="layers.length && !closeup">专业图层
         <select v-model.number="selectedIndex" aria-label="专业图层">
           <option :value="-1">全部图层</option>
           <option v-for="(name, i) in layers" :key="i" :value="i">{{ name }}</option>
@@ -12,23 +47,128 @@
       </label>
       <dl aria-live="polite">
         <template v-if="selectedIndex >= 0"><dt>选中图层</dt><dd class="picked">{{ layers[selectedIndex] }}</dd></template>
-        <dt>模型 ID</dt><dd>{{ item.id }}</dd><dt>定位状态</dt><dd>已按 B2 底图配准</dd>
+        <dt>模型 ID</dt><dd>{{ item.id }}</dd><dt>专业图定位</dt><dd>已按 B2 底图配准</dd>
         <dt>来源图号</dt><dd>{{ sheetFilter || item.drawings }}</dd>
         <dt>建模依据</dt><dd>{{ item.basis }}</dd>
         <template v-if="notes"><dt>模型范围</dt><dd>{{ notes }}</dd></template>
       </dl>
-      <button v-for="s in sheets" :key="s.id" @click="$emit('source',s.code)">核对原图 · {{ s.code }}</button>
+      <button v-for="code in sourceCodes" :key="code" @click="$emit('source',code)">核对原图 · {{ code }}</button>
     </aside>
   </div>
 </template>
 <script setup>
-import { computed, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { BufferGeometry, Group, Line, LineBasicMaterial, Vector3 } from 'three'
+import JSZip from 'jszip'
 import FloorScene from './FloorScene.vue'
-import {checkedEntry} from './b2Disciplines'
-const props = defineProps({title:String, sheetFilter:String, item:Object, archive:Object, geometry:Object, sheets:Array, roomLabels:Array})
+import ObjectInspection from './ObjectInspection.vue'
+import {checkedEntry, purposes} from './b2Disciplines'
+const props = defineProps({title:String, sheetFilter:String, item:Object, objects:Array, installationPacks:Object, objectArchive:Object, archive:Object, geometry:Object, sheets:Array, roomLabels:Array})
 defineEmits(['source'])
 const scene=shallowRef(null), layers=ref([]), notes=ref(''), error=ref(''), retry=ref(0)
+const assetId=ref(''), closeup=ref(false), assetRetry=ref(0), assetError=ref('')
+const asset=shallowRef(null), placed=shallowRef(null)
+const floorScene=ref(null)
+async function locateInstallation() {
+  closeup.value=false
+  await nextTick()
+  floorScene.value?.showAsset()
+}
+const available=computed(()=>props.objects.filter(r=>r.views.includes(props.item.name) &&
+  (!props.sheetFilter || !r.sheetCodes || r.sheetCodes.includes(props.sheetFilter))))
+const planSegments=computed(()=>available.value.filter(r=>r.placement?.endpointsXZ?.length===2 || r.planLine?.length>=2))
+const viewLabels=computed(()=>{
+  if (props.item.name !== '普通通风') return props.roomLabels
+  return props.roomLabels?.filter(room=>/风机房|风井/.test(room.name))
+})
+const objectGroups=computed(()=>[['installed','图纸已核安装位置'],['segment','图注尺寸管段'],['room','楼层已定位空间'],['family','构件参考样件']].map(([kind,label])=>({
+  kind,label,items:available.value.filter(r=>r.kind===kind)
+})).filter(g=>g.items.length))
+const selectedAsset=computed(()=>available.value.find(r=>r.id===assetId.value))
+const installations=computed(()=>available.value.filter(r=>r.kind==='installed' || r.verticalExtentVerified))
+const combineRequest=ref(0),combined=shallowRef(null),combining=ref(false),combinedError=ref('')
+async function showInstallations() {
+  assetId.value=''
+  closeup.value=false
+  if (combined.value) { floorScene.value?.showAsset(); return }
+  combineRequest.value++
+}
+defineExpose({showInstallations})
+watch([combineRequest,()=>props.item.id,assetId,()=>props.objectArchive], async ([request,id,selected,archive],old,onCleanup)=>{
+  let current=true
+  const resources=new Set()
+  onCleanup(()=>{current=false;resources.forEach(r=>r.dispose())})
+  combined.value=null; combining.value=false; combinedError.value=''
+  if (!request || selected || !archive || id!==old[1] || request===old[0]) return
+  combining.value=true
+  try {
+    const group=new Group()
+    const bundle=props.installationPacks?.[props.item.name]
+    const files=bundle ? await JSZip.loadAsync(await checkedEntry(archive,bundle.file,bundle.sha256,8*1024*1024)) : archive
+    for (const record of installations.value) {
+      if (!current) return
+      const bytes=await checkedEntry(files,record.file,record.sha256,8*1024*1024)
+      if (!current) return
+      const {scene}=await new GLTFLoader().parseAsync(bytes,'')
+      scene.traverse(node=>{
+        if (node.geometry) resources.add(node.geometry)
+        if (node.material) [].concat(node.material).forEach(m=>resources.add(m))
+      })
+      if (!current) {resources.forEach(r=>r.dispose());return}
+      scene.userData.instanceId=record.id
+      scene.position.fromArray(record.origin)
+      if (record.planLine) {
+        // Keep the documented lower edge pickable on a whole-floor display.
+        const geometry=new BufferGeometry().setFromPoints(record.planLine.map(([x,z])=>
+          new Vector3(x-record.origin[0],0,z-record.origin[2])))
+        const material=new LineBasicMaterial({color:0x536e79})
+        resources.add(geometry);resources.add(material)
+        scene.add(new Line(geometry,material))
+      }
+      group.add(scene)
+    }
+    combined.value=group
+    await nextTick()
+    if (current) floorScene.value?.showAsset()
+  } catch (e) {if (current) combinedError.value=e.message || '已核标高模型装配失败'}
+  finally {if (current) combining.value=false}
+})
+const sourceCodes=computed(()=>[...new Set([...(selectedAsset.value?.sourceCodes || []),...props.sheets.map(s=>s.code)])])
+const placementNote=computed(()=>{
+  if (selectedAsset.value?.kind==='installed') return '可在楼层中查看本件的安装位置。标高的基准和图注见下方。'
+  if (selectedAsset.value?.kind==='family') return '可旋转查看目录原型。对应的现场实例和安装位置待核。'
+  if (selectedAsset.value?.kind==='segment') return '可近看已核的管段几何。楼层图保留平面走向，立体安装位置待核。'
+  if (selectedAsset.value?.verticalExtentVerified) return '坑口放在本处完成地面，坑体向下至图注坑底。控制水位线可与 P202 对照。'
+  return '按楼层索引定位房间。房内设备外形及安装依据请见各模块说明。'
+})
+watch(()=>props.item.id,()=>{assetId.value='';closeup.value=false})
+watch([selectedAsset,()=>props.objectArchive,assetRetry],async ([record,archive],_,onCleanup)=>{
+  let current=true
+  const resources=new Set()
+  onCleanup(()=>{current=false;resources.forEach(r=>r.dispose())})
+  asset.value=null;placed.value=null;assetError.value='';closeup.value=false
+  if(!record || !archive) return
+  try {
+    const bytes=await checkedEntry(archive,record.file,record.sha256,8*1024*1024)
+    if(!current) return
+    const result=await new GLTFLoader().parseAsync(bytes,'')
+    result.scene.traverse(node=>{
+      if (node.geometry) resources.add(node.geometry)
+      if (node.material) [].concat(node.material).forEach(m=>resources.add(m))
+    })
+    if(!current) {resources.forEach(r=>r.dispose());return}
+    if(record.origin) {
+      const instance=result.scene.clone(true)
+      instance.traverse(node=>{
+        if (node.userData.asset?.['安装标高']?.includes('待核')) node.visible=false
+      })
+      instance.position.fromArray(record.origin)
+      placed.value=instance
+    }
+    asset.value=result;closeup.value=true
+  } catch(e){ if(current) assetError.value=e.message || '实体模型读取失败' }
+},{immediate:true})
 const selection=ref({group:'discipline',index:-1})
 const selectedIndex=computed({
   get:()=>selection.value.index,
@@ -76,6 +216,7 @@ aside {min-width:0;border-left:1px solid var(--dhic-border-color-light);padding:
 h3 {margin:0 0 12px} label {display:flex;align-items:center;gap:8px}select {max-width:80%}
 dt {color:var(--dhic-text-secondary);font-size:12px}dd {margin:4px 0 12px;overflow-wrap:anywhere;line-height:1.55}
 button,select {font:inherit;background:white;color:inherit;border:1px solid var(--dhic-border-color);border-radius:5px;padding:5px 8px;margin:0 4px 4px 0;cursor:pointer}
+.purpose,.inspect p{line-height:1.55;color:var(--dhic-text-secondary)}.inspect{padding-bottom:8px;margin-bottom:12px;border-bottom:1px solid var(--dhic-border-color-light)}.inspect label{margin-bottom:8px}.inspect button[aria-pressed=true]{font-weight:650;background:var(--dhic-row-selected)}
 .picked {color:var(--selection-color);font-weight:650}.pending {padding:20px}
 @container (max-width:800px) {.system-layout {grid-template-columns:1fr}aside {border:0;padding:0}}
 </style>

@@ -40,3 +40,4 @@ dehui-property-admin/pnpm-lock.yaml
 
 # Private B2 drawing attachments and local digitization working files
 /output/b2-garage-private/
+/output/B2系统制图/全局复核/
