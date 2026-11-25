@@ -278,6 +278,25 @@ function showAsset() {
   if (projected && inPlan.value) reset(false)
   focusObject(props.placedAsset)
 }
+function focusInstance(id) {
+  const obj=props.placedAsset?.children.find(child=>child.userData.instanceId===id)
+  if (!obj || !controls) return
+  if (projected && inPlan.value) reset(false)
+  const box=new T.Box3().setFromObject(obj)
+  if (box.isEmpty()) return
+  const centre=box.getCenter(new T.Vector3())
+  box.expandByPoint(new T.Vector3(centre.x,0,centre.z))
+  // Leave the surrounding room and floor visible when looking at a small terminal.
+  box.expandByScalar(2)
+  box.getCenter(centre)
+  controls.target.copy(centre)
+  camera.position.copy(centre).add(new T.Vector3(55,34,75))
+  controls.update()
+  const size=box.applyMatrix4(camera.matrixWorldInverse).getSize(new T.Vector3())
+  camera.zoom=T.MathUtils.clamp(.85*Math.min((camera.right-camera.left)/size.x,(camera.top-camera.bottom)/size.y),.5,controls.maxZoom)
+  camera.updateProjectionMatrix()
+  schedule()
+}
 function showElevation() {
   if (!props.placedAsset || !controls) return
   if (projected && inPlan.value) reset(false)
@@ -385,7 +404,7 @@ async function exportSelectedStation() {
   if (!room) throw Error('需要关联房间轮廓后才能导出')
   return exportRoom(room)
 }
-defineExpose({exportSelectedRoom,exportSelectedStation,showAsset})
+defineExpose({exportSelectedRoom,exportSelectedStation,showAsset,focusInstance})
 function startPoint(event) { pointer = { x:event.clientX, y:event.clientY } }
 const selectedMaterial = retain(new T.MeshBasicMaterial({color:selectionColor,side:T.DoubleSide}))
 let previousMaterial
@@ -519,6 +538,7 @@ onMounted(() => {
     for (const mesh of pickables) {
       const ink = createDisciplineInk(mesh, retain)
       if (ink) {
+        mesh.layers.set(1)
         mesh.add(ink)
         disciplineInk.set(mesh, ink)
       }
@@ -575,7 +595,7 @@ onBeforeUnmount(() => {
   renderer?.domElement.removeEventListener('pointerdown', startPoint)
   renderer?.domElement.removeEventListener('pointerup', selectPoint)
   cancelAnimationFrame(frame)
-  for (const ink of disciplineInk.values()) ink.removeFromParent()
+  for (const [mesh, ink] of disciplineInk) { mesh.layers.enable(0); mesh.layers.disable(1); ink.removeFromParent() }
   if (props.placedAsset) placed.remove(props.placedAsset)
   if (projected) props.disciplineScene.visible = true
   if (highlighted && previousMaterial) highlighted.material = previousMaterial

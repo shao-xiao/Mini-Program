@@ -5,13 +5,23 @@
     <FloorScene v-else-if="scene" ref="floorScene" :key="item.id" :geometry="geometry" :discipline-scene="scene" :placed-asset="combined || placed"
       :located-heights="Boolean(combined || selectedAsset?.verticalExtentVerified || selectedAsset?.kind==='installed')"
       :room-labels="viewLabels" :plan-segments="planSegments" :selected-plan-id="assetId" :selection="selection"
-      @select="selection=$event" @inspect-segment="assetId=$event;closeup=true" @inspect-instance="assetId=$event" />
+      @select="selection=$event" @inspect-segment="assetId=$event;closeup=true" @inspect-instance="inspectInstance" />
     <div v-else class="pending" role="status">{{ error || '正在读取专业模型…' }} <button v-if="error" @click="retry++">重试</button></div>
     <aside aria-label="专业模型详情">
       <h3>{{ title }}</h3>
       <p class="purpose">{{ purposes[item.name] }}</p>
       <section v-if="available.length" class="inspect">
         <button v-if="installations.length" @click="showInstallations" :disabled="combining">查看已核标高 · {{ installations.length }} 件</button>
+        <div v-if="combined && nearbyObjects.length" class="local-views">
+          <button v-for="r in nearbyObjects" :key="r.id" @click="inspectInstance(r.id)">{{ r.name }}</button>
+        </div>
+        <section v-if="combined && focusedRecord" aria-label="楼层中选中的构件" class="focused">
+          <h4>{{ focusedRecord.name }}</h4>
+          <dl><template v-for="[name,value] in focusedRecord.fields" :key="name">
+            <dt>{{ name }}</dt><dd>{{ value }}</dd>
+          </template><dt>来源图号</dt><dd>{{ focusedRecord.drawings }}</dd></dl>
+          <button @click="assetId=focusedRecord.id">单独查看构件</button>
+        </section>
         <p v-if="combining" role="status">正在装配本层已核标高的构件…</p>
         <p v-if="combinedError" role="alert">{{ combinedError }}</p>
         <label>查看对象<select v-model="assetId" aria-label="查看实体对象">
@@ -45,11 +55,11 @@
           <option v-for="(name, i) in layers" :key="i" :value="i">{{ name }}</option>
         </select>
       </label>
-      <dl aria-live="polite">
+      <dl v-if="!closeup && !(combined && focusedRecord)" aria-live="polite">
         <template v-if="selectedIndex >= 0"><dt>选中图层</dt><dd class="picked">{{ layers[selectedIndex] }}</dd></template>
         <dt>模型 ID</dt><dd>{{ item.id }}</dd><dt>专业图定位</dt><dd>已按 B2 底图配准</dd>
         <dt>来源图号</dt><dd>{{ sheetFilter || item.drawings }}</dd>
-        <dt>建模依据</dt><dd>{{ item.basis }}</dd>
+        <dt>平面图依据</dt><dd>{{ item.basis }}</dd>
         <template v-if="notes"><dt>模型范围</dt><dd>{{ notes }}</dd></template>
       </dl>
       <button v-for="code in sourceCodes" :key="code" @click="$emit('source',code)">核对原图 · {{ code }}</button>
@@ -88,10 +98,22 @@ const objectGroups=computed(()=>[['installed','图纸已核安装位置'],['segm
 const selectedAsset=computed(()=>available.value.find(r=>r.id===assetId.value))
 const installations=computed(()=>available.value.filter(r=>r.kind==='installed' || r.verticalExtentVerified))
 const combineRequest=ref(0),combined=shallowRef(null),combining=ref(false),combinedError=ref('')
+const contextRooms=computed(()=>available.value.filter(r=>r.kind==='room' && r.origin && !r.verticalExtentVerified))
+const nearbyObjects=computed(()=>contextRooms.value.filter(r=>/机房|强电间/.test(r.name)))
+watch([scene,()=>props.objectArchive,()=>installations.value.length],([drawing,archive,count])=>{
+  if (drawing && archive && count && !assetId.value) showInstallations()
+},{flush:'post'})
+const focusedId=ref('')
+const focusedRecord=computed(()=>available.value.find(r=>r.id===focusedId.value))
+function inspectInstance(id) {
+  if (!combined.value) {assetId.value=id;return}
+  focusedId.value=id
+  floorScene.value?.focusInstance(id)
+}
 async function showInstallations() {
   assetId.value=''
   closeup.value=false
-  if (combined.value) { floorScene.value?.showAsset(); return }
+  if (combined.value) { focusedId.value=''; floorScene.value?.showAsset(); return }
   combineRequest.value++
 }
 defineExpose({showInstallations})
@@ -100,15 +122,16 @@ watch([combineRequest,()=>props.item.id,assetId,()=>props.objectArchive], async 
   const resources=new Set()
   onCleanup(()=>{current=false;resources.forEach(r=>r.dispose())})
   combined.value=null; combining.value=false; combinedError.value=''
-  if (!request || selected || !archive || id!==old[1] || request===old[0]) return
+  if (!request || selected || !archive || request===old[0]) return
   combining.value=true
   try {
     const group=new Group()
     const bundle=props.installationPacks?.[props.item.name]
     const files=bundle ? await JSZip.loadAsync(await checkedEntry(archive,bundle.file,bundle.sha256,8*1024*1024)) : archive
-    for (const record of installations.value) {
+    for (const record of [...installations.value,...contextRooms.value]) {
       if (!current) return
-      const bytes=await checkedEntry(files,record.file,record.sha256,8*1024*1024)
+      const source=record.kind==='room' && !record.verticalExtentVerified ? archive : files
+      const bytes=await checkedEntry(source,record.file,record.sha256,8*1024*1024)
       if (!current) return
       const {scene}=await new GLTFLoader().parseAsync(bytes,'')
       scene.traverse(node=>{
@@ -130,11 +153,15 @@ watch([combineRequest,()=>props.item.id,assetId,()=>props.objectArchive], async 
     }
     combined.value=group
     await nextTick()
-    if (current) floorScene.value?.showAsset()
+    if (current) {
+      floorScene.value?.showAsset()
+      const first=installations.value[0]
+      if (first) inspectInstance(first.id)
+    }
   } catch (e) {if (current) combinedError.value=e.message || '已核标高模型装配失败'}
   finally {if (current) combining.value=false}
 })
-const sourceCodes=computed(()=>[...new Set([...(selectedAsset.value?.sourceCodes || []),...props.sheets.map(s=>s.code)])])
+const sourceCodes=computed(()=>[...new Set([...((selectedAsset.value || (combined.value && focusedRecord.value))?.sourceCodes || []),...props.sheets.map(s=>s.code)])])
 const placementNote=computed(()=>{
   if (selectedAsset.value?.kind==='installed') return '可在楼层中查看本件的安装位置。标高的基准和图注见下方。'
   if (selectedAsset.value?.kind==='family') return '可旋转查看目录原型。对应的现场实例和安装位置待核。'
@@ -211,6 +238,8 @@ watch([()=>props.item,()=>props.archive,()=>props.sheetFilter,retry], async ([it
 },{immediate:true})
 </script>
 <style scoped>
+.focused{margin:9px 0;padding:10px;background:#f3f6f5;border-radius:5px}.focused h4{margin:0 0 8px}.focused dd{margin-bottom:7px}
+
 .system-layout {display:grid;grid-template-columns:minmax(0,1fr) clamp(200px,18%,270px);gap:18px}
 aside {min-width:0;border-left:1px solid var(--dhic-border-color-light);padding:6px 0 0 16px;font-size:13px}
 h3 {margin:0 0 12px} label {display:flex;align-items:center;gap:8px}select {max-width:80%}
