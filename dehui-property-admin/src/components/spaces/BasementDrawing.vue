@@ -10,35 +10,45 @@
       <label v-if="canAttach">关联竣工图包<input type="file" accept=".zip" @change="attach"></label>
     </div>
     <template v-else>
-      <header><h3>{{ tab === '平面图' ? '地下二层 · 建筑模型' : (tab === '给排水' && plumbing ? '地下二层 · 给排水模型' : tab + '竣工图') }}</h3>
-        <div v-if="tab === '给排水'" class="views">
+      <header><h3>{{ heading }}</h3>
+        <div v-if="catalogChoices.length && !original" class="scope" aria-label="专业模型分类">
+          <button v-for="item in catalogChoices" :key="item.id" :aria-pressed="activeModel?.id === item.id" @click="catalogName=item.name">{{ modelTitle(item) }}</button>
+        </div>
+        <div v-if="activeModel" class="views">
+          <button v-if="!original && fullscreenAvailable" @click="toggleFull">{{ full ? '退出全屏' : '全屏' }}</button>
+          <button v-if="catalogSheets.length" @click="original=!original">{{ original ? '返回专业模型' : '核对专业原图' }}</button>
+        </div>
+        <div v-if="tab === '给排水' || tab === '消防'" class="views">
           <template v-if="plumbing">
-            <div v-if="!original" class="scope" aria-label="给排水模型分类">
-              <button v-if="hasStationSurvey(plumbing)" :aria-pressed="waterSystem==='stations'" @click="openStation()">设备间与流向</button>
-              <button v-for="(info,key) in availableWaterSystems" :key="key" :aria-pressed="waterSystem===key" @click="waterSystem=key">{{ info.name }}</button>
+            <div v-if="!original" class="scope" aria-label="水系统仿真">
+              <button v-if="tab==='给排水' && hasStationSurvey(plumbing)" :aria-pressed="!activeModel && waterSystem==='stations'" @click="openStation()">设备间与流向</button>
+              <button v-for="(info,key) in tabWaterSystems" :key="key" :aria-pressed="!activeModel && waterSystem===key" @click="showWater(key)">{{ tab==='消防' ? info.name+'演示' : info.name }}</button>
             </div>
-            <button v-if="!original && fullscreenAvailable" @click="toggleFull">{{ full ? '退出全屏' : '全屏' }}</button>
-            <label v-if="!loadingDetails && canAttach && plumbing.version < 2" class="upload">关联深化图包<input type="file" accept=".zip" @change="attachDetail($event,'plumbing')"></label>
-            <button @click="toggleWaterSource">{{ original ? '返回给排水模型' : '核对专业原图' }}</button>
+            <button v-if="waterView && !original && fullscreenAvailable" @click="toggleFull">{{ full ? '退出全屏' : '全屏' }}</button>
+            <label v-if="tab==='给排水' && !loadingDetails && canAttach && plumbing.version < 2" class="upload">关联深化图包<input type="file" accept=".zip" @change="attachDetail($event,'plumbing')"></label>
+            <button v-if="waterView" @click="toggleWaterSource">{{ original ? '返回' + tab + '模型' : '核对专业原图' }}</button>
           </template>
-          <label v-else-if="!loadingDetails && canAttach" class="upload">关联给排水图包<input type="file" accept=".zip" @change="attachDetail($event,'plumbing')"></label>
+          <label v-else-if="tab==='给排水' && !loadingDetails && canAttach" class="upload">关联给排水图包<input type="file" accept=".zip" @change="attachDetail($event,'plumbing')"></label>
         </div>
         <div v-if="tab === '平面图'" class="views">
-          <div v-if="(core || garage) && !original" class="scope" aria-label="模型范围">
-            <button v-if="garage" :aria-pressed="mode === 'traffic'" @click="scope('traffic')">车位与车道</button>
-            <button :aria-pressed="mode === 'building'" @click="scope('building')">建筑</button>
-            <button v-if="core" :aria-pressed="detail" @click="scope('core')">核心筒</button>
+          <div v-if="(core || garage || disciplines) && !original" class="scope" aria-label="模型范围">
+            <button v-if="garage" :aria-pressed="!activeModel && mode === 'traffic'" @click="scope('traffic')">车位与车道</button>
+            <button :aria-pressed="!activeModel && mode === 'building'" @click="scope('building')">建筑</button>
+            <button v-if="core" :aria-pressed="!activeModel && detail" @click="scope('core')">核心筒</button>
+            <span v-if="disciplines" class="unbound">装修 · 待关联</span>
           </div>
           <label v-if="!loadingDetails && canAttach && !core && !coreError" class="upload">关联核心筒详图<input type="file" accept=".zip" @change="attachDetail($event,'core')"></label>
           <label v-if="!loadingDetails && canAttach && !garage && !coreError" class="upload">关联车库详图<input type="file" accept=".zip" @change="attachDetail($event,'garage')"></label>
           <label v-if="!loadingDetails && canAttach && core && !survey" class="upload">关联空间规格<input type="file" accept=".zip" @change="attachDetail($event,'survey')"></label>
-          <button v-if="!original && fullscreenAvailable" @click="toggleFull">{{ full ? '退出全屏' : '全屏' }}</button>
-          <button v-if="tab === '平面图'" type="button" @click="original = !original">{{ original ? '返回三维模型' : '核对建筑原图' }}</button>
+          <button v-if="!activeModel && !original && fullscreenAvailable" @click="toggleFull">{{ full ? '退出全屏' : '全屏' }}</button>
+          <button v-if="!activeModel && tab === '平面图'" type="button" @click="original = !original">{{ original ? '返回三维模型' : '核对建筑原图' }}</button>
         </div>
+        <label v-if="!loadingDetails && !disciplines && canAttach" class="upload">关联 B2 专业模型<input type="file" accept=".zip" @change="attachDetail($event,'disciplines')"></label>
       </header>
       <small v-if="loadingDetails" role="status">正在载入专业详图…</small>
       <p v-if="message || coreError" role="alert">{{ message || coreError }}</p>
-      <template v-if="tab === '平面图' && !original">
+      <DisciplineModel v-if="activeModel" v-show="!original" :item="activeModel" :title="modelTitle(activeModel)" :sheet-filter="emergencyOnly ? 'E301' : ''" :archive="disciplineArchive" :geometry="model.geometry" :room-labels="survey?.rooms || garage?.rooms || []" :sheets="catalogSheets" @source="code=>{sourceCode=code;original=true}" />
+      <template v-if="!activeModel && tab === '平面图' && !original">
         <div class="model-workbench">
         <FloorScene ref="floorScene" :floor-elevation="model.elevation" :plumbing="plumbing" :key="mode + (loadingDetails ? '-base' : '')" :rooms="visibleRooms" :garage="garage" :traffic="mode === 'traffic'" :core="core" :detail="detail" :geometry="model.geometry" :selection="selection" @select="selection = $event" />
         <aside class="properties" :class="{'picked':selection.group !== 'outline'}" aria-label="模型规格">
@@ -60,11 +70,12 @@
         </aside>
         </div>
       </template>
-      <PlumbingRoomModel :core="core" :floor-elevation="model.elevation" v-if="tab === '给排水' && waterSystem === 'stations' && hasStationSurvey(plumbing)" v-show="!original" :initial-name="stationName" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" @source="code=>{sourceCode=code;original=true}" />
-      <PlumbingModel :core="core" :floor-elevation="model.elevation" @station="openStation" v-else-if="tab === '给排水' && plumbing" v-show="!original" :key="waterSystem" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" :system="waterSystem" @source="code=>{sourceCode=code;original=true}"/>
-      <table v-else-if="!original && tab !== '平面图'" class="drawing-index">
+      <PlumbingRoomModel :core="core" :floor-elevation="model.elevation" v-if="waterView && waterSystem === 'stations' && hasStationSurvey(plumbing)" v-show="!original" :initial-name="stationName" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" @source="code=>{sourceCode=code;original=true}" />
+      <PlumbingModel :core="core" :floor-elevation="model.elevation" @station="openStation" v-else-if="waterView" v-show="!original" :key="waterSystem" :rooms="survey?.rooms || garage?.rooms || []" :model="plumbing" :geometry="model.geometry" :system="waterSystem" @source="code=>{sourceCode=code;original=true}"/>
+      <table v-else-if="!activeModel && !original && tab !== '平面图'" class="drawing-index">
         <thead><tr><th>图号</th><th>图名</th><th>核对状态</th></tr></thead>
-        <tbody><tr v-for="s in sources" :key="s.code"><td>{{ s.code }}</td><td>{{ sheetTitle(s) }}</td><td><button v-if="s.code==='P401' && availableWaterSystems.sprinkler" @click="changeTab('给排水'); waterSystem='sprinkler'">查看自动喷淋模型</button><template v-else>已核对图签 · 未建模</template></td></tr></tbody>
+        <tbody><tr v-for="s in sources" :key="s.code"><td>{{ s.code }}</td><td>{{ sheetTitle(s) }}</td><td>已登记图纸 · 待关联专业模型</td></tr>
+          <tr v-if="!sources.length"><td colspan="3">待关联 B2 专业模型图包</td></tr></tbody>
       </table>
       <div v-if="original" class="sources">
         <label>图纸<select v-model="sourceCode"><option v-for="s in sources" :key="s.code" :value="s.code">{{ s.code }} · {{ sheetTitle(s) }}</option></select></label>
@@ -86,18 +97,22 @@ import { objectSpecs } from './floorDrawingSpecs'
 import { selectionColor } from './garageMarkings'
 import { hasPermission } from '../../utils/permission'
 import { readFloorArchive, attachFloorArchive, attachSupplement, openSource } from './floorDrawingArchive'
+import { disciplineModels } from './b2Disciplines'
 import { waterSystems } from './plumbingCatalog'
 import { buildStations, hasStationSurvey } from './plumbingStations'
 const PlumbingRoomModel = defineAsyncComponent(() => import('./PlumbingRoomModel.vue'))
+const DisciplineModel = defineAsyncComponent(() => import('./DisciplineModel.vue'))
 const stationName = ref('')
 function openStation(name = '') {
+  tab.value = '给排水'
+  catalogName.value = ''
   stationName.value = name
   waterSystem.value = 'stations'
 }
 const PlumbingModel = defineAsyncComponent(() => import('./PlumbingModel.vue'))
 const FloorScene = defineAsyncComponent(() => import('./FloorScene.vue'))
 const props = defineProps({ floorId: { type: Number, required: true }, ledgerArea: [String, Number] })
-const tabs = ['平面图','给排水','强电','消防','弱电']
+const tabs = Object.keys(disciplineModels)
 const floorScene=ref(null), exporting=ref(false)
 async function downloadRoom() {
   exporting.value=true
@@ -111,6 +126,27 @@ const garage = shallowRef(null), garageArchive = shallowRef(null)
 const plumbing = shallowRef(null), plumbingArchive = shallowRef(null), waterSystem = ref('drain')
 const availableWaterSystems = computed(() => Object.fromEntries(Object.entries(waterSystems).filter(([key]) =>
   plumbing.value?.items.some(item => item.system === key))))
+const disciplines = shallowRef(null), disciplineArchive = shallowRef(null), catalogName = ref('')
+const catalogChoices = computed(()=>disciplineModels[tab.value].map(name=>disciplines.value?.models.find(m=>m.name===name)).filter(Boolean))
+const activeModel = computed(()=>catalogChoices.value.find(m=>m.name===catalogName.value))
+function modelTitle(item) {
+  if (tab.value === '消防' && item.name === '室内照明与应急') return '应急照明'
+  return item.name === '给排水' ? '给排水综合图' : item.name
+}
+const emergencyOnly = computed(() => tab.value === '消防' && activeModel.value?.name === '室内照明与应急')
+const catalogSheets = computed(() => {
+  const item = activeModel.value
+  if (!item) return []
+  const sheets = item.sources.map(id => disciplines.value.sources.find(s => s.id === id)).filter(Boolean)
+  if (emergencyOnly.value) return sheets.filter(s => s.code === 'E301')
+  if (item.name === '消火栓') sheets.sort((a,b) => Number(b.code === 'P301') - Number(a.code === 'P301'))
+  return sheets
+})
+const tabWaterSystems = computed(()=>Object.fromEntries(Object.entries(availableWaterSystems.value).filter(([key])=>
+  ['sprinkler','hydrant'].includes(key) === (tab.value==='消防'))))
+const waterView = computed(()=>!activeModel.value && plumbing.value && (tab.value==='给排水' || tab.value==='消防') &&
+  (tabWaterSystems.value[waterSystem.value] || (tab.value==='给排水' && waterSystem.value==='stations')))
+function showWater(key) { catalogName.value=''; waterSystem.value=key }
 function toggleWaterSource() {
   if (!original.value) sourceCode.value = waterSystems[waterSystem.value]?.plan || 'P301'
   original.value = !original.value
@@ -149,19 +185,33 @@ const paths = computed(() => {
   return model.value?.geometry[group]
 })
 function scope(value) {
+  catalogName.value = ''
   mode.value = value
   selection.value = { group:value === 'core' ? 'coreOverview' : 'outline', index:0 }
 }
 const canAttach = hasPermission('floor:update')
 const tab = ref(tabs[0]), original = ref(false), selection = ref({ group:'outline', index:0 })
+const heading = computed(() => {
+  if (tab.value === '平面图') return activeModel.value ? '地下二层 · 承重结构' : '地下二层 · 建筑模型'
+  return activeModel.value || waterView.value ? '地下二层 · ' + tab.value + '模型' : tab.value + '竣工图'
+})
 const loadingDetails = ref(false)
 const model = shallowRef(null), archive = shallowRef(null), busy = ref(false), message = ref('')
 const sourceCode = ref(''), pdfUrl = ref(''), sourceError = ref('')
 let epoch = 0, pdfEpoch = 0
 const buildingSources = computed(() => [...(model.value?.sources || []), ...(core.value ? [core.value.source] : []), ...(garage.value ? [garage.value.source] : [])])
-const sources = computed(() => tab.value === '给排水' && plumbing.value ? plumbing.value.sources : buildingSources.value.filter(s => tab.value === '平面图' ? ['建筑','剖面'].includes(s.group) : s.group === tab.value) || [])
+const sources = computed(() => activeModel.value ? catalogSheets.value : waterView.value ? plumbing.value.sources : buildingSources.value.filter(s => tab.value === '平面图' ? ['建筑','剖面'].includes(s.group) : s.group === tab.value) || [])
 const source = computed(() => sources.value.find(s => s.code === sourceCode.value))
-function changeTab(name) { tab.value = name; original.value = false }
+function changeTab(name) {
+  tab.value = name
+  original.value = false
+  catalogName.value = ['平面图','给排水'].includes(name) ? '' : disciplineModels[name][0]
+  if (name==='消防') waterSystem.value=availableWaterSystems.value.sprinkler ? 'sprinkler' : 'hydrant'
+  if (name==='给排水') {
+    waterSystem.value='drain'
+    if (!plumbing.value) catalogName.value='给排水'
+  }
+}
 function sheetTitle(s) { if (s.code === 'P302') return '地下一层给排水消防平面图（跨层对照）'; return s.name.replace(/\.pdf$/i, '') }
 function clearPdf() { if (pdfUrl.value) URL.revokeObjectURL(pdfUrl.value); pdfUrl.value = '' }
 watch(sources, list => { sourceCode.value = list[0]?.code || '' }, { immediate:true })
@@ -170,13 +220,14 @@ watch([source, original, tab, archive], async () => {
   clearPdf(); sourceError.value = ''
   if (!source.value?.file || !archive.value || !original.value) return
   try {
-    const url = await openSource(tab.value === '给排水' ? plumbingArchive.value : source.value.code === 'A401' ? coreArchive.value : source.value.code === 'B2交通' ? garageArchive.value : archive.value, source.value)
+    const url = await openSource(activeModel.value ? disciplineArchive.value : waterView.value ? plumbingArchive.value : source.value.code === 'A401' ? coreArchive.value : source.value.code === 'B2交通' ? garageArchive.value : archive.value, source.value)
     if (run === pdfEpoch) pdfUrl.value = url
     else URL.revokeObjectURL(url)
   } catch (e) { if (run === pdfEpoch) sourceError.value = e.message }
 })
 async function load() {
   const run = ++epoch
+  disciplines.value=null; disciplineArchive.value=null
   let preview
   loadingDetails.value = false; survey.value = null
   waterSystem.value = 'drain'; plumbing.value = null; plumbingArchive.value = null
@@ -192,7 +243,22 @@ async function load() {
         loadingDetails.value = true
       }, 200)
     })
-    if (data && run === epoch) { plumbing.value = data.plumbing; plumbingArchive.value = data.plumbingArchive; archive.value = data.archive; model.value = data.model; core.value = data.core; coreArchive.value = data.coreArchive; coreError.value = data.coreError; survey.value = data.survey; garage.value = data.garage; garageArchive.value = data.garageArchive; if (garage.value) scope('traffic') }
+    if (data && run === epoch) {
+      plumbing.value = data.plumbing
+      plumbingArchive.value = data.plumbingArchive
+      archive.value = data.archive
+      model.value = data.model
+      core.value = data.core
+      coreArchive.value = data.coreArchive
+      coreError.value = data.coreError
+      survey.value = data.survey
+      garage.value = data.garage
+      garageArchive.value = data.garageArchive
+      if (garage.value) scope('traffic')
+      disciplines.value = data.disciplines
+      disciplineArchive.value = data.disciplinesArchive
+      changeTab(tab.value)
+    }
   } catch (e) { if (run === epoch) message.value = e.message || '读取失败' }
   finally { clearTimeout(preview); if (run === epoch) { busy.value = false; loadingDetails.value = false } }
 }
@@ -242,7 +308,7 @@ button,label,select,a {font:inherit;font-size:13px;}
 button,select,.blank label { cursor:pointer; border:1px solid var(--dhic-border-color); border-radius:5px; padding:5px 9px; background:white; color:inherit; }
 nav button {border-color:transparent;}
 nav button[aria-pressed=true] { background:var(--dhic-row-selected); font-weight:650; }
-header { justify-content:space-between; padding:12px 0; } h3 { margin:0; font-size:15px; }
+header { gap:8px 12px; } header h3 { margin-right:auto; } header { justify-content:flex-end; padding:12px 0; } h3 { margin:0; font-size:15px; }
 .properties,.blank,.sources {padding:12px 0;} .pickers label,.sources label {display:flex; align-items:center; gap:6px;}
 .blank input {max-width:170px;} dl { display:grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap:10px 18px; margin:12px 0; }
 dt,.note,small {font-size:12px;color:var(--dhic-text-secondary);} dd {margin:4px 0 0;font-size:13px;} .note {line-height:1.6;margin:0;}
@@ -251,6 +317,7 @@ dt,.note,small {font-size:12px;color:var(--dhic-text-secondary);} dd {margin:4px
 .drawing-index th,.drawing-index td {text-align:start;padding:11px 6px;border-bottom:1px solid var(--dhic-border-color-light);}
 .drawing-index th {color:var(--dhic-text-secondary);font-weight:550;}
 .drawing {container-type:inline-size;}
+.unbound {align-self:center;padding:0 8px;color:var(--dhic-text-secondary);font-size:12px;}
 .views,.scope {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .scope {gap:0;padding:2px;background:#f0f1f2;border-radius:6px;}
 .scope button {background:transparent;border:0;padding:5px 12px;}

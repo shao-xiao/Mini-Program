@@ -1,4 +1,5 @@
 import JSZip from 'jszip'
+import {checkedEntry, parseDisciplines} from './b2Disciplines'
 import {readModelAttachment} from './floorArchiveReader'
 import { pipeLayers, waterSystems } from './plumbingCatalog'
 import { normalizeCustomFieldFiles } from '../../utils/customFieldValues'
@@ -91,6 +92,7 @@ function validPoint(p) {
 async function parseSupplement(file, model) {
   if (file.size > maxBytes) throw Error('详图包超过 20 MB')
   const archive = file.archive || await JSZip.loadAsync(await file.arrayBuffer())
+  if (archive.file('disciplines.json')) return parseDisciplines(archive, model)
   if (archive.file('core.json')) {
     const result = await parseCore(archive, model)
     return {kind:'core', data:result.core, archive}
@@ -167,7 +169,10 @@ async function parseSupplement(file, model) {
 export async function attachSupplement(id, file, model, kind) {
   const result = await parseSupplement(file, model)
   if (result.kind !== kind) throw Error('请选择对应的详图包')
-  if (kind === 'survey') {
+  if (kind === 'disciplines') {
+    for (const item of [...result.data.models, ...result.data.sources])
+      await checkedEntry(result.archive, item.file, item.sha256, maxBytes)
+  } else if (kind === 'survey') {
     if (result.data.detailReference !== model.sources.find(s => s.code === 'A401')?.sha256)
       throw Error('请先关联规格对应的 A401 详图')
   } else {

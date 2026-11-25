@@ -4,8 +4,10 @@
     <div class="view-tools" aria-label="模型视角">
       <button type="button" @click="reset(false)">轴测</button>
       <button type="button" @click="reset(true)">俯视</button>
-      <button v-if="waterItems || stations" type="button" @click="reset('below')">仰视</button>
+      <button v-if="overlay" type="button" @click="reset('below')">仰视</button>
       <button v-if="waterItems || stations" type="button" @click="focusWater">定位构件</button>
+      <button v-if="disciplineScene" type="button" :disabled="selection?.index < 0" @click="focusLayer">定位图层</button>
+      <button v-if="disciplineScene" type="button" :aria-pressed="showReference" @click="toggleReference">建筑参照</button>
       <button v-if="stations" type="button" @click="focusStation(true)">设备立面</button>
       <button type="button" aria-label="放大模型" @click="zoom(1.35)">＋</button>
       <button type="button" aria-label="缩小模型" @click="zoom(1 / 1.35)">−</button>
@@ -28,13 +30,15 @@ import { addGarageMarkings, selectionColor, garageColors, rampProfile, rampGeome
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { SVGRenderer } from 'three/addons/renderers/SVGRenderer.js'
 
-const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array, plumbing: Object, floorElevation: Number, stations: Array, startInElevation: Boolean })
+const props = defineProps({ geometry: { type: Object, required: true }, selection: Object, core: Object, detail: Boolean, garage: Object, rooms: Array, traffic: Boolean, waterItems: Array, plumbing: Object, floorElevation: Number, stations: Array, disciplineScene: Object, roomLabels: Array, startInElevation: Boolean })
 const emit = defineEmits(['select'])
 const stage = ref(null)
 const labelLayer = ref(null)
 const pickables = []
 let labels, plumbingMotion, stationMotion, elevationView=false
 const backdrop=[]
+const showReference=ref(true)
+const overlay = Boolean(props.disciplineScene || props.stations || props.waterItems)
 const scene = new T.Scene()
 const camera = new T.OrthographicCamera(-60, 60, 60, -60, 0.1, 1000)
 const meshes = new Map()
@@ -104,7 +108,7 @@ function surface(points, group, index) {
     : new T.ShapeGeometry(shape))
   if (!ramp) geom.rotateX(-Math.PI / 2)
   const color = group === 'parking' ? garageColors[props.garage.parking[index].zone] : palette[group]
-  const material = retain(new T.MeshLambertMaterial({ color, side: (props.waterItems || props.stations) && !solid ? T.FrontSide : T.DoubleSide, transparent: Boolean(props.waterItems || props.stations), opacity: props.waterItems || props.stations ? (solid ? .20 : .09) : 1, depthWrite: !(props.waterItems || props.stations) }))
+  const material = retain(new T.MeshLambertMaterial({ color, side: overlay && !solid ? T.FrontSide : T.DoubleSide, transparent: overlay, opacity: overlay ? (solid ? .20 : .09) : 1, depthWrite: !overlay }))
   const mesh = new T.Mesh(geom, material)
   mesh.position.y = { bays:.018, lanes:roadLevel, crossings:.05, parking:.04, rooms:.025 }[group] || 0
   mesh.userData = { group, index }
@@ -184,6 +188,29 @@ function focusStation(front) {
   camera.updateProjectionMatrix()
   schedule()
 }
+function toggleReference() {
+  showReference.value = !showReference.value
+  backdrop.forEach(object => { object.visible = showReference.value })
+  labelLayer.value.hidden = !showReference.value
+  schedule()
+}
+function focusLayer() {
+  const mesh = meshes.get('discipline:' + props.selection?.index)
+  if (!mesh || !controls) return
+  const box = new T.Box3().setFromObject(mesh)
+  if (box.isEmpty()) return
+  const middle = box.getCenter(new T.Vector3())
+  camera.position.add(middle.clone().sub(controls.target))
+  controls.target.copy(middle)
+  controls.update()
+  const view = box.applyMatrix4(camera.matrixWorldInverse).getSize(new T.Vector3())
+  camera.zoom = T.MathUtils.clamp(Math.min(
+    (camera.right - camera.left) / Math.max(1, view.x),
+    (camera.top - camera.bottom) / Math.max(1, view.y)
+  ) * .9, .5, controls.maxZoom)
+  camera.updateProjectionMatrix()
+  schedule()
+}
 function focusWater() {
   if (props.stations) { focusStation(false); return }
   const points = props.waterItems?.[props.selection?.index]?.points
@@ -200,14 +227,14 @@ function focusWater() {
   schedule()
 }
 function zoom(factor) {
-  camera.zoom = T.MathUtils.clamp(camera.zoom * factor, .5, props.stations ? 36 : props.waterItems ? 18 : 10)
+  camera.zoom = T.MathUtils.clamp(camera.zoom * factor, .5, props.stations ? 36 : overlay ? 18 : 10)
   camera.updateProjectionMatrix()
   schedule()
 }
 function selectPoint(event) {
   if (!pointer || Math.hypot(event.clientX-pointer.x, event.clientY-pointer.y) > 5) return
   const caption = labels.hit(event.clientX,event.clientY)
-  if (!elevationView && caption && (props.stations ? caption.group==='station' : !props.waterItems || caption.group==='water')) { emit('select',caption); return }
+  if (!props.disciplineScene && !elevationView && caption && (props.stations ? caption.group==='station' : !props.waterItems || caption.group==='water')) { emit('select',caption); return }
   const rect = renderer.domElement.getBoundingClientRect()
   const coords = new T.Vector2((event.clientX-rect.left)/rect.width*2-1, 1-(event.clientY-rect.top)/rect.height*2)
   const ray = new T.Raycaster()
@@ -275,7 +302,7 @@ onMounted(() => {
     room.inCore ? coreStrokes : geo.lines))
   if (!props.detail) {
     surface(geo.outline, 'outline', 0)
-    for (const group of (props.traffic || props.waterItems || props.stations ? ['walls','columns'] : ['bays','walls','columns'])) geo[group].forEach((points, i) => surface(points, group, i))
+    for (const group of (props.traffic || overlay ? ['walls','columns'] : ['bays','walls','columns'])) geo[group].forEach((points, i) => surface(points, group, i))
     linework(geo.lines)
 
     if (props.traffic) {
@@ -318,6 +345,21 @@ onMounted(() => {
     pickables.length=0
     plumbingMotion=addPlumbing(scene,props.waterItems,retain,pickables,labels,Boolean(renderer.isWebGLRenderer))
   }
+  if (props.disciplineScene) {
+    backdrop.push(...scene.children)
+    pickables.length = 0
+    for (const [index, room] of (props.roomLabels || []).entries())
+      labels.add('water-room', index, room.name, room.points, () => 1.25)
+    scene.add(props.disciplineScene)
+    props.disciplineScene.traverse(mesh => {
+      if (!mesh.isMesh) return
+      const index = pickables.length
+      mesh.userData.group = 'discipline'
+      mesh.userData.index = index
+      pickables.push(mesh)
+      meshes.set('discipline:' + index, mesh)
+    })
+  }
   const fitPoints = props.detail ? [...props.core.columns.flat(), ...props.core.walls.flat(), ...props.core.lines.flat()] : geo.outline
   bounds = new T.Box3().setFromPoints(fitPoints.map(([x,z]) => new T.Vector3(x,0,z)))
   bounds.getCenter(centre)
@@ -341,16 +383,16 @@ onMounted(() => {
     scene.add(reflected)
   }
   controls = new OrbitControls(camera, renderer.domElement)
-  controls.maxPolarAngle = props.waterItems || props.stations ? Math.PI - .000001 : Math.PI / 2.3
+  controls.maxPolarAngle = overlay ? Math.PI - .000001 : Math.PI / 2.3
   controls.minZoom = .5
-  controls.maxZoom = props.stations ? 36 : props.waterItems ? 18 : 10
+  controls.maxZoom = props.stations ? 36 : overlay ? 18 : 10
   controls.addEventListener('change', schedule)
   renderer.domElement.addEventListener('pointerdown', startPoint)
   renderer.domElement.addEventListener('pointerup', selectPoint)
   sizeToViewport()
   window.addEventListener('resize', sizeToViewport)
   labels.prepare()
-  reset(Boolean(props.waterItems || props.stations))
+  reset(overlay)
   if (props.startInElevation) focusStation(true)
   highlight()
   observer = new ResizeObserver(() => { sizeToViewport(); fit() })
@@ -382,6 +424,8 @@ onBeforeUnmount(() => {
 .view-tools { position: absolute; top: 10px; left: 10px; max-width:calc(100% - 20px); flex-wrap:wrap; display: flex; gap: 2px; padding: 3px; background: #fff; border: 1px solid #d8dcdc; border-radius: 6px; }
 .view-tools button { min-width: 32px; min-height: 30px; border: 0; background: transparent; cursor: pointer; font: inherit; color: inherit; }
 .view-tools .play-control {border-left:1px solid #d8dcdc; padding:0 8px;}
+.view-tools button[aria-pressed=true] {background:#edf0ef;}
+.view-tools button:disabled {opacity:.48;cursor:default;}
 .view-tools button:hover { background: #edf0ef; }
 @container (max-width:800px) { .model-stage {height:clamp(280px, min(var(--available-model-height, 75svh), 97cqw), 720px);} }
 </style>
