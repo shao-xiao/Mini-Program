@@ -1,6 +1,6 @@
 <template>
   <div class="stations">
-    <FloorScene :core="core" :floor-elevation="floorElevation" :plumbing="model" :rooms="rooms" :key="filter" :geometry="geometry"  :start-in-elevation="Boolean(initialName)" :stations="visible" :selection="selection" @select="index=$event.index" />
+    <FloorScene ref="scene" :core="core" :floor-elevation="floorElevation" :plumbing="model" :rooms="rooms" :key="filter" :geometry="geometry"  :start-in-elevation="Boolean(initialName)" :stations="visible" :selection="selection" @select="index=$event.index" />
     <aside aria-label="设备间与流路详情">
       <h3>{{ station.name }}</h3>
       <label>显示范围<select :value="filter" @change="changeFilter($event.target.value)">
@@ -23,6 +23,8 @@
         <li>{{ station.outlet }} · DN{{ station.connection.dn }}</li><li>图示出口 {{ station.connection.outlet }}</li></ol>
       <div class="legend"><span v-for="(color,key) in stationMedia" :key="key"><i :style="{background:color}"></i>{{ key }}</span></div>
       <p>紫色标出所选设备的管路。箭头指向出水侧，通气支管以往复气泡显示。设备外形、安装高度及动画速度为示意。</p>
+      <button v-if="station.kind==='集水坑' || station.footprint" :disabled="exporting" @click="downloadModule">导出{{ station.kind==='集水坑' ? '集水坑' : '设备间' }}模块 · GLB</button>
+      <p v-if="exportError" role="alert">{{ exportError }}</p>
       <button @click="$emit('source','P301')">核对平面 · P301</button>
       <button v-if="station.kind==='集水坑'" @click="$emit('source','P202')">排水原理 · P202</button>
       <button v-else @click="$emit('source','P203')">冲洗原理 · P203</button>
@@ -37,6 +39,14 @@ import {buildStations,stationMedia} from './plumbingStations'
 import FloorScene from './FloorScene.vue'
 const props=defineProps({core:Object, floorElevation:Number, geometry:Object,model:Object,rooms:Array,initialName:String})
 defineEmits(['source'])
+const scene=ref(null),exporting=ref(false),exportError=ref('')
+async function downloadModule(){
+  exporting.value=true
+  exportError.value=''
+  try { await scene.value.exportSelectedStation() }
+  catch(error){exportError.value=error.message || '模块导出失败'}
+  finally{exporting.value=false}
+}
 const stations=computed(()=>buildStations(props.model,props.rooms))
 const filter=ref('全部')
 const visible=computed(()=>stations.value.filter(s=>filter.value==='全部'||s.kind===filter.value))

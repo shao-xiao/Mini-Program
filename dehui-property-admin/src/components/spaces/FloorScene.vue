@@ -226,7 +226,16 @@ async function exportSelectedRoom() {
   const {exportRoom}=await import('./roomExport')
   await exportRoom(room)
 }
-defineExpose({exportSelectedRoom})
+async function exportSelectedStation() {
+  const station=props.stations?.[props.selection?.index]
+  if (!station) throw Error('请先选择设备位置')
+  const {exportRoom,exportSump}=await import('./roomExport')
+  if (station.kind==='集水坑') return exportSump(station)
+  const room=roomDefinitions.find(r=>r.name===station.name)
+  if (!room) throw Error('需要关联房间轮廓后才能导出')
+  return exportRoom(room)
+}
+defineExpose({exportSelectedRoom,exportSelectedStation})
 function startPoint(event) { pointer = { x:event.clientX, y:event.clientY } }
 const selectedMaterial = retain(new T.MeshBasicMaterial({color:selectionColor,side:T.DoubleSide}))
 let previousMaterial

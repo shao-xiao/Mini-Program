@@ -18,10 +18,10 @@
               <button v-for="(info,key) in availableWaterSystems" :key="key" :aria-pressed="waterSystem===key" @click="waterSystem=key">{{ info.name }}</button>
             </div>
             <button v-if="!original && fullscreenAvailable" @click="toggleFull">{{ full ? '退出全屏' : '全屏' }}</button>
-            <label v-if="canAttach && plumbing.version < 2" class="upload">关联深化图包<input type="file" accept=".zip" @change="attachDetail($event,'plumbing')"></label>
+            <label v-if="!loadingDetails && canAttach && plumbing.version < 2" class="upload">关联深化图包<input type="file" accept=".zip" @change="attachDetail($event,'plumbing')"></label>
             <button @click="toggleWaterSource">{{ original ? '返回给排水模型' : '核对专业原图' }}</button>
           </template>
-          <label v-else-if="canAttach" class="upload">关联给排水图包<input type="file" accept=".zip" @change="attachDetail($event,'plumbing')"></label>
+          <label v-else-if="!loadingDetails && canAttach" class="upload">关联给排水图包<input type="file" accept=".zip" @change="attachDetail($event,'plumbing')"></label>
         </div>
         <div v-if="tab === '平面图'" class="views">
           <div v-if="(core || garage) && !original" class="scope" aria-label="模型范围">
@@ -29,17 +29,18 @@
             <button :aria-pressed="mode === 'building'" @click="scope('building')">建筑</button>
             <button v-if="core" :aria-pressed="detail" @click="scope('core')">核心筒</button>
           </div>
-          <label v-if="canAttach && !core && !coreError" class="upload">关联核心筒详图<input type="file" accept=".zip" @change="attachDetail($event,'core')"></label>
-          <label v-if="canAttach && !garage && !coreError" class="upload">关联车库详图<input type="file" accept=".zip" @change="attachDetail($event,'garage')"></label>
-          <label v-if="canAttach && core && !survey" class="upload">关联空间规格<input type="file" accept=".zip" @change="attachDetail($event,'survey')"></label>
+          <label v-if="!loadingDetails && canAttach && !core && !coreError" class="upload">关联核心筒详图<input type="file" accept=".zip" @change="attachDetail($event,'core')"></label>
+          <label v-if="!loadingDetails && canAttach && !garage && !coreError" class="upload">关联车库详图<input type="file" accept=".zip" @change="attachDetail($event,'garage')"></label>
+          <label v-if="!loadingDetails && canAttach && core && !survey" class="upload">关联空间规格<input type="file" accept=".zip" @change="attachDetail($event,'survey')"></label>
           <button v-if="!original && fullscreenAvailable" @click="toggleFull">{{ full ? '退出全屏' : '全屏' }}</button>
           <button v-if="tab === '平面图'" type="button" @click="original = !original">{{ original ? '返回三维模型' : '核对建筑原图' }}</button>
         </div>
       </header>
+      <small v-if="loadingDetails" role="status">正在载入专业详图…</small>
       <p v-if="message || coreError" role="alert">{{ message || coreError }}</p>
       <template v-if="tab === '平面图' && !original">
         <div class="model-workbench">
-        <FloorScene ref="floorScene" :floor-elevation="model.elevation" :plumbing="plumbing" :key="mode" :rooms="visibleRooms" :garage="garage" :traffic="mode === 'traffic'" :core="core" :detail="detail" :geometry="model.geometry" :selection="selection" @select="selection = $event" />
+        <FloorScene ref="floorScene" :floor-elevation="model.elevation" :plumbing="plumbing" :key="mode + (loadingDetails ? '-base' : '')" :rooms="visibleRooms" :garage="garage" :traffic="mode === 'traffic'" :core="core" :detail="detail" :geometry="model.geometry" :selection="selection" @select="selection = $event" />
         <aside class="properties" :class="{'picked':selection.group !== 'outline'}" aria-label="模型规格">
           <h3>{{ detail ? '核心筒规格' : '构件规格' }}</h3>
           <div class="pickers">
@@ -153,6 +154,7 @@ function scope(value) {
 }
 const canAttach = hasPermission('floor:update')
 const tab = ref(tabs[0]), original = ref(false), selection = ref({ group:'outline', index:0 })
+const loadingDetails = ref(false)
 const model = shallowRef(null), archive = shallowRef(null), busy = ref(false), message = ref('')
 const sourceCode = ref(''), pdfUrl = ref(''), sourceError = ref('')
 let epoch = 0, pdfEpoch = 0
@@ -175,13 +177,24 @@ watch([source, original, tab, archive], async () => {
 })
 async function load() {
   const run = ++epoch
+  let preview
+  loadingDetails.value = false; survey.value = null
   waterSystem.value = 'drain'; plumbing.value = null; plumbingArchive.value = null
   busy.value = true; message.value = ''; model.value = null; archive.value = null; core.value = null; coreArchive.value = null; coreError.value = ''; garage.value = null; garageArchive.value = null; scope('building')
   try {
-    const data = await readFloorArchive(props.floorId)
+    const data = await readFloorArchive(props.floorId, base => {
+      if (run !== epoch) return
+      preview = setTimeout(() => {
+        if (run !== epoch) return
+        archive.value = base.archive
+        model.value = base.model
+        busy.value = false
+        loadingDetails.value = true
+      }, 200)
+    })
     if (data && run === epoch) { plumbing.value = data.plumbing; plumbingArchive.value = data.plumbingArchive; archive.value = data.archive; model.value = data.model; core.value = data.core; coreArchive.value = data.coreArchive; coreError.value = data.coreError; survey.value = data.survey; garage.value = data.garage; garageArchive.value = data.garageArchive; if (garage.value) scope('traffic') }
   } catch (e) { if (run === epoch) message.value = e.message || '读取失败' }
-  finally { if (run === epoch) busy.value = false }
+  finally { clearTimeout(preview); if (run === epoch) { busy.value = false; loadingDetails.value = false } }
 }
 async function attach(event) {
   const file = event.target.files[0]

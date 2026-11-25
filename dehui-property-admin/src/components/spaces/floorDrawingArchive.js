@@ -1,4 +1,5 @@
 import JSZip from 'jszip'
+import {readModelAttachment} from './floorArchiveReader'
 import { pipeLayers, waterSystems } from './plumbingCatalog'
 import { normalizeCustomFieldFiles } from '../../utils/customFieldValues'
 import request from '../../utils/request'
@@ -15,7 +16,7 @@ async function values(id) {
 
 export async function parseArchive(file) {
   if (file.size > maxBytes) throw Error('图模包超过 20 MB')
-  const archive = await JSZip.loadAsync(await file.arrayBuffer())
+  const archive = file.archive || await JSZip.loadAsync(await file.arrayBuffer())
   const manifest = archive.file('model.json')
   if (!manifest || manifest._data?.uncompressedSize > 2 * 1024 * 1024) throw Error('图模包缺少有效清单')
   const model = JSON.parse(await manifest.async('string'))
@@ -59,12 +60,14 @@ async function parseCore(archive, model) {
   return { core, archive }
 }
 
-export async function readFloorArchive(id) {
+export async function readFloorArchive(id, onBaseReady) {
   const files = normalizeCustomFieldFiles((await values(id))[field])
   if (!files.length) return null
-  const base = await parseArchive(await download(files[0]))
+  const base = {...await readModelAttachment(files[0], 'base', parseArchive)}
+  onBaseReady?.(base)
+  const reference = base.model.sources.find(s=>s.code==='A101')?.sha256
   const results = await Promise.allSettled(files.slice(1).map(async file =>
-    parseSupplement(await download(file), base.model)))
+    readModelAttachment(file, reference, remote => parseSupplement(remote, base.model))))
   const errors = []
   for (const result of results) {
     if (result.status === 'rejected') { errors.push(result.reason.message); continue }
@@ -87,7 +90,7 @@ function validPoint(p) {
 
 async function parseSupplement(file, model) {
   if (file.size > maxBytes) throw Error('详图包超过 20 MB')
-  const archive = await JSZip.loadAsync(await file.arrayBuffer())
+  const archive = file.archive || await JSZip.loadAsync(await file.arrayBuffer())
   if (archive.file('core.json')) {
     const result = await parseCore(archive, model)
     return {kind:'core', data:result.core, archive}

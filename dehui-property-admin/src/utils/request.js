@@ -25,6 +25,7 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   response => {
+    if (response.config?.binaryResponse && response.config.responseType === 'arraybuffer') return response
     const res = response.data
     const silent = response.config?.silent === true
 
