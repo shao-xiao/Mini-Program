@@ -17,6 +17,10 @@
       <button type="button" aria-label="缩小模型" @click="zoom(1 / 1.35)">−</button>
       <button v-if="hasMotion && !(stations && inPlan)" type="button" class="play-control" :aria-pressed="playing" @click="toggleMotion">{{ playing ? '暂停演示' : '播放演示' }}</button>
     </div>
+    <div v-if="professionalMotion && !inPlan" class="sim-tools">
+      <button type="button" :aria-pressed="simulationPlaying" @click="toggleSimulation">{{ simulationPlaying ? '暂停仿真' : '播放仿真' }}</button>
+      <span>设备运行示意</span>
+    </div>
     <p v-if="constrainedPlan" class="view-note" role="status">{{ viewNote }}</p>
   </div>
 </template>
@@ -107,13 +111,40 @@ const hasMotion = ref(false)
 const playing = ref(false)
 let inView=true, labelsDirty=true, previousTime, elapsed=0, visibilityObserver
 const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
+let mixers=[]
+const professionalMotion=ref(false)
+const simulationPlaying=ref(!motionPreference.matches)
+function bindSimulation(group) {
+  for (const mixer of mixers) {
+    mixer.stopAllAction()
+    mixer.uncacheRoot(mixer.getRoot())
+  }
+  mixers=[]
+  if (props.disciplineScene) for (const instance of group?.children || []) {
+    if (!instance.animations.length) continue
+    const mixer=new T.AnimationMixer(instance)
+    instance.animations.forEach(clip=>mixer.clipAction(clip).play())
+    mixers.push(mixer)
+  }
+  professionalMotion.value=Boolean(mixers.length)
+  previousTime=undefined
+}
+function toggleSimulation() {
+  simulationPlaying.value=!simulationPlaying.value
+  resetClock()
+}
 function render(now) {
   frame=undefined
-  const animate=playing.value && inView && !document.hidden && hasMotion.value && !(props.stations && inPlan.value)
+  const simulate=professionalMotion.value && simulationPlaying.value && !inPlan.value
+  const animate=inView && !document.hidden && (simulate || (playing.value && hasMotion.value && !(props.stations && inPlan.value)))
   // Render motion at 20 fps. Camera motion stays responsive, and labels only
   // need reprojection when the camera or selection changes.
   if (labelsDirty || (animate && (previousTime==null || now-previousTime>=50))) {
-    if (animate && previousTime!=null) elapsed+=(now-previousTime)/1000
+    if (animate && previousTime!=null) {
+      const delta=(now-previousTime)/1000
+      if (simulate) mixers.forEach(mixer=>mixer.update(Math.min(delta,.15)))
+      if (playing.value && hasMotion.value) elapsed+=delta
+    }
     previousTime=animate ? now : undefined
     stationMotion?.update(elapsed)
     plumbingMotion?.update(elapsed)
@@ -433,6 +464,7 @@ function highlight() {
 }
 watch(() => props.selection, highlight)
 watch(() => props.placedAsset, (asset, previous) => {
+  bindSimulation(asset)
   if (previous) placed.remove(previous)
   if (asset) placed.add(asset)
   else if (projected && !inPlan.value) reset(true)
@@ -545,7 +577,7 @@ onMounted(() => {
     }
     addPlanFootprints()
     scene.add(placed)
-    if (props.placedAsset) placed.add(props.placedAsset)
+    if (props.placedAsset) { placed.add(props.placedAsset); bindSimulation(props.placedAsset) }
   }
   const fitPoints = props.detail ? [...props.core.columns.flat(), ...props.core.walls.flat(), ...props.core.lines.flat()] : geo.outline
   bounds = new T.Box3().setFromPoints(fitPoints.map(([x,z]) => new T.Vector3(x,0,z)))
@@ -596,6 +628,7 @@ onBeforeUnmount(() => {
   renderer?.domElement.removeEventListener('pointerup', selectPoint)
   cancelAnimationFrame(frame)
   for (const [mesh, ink] of disciplineInk) { mesh.layers.enable(0); mesh.layers.disable(1); ink.removeFromParent() }
+  bindSimulation(null)
   if (props.placedAsset) placed.remove(props.placedAsset)
   if (projected) props.disciplineScene.visible = true
   if (highlighted && previousMaterial) highlighted.material = previousMaterial
@@ -605,6 +638,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.sim-tools{position:absolute;bottom:10px;right:10px;padding:4px 7px;background:#fffffff0;border-radius:4px;display:flex;gap:7px;align-items:center;font-size:12px}.sim-tools button{font:inherit;cursor:pointer;padding:3px 7px;border:1px solid #cbd4d6;background:white;border-radius:4px}
 .model-stage { position: relative; width:100%; height:clamp(360px, min(var(--available-model-height, 78svh), 96cqw), 1500px); overflow: hidden; border-radius: 6px; background: #f3f5f4; }
 .model-stage :deep(canvas), .model-stage :deep(svg) { display: block; touch-action: none; }
 .plan-labels { position:absolute; inset:0; pointer-events:none; overflow:hidden; }

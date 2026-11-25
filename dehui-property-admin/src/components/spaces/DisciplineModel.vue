@@ -11,7 +11,7 @@
       <h3>{{ title }}</h3>
       <p class="purpose">{{ purposes[item.name] }}</p>
       <section v-if="available.length" class="inspect">
-        <button v-if="installations.length" @click="showInstallations" :disabled="combining">查看已核标高 · {{ installations.length }} 件</button>
+        <button v-if="installations.length || simRooms.length" @click="showInstallations" :disabled="combining">{{ installations.length ? "查看已核标高 · "+installations.length+" 件" : "查看设备间" }}</button>
         <div v-if="combined && nearbyObjects.length" class="local-views">
           <button v-for="r in nearbyObjects" :key="r.id" @click="inspectInstance(r.id)">{{ r.name }}</button>
         </div>
@@ -100,7 +100,8 @@ const installations=computed(()=>available.value.filter(r=>r.kind==='installed' 
 const combineRequest=ref(0),combined=shallowRef(null),combining=ref(false),combinedError=ref('')
 const contextRooms=computed(()=>available.value.filter(r=>r.kind==='room' && r.origin && !r.verticalExtentVerified))
 const nearbyObjects=computed(()=>contextRooms.value.filter(r=>/机房|强电间/.test(r.name)))
-watch([scene,()=>props.objectArchive,()=>installations.value.length],([drawing,archive,count])=>{
+const simRooms=computed(()=>props.item.name==='承重结构' ? [] : contextRooms.value)
+watch([scene,()=>props.objectArchive,()=>installations.value.length || simRooms.value.length],([drawing,archive,count])=>{
   if (drawing && archive && count && !assetId.value) showInstallations()
 },{flush:'post'})
 const focusedId=ref('')
@@ -133,7 +134,8 @@ watch([combineRequest,()=>props.item.id,assetId,()=>props.objectArchive], async 
       const source=record.kind==='room' && !record.verticalExtentVerified ? archive : files
       const bytes=await checkedEntry(source,record.file,record.sha256,8*1024*1024)
       if (!current) return
-      const {scene}=await new GLTFLoader().parseAsync(bytes,'')
+      const {scene,animations}=await new GLTFLoader().parseAsync(bytes,'')
+      scene.animations = props.item.name === '承重结构' ? [] : animations
       scene.traverse(node=>{
         if (node.geometry) resources.add(node.geometry)
         if (node.material) [].concat(node.material).forEach(m=>resources.add(m))
@@ -155,7 +157,8 @@ watch([combineRequest,()=>props.item.id,assetId,()=>props.objectArchive], async 
     await nextTick()
     if (current) {
       floorScene.value?.showAsset()
-      const first=installations.value[0]
+      const animated=group.children.find(child=>child.animations.length)
+      const first=available.value.find(record=>animated && record.id===animated.userData.instanceId) || installations.value[0]
       if (first) inspectInstance(first.id)
     }
   } catch (e) {if (current) combinedError.value=e.message || '已核标高模型装配失败'}
