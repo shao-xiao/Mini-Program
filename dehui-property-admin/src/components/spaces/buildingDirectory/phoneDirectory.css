@@ -1,0 +1,33 @@
+.tower-floor-picker {display:none}
+@media (max-width: 760px), (pointer: coarse) and (max-height: 540px) {
+  .el-main.main:has(.spaces-page){padding:8px}
+  .spaces-page .directory{padding:8px;min-width:0}
+  .spaces-page .asset-page__header{padding:5px 9px;gap:4px;min-height:0;margin-bottom:6px}
+  .spaces-page .asset-page__header p{display:none}
+  .spaces-page .directory.dhic-has-tower{display:flex;flex-direction:column;gap:4px}
+  .spaces-page .directory-head{order:-3;gap:2px 8px;min-height:40px}
+  .spaces-page .dhic-has-tower>.dhic-tower{order:-2;margin:4px 0;width:100%;min-height:0;height:clamp(280px,41svh,470px);border-radius:9px}
+  .spaces-page .dhic-has-tower>.section{align-self:stretch;width:100%}
+  .spaces-page .directory .folders{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+  .spaces-page .directory .folders .tile{width:100%;min-height:55px;border:1px solid #e3e9ea;border-radius:7px;padding:5px;gap:1px}
+  .spaces-page .folders .tile svg{height:27px;width:38px}
+  .spaces-page .folders .tile small{font-size:11px}
+  .spaces-page .rule{min-height:28px}
+  .spaces-page .dhic-tower header{align-items:center;inset:6px 8px auto;pointer-events:none}
+  .spaces-page .tower-floor-picker{display:block;margin-left:auto;max-width:50%;min-height:40px;border:1px solid #c9d5d7;background:white;color:#283c42;border-radius:6px;padding:3px 6px;font:inherit;pointer-events:auto}
+  .spaces-page .dhic-tower header span,.spaces-page .tower-plan-label{display:none}
+  .spaces-page .tower-stage canvas{touch-action:none}
+  .spaces-page .drawing>nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0}
+  .spaces-page .drawing>nav button{padding:4px 0;min-height:42px}
+  .spaces-page .drawing .view-tools{max-width:calc(100% - 12px);overflow-x:auto;flex-wrap:nowrap}
+  .spaces-page .drawing .view-tools button{min-height:38px;flex:none}
+  .spaces-page .directory iframe[title$="六专业三维模型"]{max-width:100%}
+}
+@media (orientation:landscape) and (pointer:coarse) and (max-height:540px) {
+  /* The floor viewer already carries its own title, navigation and full-screen control. */
+  .spaces-page:has(iframe[title$="六专业三维模型"]){display:flex;flex-direction:column}
+  .spaces-page:has(iframe[title$="六专业三维模型"])>.asset-page__header{order:1}
+  .spaces-page .directory-head{min-height:32px}
+  .spaces-page .directory:has(iframe[title$="六专业三维模型"]){padding-block:2px}
+  .spaces-page .directory:has(iframe[title$="六专业三维模型"]) .directory-head button{min-height:32px}
+}

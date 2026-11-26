@@ -1,4 +1,6 @@
 import './style.css'
+import './phoneDirectory.css'
+import phoneViewerCss from './phoneViewer.css?inline'
 import exterior from './exterior.json'
 import {readBytes} from './bytes'
 import {readArchive,warmFloor} from './warmFloor'
@@ -34,6 +36,8 @@ function select(name) {
   name = supported.test(name) ? name : null
   if (selection === name) return
   selection = name
+  const picker=panel?.querySelector('.tower-floor-picker')
+  if(picker)picker.value=name||''
   directory?.querySelectorAll('.folders .tile').forEach(el => el.classList.toggle('dhic-previewing', tileName(el) === name))
   clearTimeout(warmTimer)
   if(name)warmTimer=setTimeout(()=>warmFloor(name,controller.signal),700)
@@ -95,6 +99,14 @@ function mount(el,global) {
     directory.classList.add('dhic-global-directory')
     panel.querySelector('strong').textContent='德汇创新中心 · 全楼三维总览'
   }
+  if(!global){
+    const picker=document.createElement('select')
+    picker.className='tower-floor-picker'
+    picker.setAttribute('aria-label','预览楼层')
+    picker.add(new Option('整栋视角',''))
+    picker.onchange=()=>select(picker.value)
+    panel.querySelector('header').append(picker)
+  }
   directory.classList.add('dhic-has-tower');directory.append(panel)
   primePreviews()
 
@@ -117,7 +129,7 @@ function mount(el,global) {
   },{...options,passive:false})
   directory.addEventListener('pointerdown', e=>{
     suppressClick=false
-    if(e.button===0 && tile(e.target))drag={card:tile(e.target),x:e.clientX,y:e.clientY,id:e.pointerId}
+    if(e.pointerType!=='touch' && e.button===0 && tile(e.target))drag={card:tile(e.target),x:e.clientX,y:e.clientY,id:e.pointerId}
   },options)
   directory.addEventListener('pointermove',e=>{
     if(!drag || drag.id!==e.pointerId || !e.buttons)return
@@ -139,18 +151,37 @@ function mount(el,global) {
   directory.addEventListener('keydown', e => {if(e.key === 'Escape'){focusFloor=null;pointerFloor=null;select(null)}},options)
   start()
 }
+function syncFloorPicker(){
+  const picker=panel?.querySelector('.tower-floor-picker')
+  if(!picker)return
+  const names=Array.from(directory.querySelectorAll('.folders .tile'),tileName).filter(name=>supported.test(name))
+  if(picker.dataset.floors===names.join('|'))return
+  picker.dataset.floors=names.join('|')
+  picker.replaceChildren(new Option('整栋视角',''),...names.map(name=>new Option(name+' · 预览',name)))
+  picker.value=selection||''
+}
 function sync() {
   const el = document.querySelector('section.directory')
   const title=el?.querySelector('.directory-head h2')?.textContent.trim()
   const global=title==='楼宇目录' && [...el.querySelectorAll('.folders .tile strong')].some(t=>t.textContent.trim()==='德汇创新中心')
   const floors=title==='德汇创新中心' && el?.querySelector(':scope > .floor-tools')
   const matches=location.pathname==='/assets/spaces' && (global||floors)
-  if(matches && directory===el && panel?.isConnected && panel.dataset.global===String(global))return
+  if(matches && directory===el && panel?.isConnected && panel.dataset.global===String(global)){syncFloorPicker();return}
   if(directory)dispose()
   if(matches)mount(el,global)
 
 }
 if (!window.__dhicTowerDirectory && location.hostname === 'wuye.mingda.com.cn') {
+  function styleViewer(frame){
+    if(!(frame instanceof HTMLIFrameElement) || !frame.closest('.spaces-page') ||
+       !frame.getAttribute('src')?.startsWith('/floor-model-ui-r2/'))return
+    const doc=frame.contentDocument
+    if(!doc?.head || doc.getElementById('dhic-phone-layout'))return
+    const style=doc.createElement('style')
+    style.id='dhic-phone-layout';style.textContent=phoneViewerCss;doc.head.append(style)
+  }
+  document.addEventListener('load',event=>styleViewer(event.target),true)
+  document.querySelectorAll('.spaces-page iframe').forEach(styleViewer)
   window.__dhicTowerDirectory = true
   window[Symbol.for('dhic.readArchive')]=readArchive
   warmOverview()

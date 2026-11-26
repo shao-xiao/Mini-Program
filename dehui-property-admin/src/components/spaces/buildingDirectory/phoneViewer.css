@@ -1,0 +1,19 @@
+@media (max-width: 760px), (pointer: coarse) and (max-height: 540px) {
+  body #tabs {display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0;padding:2px 0 5px}
+  body #tabs button{min-height:42px;padding:4px 0;white-space:nowrap}
+  body #modes, body #scope {flex-wrap:nowrap;overflow-x:auto;max-width:100%;min-width:0}
+  #modes button,#scope button{flex:none;min-height:38px}
+  body #stage {height:clamp(290px,57svh,560px);min-height:0}
+  #stage>canvas:first-child{touch-action:none}
+  body .tools,body .toolbar{max-width:calc(100% - 12px);left:6px;top:6px;gap:0;overflow-x:auto;flex-wrap:nowrap}
+  body .tools button,body .toolbar button{min-height:39px;min-width:36px;flex:none}
+  body #inset{width:min(30%,140px);height:auto;bottom:52px}
+  body #side {width:100%;max-width:100%;box-sizing:border-box;max-height:none}
+  #status,#legend{pointer-events:none}
+}
+@media (pointer:coarse) and (min-width:500px) {
+  body .top{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;padding-block:3px}
+  body .top #modes{min-width:0;flex-wrap:nowrap;overflow-x:auto}
+  body .top #modes:empty{display:block}
+  body .top h3{white-space:nowrap}
+}

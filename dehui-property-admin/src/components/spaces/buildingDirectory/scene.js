@@ -1,5 +1,6 @@
 import * as T from 'three'
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js'
+import {bindPlanGestures} from './touchPlan'
 import {createPlaza} from './plaza'
 import {loadModel} from './model'
 import {daylight, instanceTrees} from './daylight'
@@ -44,7 +45,12 @@ export function createScene(panel, signal, message, select) {
   const sky=daylight(renderer);world.environment=sky.texture;lights(world);lights(plan)
   const center=new T.Vector3(),size=new T.Vector3(),planCenter=new T.Vector3(),planSize=new T.Vector3()
   const ray=new T.Raycaster(),pointer=new T.Vector2(),parts=[],cached=new Map()
-  const controls=global?new OrbitControls(cam,renderer.domElement):null
+  const touch=matchMedia('(pointer: coarse)')
+  const controls=new OrbitControls(cam,renderer.domElement)
+  controls.enabled=global || touch.matches
+  if(touch.matches){controls.minZoom=.55;controls.maxZoom=9}
+  controls.rotateSpeed=touch.matches ? .72 : 1
+  const gestureHint=()=>touch.matches?'单指旋转 · 双指缩放':global?'拖动旋转 · 滚轮缩放 · 人流模拟':hint
   controls?.addEventListener('change',queue)
   let lastAspect=0, plaza, visible=true
   const framingPoint=new T.Vector3()
@@ -93,7 +99,7 @@ export function createScene(panel, signal, message, select) {
       part.node.position.y=part.base.y+Math.sign(distance)*(15+Math.abs(distance)*2)*split
       part.node.visible=!(i===index && activePlan && amount>.015)
     }
-    if(!global || lastAspect!==w/h){
+    if((!global && !touch.matches) || lastAspect!==w/h){
       framingPoint.copy(center)
       if(global)framingPoint.y+=size.y*.065
       frame(cam,framingPoint,global?overviewDirection:streetView,size.x*(global?1.19:1.04),
@@ -190,11 +196,13 @@ export function createScene(panel, signal, message, select) {
         pins.push({point:bounds.getCenter(new T.Vector3()),label})
       }
     })
-    panel.dataset.preview=shown;message(name==='8F'?'西侧办公室 · 总成标高待核':name==='9F'?'本层独立坐标 · 总成标高待核':'')
+    panel.dataset.preview=shown;message(name==='8F'?'西侧办公室 · 总成标高待核':name==='9F'?'本层独立坐标 · 总成标高待核':touch.matches?gestureHint():'')
     queue()
   }
   function setFloor(name) {
     if(dead||name===desired)return
+    top.zoom=1;top.updateProjectionMatrix()
+    controls.enabled=global || (touch.matches && !name)
     if(name){amount=0;turn=0;tilt=.001;panel.dataset.bearing="0"}
     desired=name;epoch++;clearTimeout(timer);planRequest?.abort()
     tag.textContent=name||'';caption.hidden=!name
@@ -202,7 +210,7 @@ export function createScene(panel, signal, message, select) {
     if(name&&shown!==name&&activePlan){plan.remove(activePlan);activePlan=null;shown=null}
     panel.dataset.floor=name||'';delete panel.dataset.preview
     if(body){
-      message(name?'':hint)
+      message(name&& !touch.matches?'':gestureHint())
       if(name){const sequence=epoch;showPlan(name,sequence)}
     }
     queue()
@@ -222,7 +230,10 @@ export function createScene(panel, signal, message, select) {
   }
   const events={signal:local.signal}
   renderer.domElement.addEventListener('pointermove',hit,events)
-  renderer.domElement.addEventListener('pointerleave',()=>select(null),events)
+  renderer.domElement.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch' && !touch.matches)select(null)},events)
+  bindPlanGestures(renderer.domElement,()=>touch.matches && Boolean(desired),orbit,factor=>{
+    top.zoom=T.MathUtils.clamp(top.zoom*factor,.55,9);top.updateProjectionMatrix();queue()
+  },local.signal)
   const resize=new ResizeObserver(()=>{
     w=stage.clientWidth;h=stage.clientHeight
     if(w&&h)renderer.setSize(w,h,false)
@@ -244,7 +255,7 @@ export function createScene(panel, signal, message, select) {
       const firstFloor=parts.find(part=>part.name==='1F')
       if(firstFloor)plaza=createPlaza(firstFloor.node)
     }
-    panel.dataset.model='7-02-1A2FB40';message(global?'拖动旋转 · 滚轮缩放 · 人流模拟':desired?'':hint)
+    panel.dataset.model='7-02-1A2FB40';message(desired && !touch.matches?'':gestureHint())
     if(desired)showPlan(desired,epoch)
     if(!global)warmPlans()
     queue()
