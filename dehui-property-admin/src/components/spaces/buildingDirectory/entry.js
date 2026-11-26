@@ -1,7 +1,31 @@
 import './style.css'
+import exterior from './exterior.json'
 import {readBytes} from './bytes'
 import {readArchive,warmFloor} from './warmFloor'
 import {installFloorPreviews,primePreviews} from './floorPreviews'
+let opening, earlyTower
+function readOpening(){
+  return readArchive(exterior.opening).then(async bytes=>{
+    const image=new Image()
+    image.className='tower-opening-view'
+    image.alt='德汇创新中心全楼初始视角'
+    const url=URL.createObjectURL(new Blob([bytes],{type:'image/webp'}))
+    try{
+      image.src=url
+      await image.decode()
+      return image
+    }finally{URL.revokeObjectURL(url)}
+  })
+}
+function warmOverview(){
+  const token=localStorage.getItem('token')
+  if(!token || location.pathname!=='/assets/spaces' || location.search)return
+  opening={token,promise:readOpening()}
+  opening.promise.catch(()=>{})
+  earlyTower={token,promise:readBytes('tower',new AbortController().signal)}
+  earlyTower.promise.catch(()=>{})
+  import('./scene.js').catch(()=>{})
+}
 let warmTimer
 const supported = /^(?:[1-9]F|B[12]|屋面)$/
 let directory, panel, controller, scene, selection, pointerFloor, focusFloor, retry, version = 0
@@ -38,7 +62,9 @@ async function start() {
   }
   try {
     message('正在读取建筑主体总成…')
-    const pending=readBytes('tower',controller.signal)
+    const pending=earlyTower?.token===localStorage.getItem('token') && earlyTower
+      ?earlyTower.promise:readBytes('tower',controller.signal)
+    earlyTower=null
     pending.catch(()=>{})
     const { createScene } = await import('./scene.js')
     if (v !== version) return
@@ -59,6 +85,13 @@ function mount(el,global) {
   panel.innerHTML = '<header><strong>建筑主体总成</strong><span></span></header><div class="tower-stage"></div><div class="tower-plan-label" hidden></div><div class="tower-status" role="status"></div>'
   panel.dataset.global=String(global)
   if(global){
+    const token=localStorage.getItem('token')
+    const first=opening && opening.token===token?opening.promise:readOpening()
+    const destination=panel
+    opening=null
+    first.then(image=>{
+      if(destination.isConnected && !destination.dataset.phase && localStorage.getItem('token')===token)destination.append(image)
+    }).catch(()=>{})
     directory.classList.add('dhic-global-directory')
     panel.querySelector('strong').textContent='德汇创新中心 · 全楼三维总览'
   }
@@ -120,6 +153,7 @@ function sync() {
 if (!window.__dhicTowerDirectory && location.hostname === 'wuye.mingda.com.cn') {
   window.__dhicTowerDirectory = true
   window[Symbol.for('dhic.readArchive')]=readArchive
+  warmOverview()
   installFloorPreviews()
   new MutationObserver(sync).observe(document.body,{subtree:true,childList:true})
   window.addEventListener('popstate',sync)

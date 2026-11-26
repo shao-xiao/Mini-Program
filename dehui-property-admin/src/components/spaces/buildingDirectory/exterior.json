@@ -1,1 +1,15 @@
-{"fileId": 270, "ranges": {"tower": [39, 2522525, "024c5f2f52b58d50ab71b5327dab28a035cf139a75e054fe46f2e8019bd8d6b9"]}}
+{
+  "fileId": 270,
+  "ranges": {
+    "tower": [
+      39,
+      2522525,
+      "024c5f2f52b58d50ab71b5327dab28a035cf139a75e054fe46f2e8019bd8d6b9"
+    ]
+  },
+  "archiveSha": "08253f622ad395ae92ea6c0ed49ee6b265349db6aec9b7e19adfbdf9f8971370",
+  "opening": {
+    "id": 272,
+    "sha": "35e110e2586518195db4b2039eac56a96e284ec884954aef9a046434673dedac"
+  }
+}

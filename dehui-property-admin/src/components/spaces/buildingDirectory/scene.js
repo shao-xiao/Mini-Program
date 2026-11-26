@@ -1,11 +1,13 @@
 import * as T from 'three'
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js'
+import {createPlaza} from './plaza'
 import {loadModel} from './model'
 import {daylight, instanceTrees} from './daylight'
 
 const lerp = T.MathUtils.lerp
 
 const streetView = new T.Vector3(.32,.23,1).normalize()
+const overviewDirection = new T.Vector3(.23,.155,1).normalize()
 const hint = '悬停楼层查看平面 · 滚轮或拖动旋转'
 function lights(scene) {
   scene.add(new T.HemisphereLight(0xf0f5f9,0x929d97,1.35))
@@ -44,7 +46,8 @@ export function createScene(panel, signal, message, select) {
   const ray=new T.Raycaster(),pointer=new T.Vector2(),parts=[],cached=new Map()
   const controls=global?new OrbitControls(cam,renderer.domElement):null
   controls?.addEventListener('change',queue)
-  let lastAspect=0
+  let lastAspect=0, plaza, visible=true
+  const framingPoint=new T.Vector3()
   const reduced=matchMedia('(prefers-reduced-motion: reduce)')
   const local=new AbortController()
   let desired=null,shown=null,body=null,activePlan=null,epoch=0,planRequest,timer,raf=0,last=0,amount=0,dead=false
@@ -91,11 +94,15 @@ export function createScene(panel, signal, message, select) {
       part.node.visible=!(i===index && activePlan && amount>.015)
     }
     if(!global || lastAspect!==w/h){
-      frame(cam,center,streetView,size.x*1.04,size.y*1.05+size.z*.15,w/h)
-      if(controls){controls.target.copy(center);controls.update()}
+      framingPoint.copy(center)
+      if(global)framingPoint.y+=size.y*.065
+      frame(cam,framingPoint,global?overviewDirection:streetView,size.x*(global?1.19:1.04),
+        global?size.y*1.33+size.z*.14:size.y*1.05+size.z*.15,w/h)
+      if(controls){controls.target.copy(framingPoint);controls.update()}
       lastAspect=w/h
     }
     renderer.setViewport(0,0,w,h);renderer.setScissorTest(false);renderer.autoClear=true
+    if(plaza && visible && !document.hidden && !reduced.matches)plaza.update(dt)
     if(amount<1)renderer.render(world,cam)
     if(activePlan && amount>0){
       renderer.autoClear=false
@@ -130,7 +137,17 @@ export function createScene(panel, signal, message, select) {
     panel.dataset.phase=moving?'moving':desired?'expanded':'assembled'
     if(!moving&&!desired&&activePlan){plan.remove(activePlan);activePlan=null;shown=null}
     if(moving)queue()
+    else if(plaza && visible && !document.hidden && !reduced.matches) scheduleAnimation()
   }
+  let animationTimer
+  function scheduleAnimation(){
+    if(animationTimer || dead)return
+    animationTimer=setTimeout(()=>{animationTimer=0;queue()},32)
+  }
+  const visibility=new IntersectionObserver(([entry])=>{visible=entry.isIntersecting;if(visible)queue()})
+  visibility.observe(panel)
+  document.addEventListener('visibilitychange',queue,{signal:local.signal})
+  reduced.addEventListener('change',queue,{signal:local.signal})
   const pendingPlans=new Map()
   function prepare(name) {
     if(cached.has(name))return Promise.resolve(cached.get(name))
@@ -223,14 +240,18 @@ export function createScene(panel, signal, message, select) {
     }
     parts.sort((a,b)=>a.base.y-b.base.y)
     const box=new T.Box3().setFromObject(body);box.getCenter(center);box.getSize(size)
-    panel.dataset.model='7-02-1A2FB40';message(global?'拖动旋转 · 滚轮缩放':desired?'':hint)
+    if(global){
+      const firstFloor=parts.find(part=>part.name==='1F')
+      if(firstFloor)plaza=createPlaza(firstFloor.node)
+    }
+    panel.dataset.model='7-02-1A2FB40';message(global?'拖动旋转 · 滚轮缩放 · 人流模拟':desired?'':hint)
     if(desired)showPlan(desired,epoch)
     if(!global)warmPlans()
     queue()
   }
   function dispose() {
     if(dead)return
-    dead=true;epoch++;clearTimeout(timer);cancelAnimationFrame(raf);resize.disconnect()
+    clearTimeout(animationTimer);visibility.disconnect();dead=true;epoch++;clearTimeout(timer);cancelAnimationFrame(raf);resize.disconnect()
     signal.removeEventListener('abort',abort);local.abort();planRequest?.abort()
     controls?.dispose()
     if(body)release(body)

@@ -21,8 +21,11 @@
 .dhic-room-names{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .dhic-room-names span{position:absolute;white-space:nowrap;transform:translate(-50%,-50%);color:#293b41;background:#ffffffdb;border-radius:3px;padding:1px 4px;font-size:11px}
 @media(max-width:850px){.dhic-tower{min-height:390px}}
-.directory.dhic-global-directory{grid-template-columns:minmax(230px,2fr) minmax(0,3fr)}
+.directory.dhic-global-directory{grid-template-columns:minmax(170px,1fr) minmax(0,4fr)}
 .dhic-global-directory>.dhic-tower{grid-row:2;min-height:clamp(450px,74vh,1080px);margin-top:12px}
 .dhic-global-directory canvas{touch-action:none;cursor:grab}
 .dhic-global-directory canvas:active{cursor:grabbing}
 @media(max-width:850px){.dhic-global-directory>.dhic-tower{min-height:55vh}}
+
+.tower-opening-view{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;background:#eff4f4}
+.dhic-tower[data-phase] .tower-opening-view{display:none}
