@@ -1,0 +1,15 @@
+.directory.dhic-has-tower {display:grid;grid-template-columns:minmax(0,1fr) clamp(320px,32%,520px);column-gap:20px;align-content:start}
+.dhic-has-tower>.directory-head,.dhic-has-tower>.floor-tools{grid-column:1/-1}
+.dhic-has-tower>.section{grid-column:1}
+.dhic-tower{grid-column:2;grid-row:3/span 3;align-self:stretch;position:relative;isolation:isolate;overflow:hidden;min-height:428px;border:1px solid #dde5e7;border-radius:6px;background:#f1f5f5;color:#273a41}
+.dhic-tower header{position:absolute;top:12px;left:15px;right:15px;display:flex;justify-content:space-between;align-items:center;pointer-events:none;z-index:2;font-size:14px;line-height:1.5}
+.dhic-tower header span{font-size:12px;color:#48635c}
+.dhic-tower .tower-stage{position:absolute;inset:0}
+.dhic-tower canvas{width:100%;height:100%;display:block}
+.dhic-tower .tower-status{position:absolute;left:12px;right:12px;bottom:8px;text-align:center;font-size:12px;color:#52656a;pointer-events:none}
+.dhic-tower .tower-status button{pointer-events:auto;margin-left:8px;text-decoration:underline}
+.dhic-tower .tower-plan-label{position:absolute;top:57%;left:14px;right:14px;padding-top:6px;border-top:1px solid #d6e1df;color:#345a56;font-size:12px;pointer-events:none}
+.dhic-tower [hidden]{display:none!important}
+.dhic-has-tower .tile.dhic-previewing{background:#ecf3f2;box-shadow:inset 0 0 0 1px #c4d8d4}
+@container (max-width:870px){.directory.dhic-has-tower{grid-template-columns:minmax(0,1fr) minmax(245px,34%);gap:0 10px}.dhic-has-tower>.section .folders{grid-template-columns:repeat(auto-fill,minmax(min(98px,100%),1fr))}}
+@media(max-width:850px){.directory.dhic-has-tower{display:flex;flex-direction:column}.dhic-tower{width:100%;min-height:350px;order:1;margin-top:8px}}
