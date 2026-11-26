@@ -662,7 +662,7 @@ onMounted(async () => {
   const requestedBuildingId = queryId(route.query.buildingId)
   const initialBuildingId = requestedBuildingId && buildings.value.some(item => Number(item.id) === requestedBuildingId)
     ? requestedBuildingId
-    : (buildings.value.length === 1 || !directoryMode.value ? buildings.value[0]?.id : null)
+    : (!directoryMode.value ? buildings.value[0]?.id : null)
   if (initialBuildingId) await selectBuilding(initialBuildingId, route.query.floorId)
 })
 

@@ -45,25 +45,67 @@ const archives = {
     "e54af2ce314da9c47a582c9b1aa61813027946cd6ee1403715d7fc74b8e3eb15"
   ]
 }
-let running
+const pending = new Map()
+const memoryKey = Symbol.for('dehui.floor.packs.v2')
+const diskName = 'dhic-floor-session-v1'
+
+async function cryptKey(token) {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
+  return crypto.subtle.importKey('raw', bytes, 'AES-GCM', false, ['encrypt','decrypt'])
+}
+async function openCache() {
+  try { return await caches.open(diskName) } catch { return null }
+}
+async function verified(bytes, sha) {
+  const sum = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
+  return Array.from(sum, x=>x.toString(16).padStart(2,'0')).join('') === sha
+}
+async function acquire(ref, token, progress) {
+  if(window[memoryKey]?.token!==token)window[memoryKey]={token,files:new Map()}
+  const files=window[memoryKey].files
+  const url='/files/'+ref.id
+  const options={binaryResponse:true,responseType:'arraybuffer',silent:true,timeout:120000}
+  const disk=await openCache()
+  const key=location.origin+'/__floor_cache__/'+ref.sha
+  let bytes=files.get(ref.sha)
+  let encoded
+  if(!bytes && disk)try{encoded=await disk.match(key)}catch{}
+  if(bytes || encoded){
+    const proof=await request.get(url,{...options,headers:{Range:'bytes=0-0'}})
+    if(proof.status===206 && proof.data.byteLength===1){
+      if(!bytes)try{
+        const ciphertext=new Uint8Array(await encoded.arrayBuffer())
+        bytes=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:ciphertext.slice(0,12)},await cryptKey(token),ciphertext.slice(12)))
+        if(!await verified(bytes,ref.sha))bytes=null
+      }catch{bytes=null}
+    }else bytes=null
+  }
+  if(!bytes){
+    const response=await request.get(url,{...options,onDownloadProgress:progress})
+    bytes=new Uint8Array(response.data)
+    if(!await verified(bytes,ref.sha))throw Error('楼层附件校验失败')
+    if(disk)void (async()=>{
+      const iv=crypto.getRandomValues(new Uint8Array(12))
+      const data=await crypto.subtle.encrypt({name:'AES-GCM',iv},await cryptKey(token),bytes)
+      await disk.put(key,new Response(new Blob([iv,data])))
+      const keys=await disk.keys()
+      for(const stale of keys.slice(0,Math.max(0,keys.length-12)))await disk.delete(stale)
+    })().catch(()=>{})
+  }
+  if(token!==localStorage.getItem('token'))throw Error('登录状态已变化')
+  if(!files.has(ref.sha)&&[...files.values()].reduce((n,b)=>n+b.length,bytes.length)>32*1024**2)files.clear()
+  files.set(ref.sha,bytes)
+  return bytes
+}
+export function readArchive(ref, progress) {
+  const token=localStorage.getItem('token')
+  if(!token)return Promise.reject(Error('请登录后查看'))
+  const key=token+'|'+ref.sha
+  if(!pending.has(key))pending.set(key,acquire(ref,token,progress).finally(()=>pending.delete(key)))
+  return pending.get(key)
+}
 export async function warmFloor(name, signal) {
-  running?.abort()
-  const record=archives[name],token=localStorage.getItem('token')
-  if(!record||!token||signal.aborted)return
-  const key=Symbol.for('dehui.floor.packs.v2')
-  if(window[key]?.token!==token)window[key]={token,files:new Map()}
-  const files=window[key].files,[id,sha]=record
-  if(files.has(sha))return
-  const job=new AbortController();running=job
-  const abort=()=>job.abort()
-  signal.addEventListener('abort',abort,{once:true})
-  try {
-    const r=await request.get('/files/'+id,{binaryResponse:true,responseType:'arraybuffer',silent:true,signal:job.signal,timeout:45000})
-    const bytes=new Uint8Array(r.data)
-    const sum=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))
-    if(Array.from(sum,x=>x.toString(16).padStart(2,'0')).join('')!==sha || token!==localStorage.getItem('token'))return
-    if([...files.values()].reduce((n,b)=>n+b.byteLength,bytes.byteLength)>32*1024**2)files.clear()
-    files.set(sha,bytes)
-  } catch { /* Opening the floor retries through the regular viewer. */ }
-  finally {signal.removeEventListener('abort',abort)}
+  const record=archives[name]
+  if(!record || signal.aborted || navigator.connection?.saveData)return
+  try { await readArchive({id:record[0],sha:record[1]}) } catch { /* The foreground viewer retries. */ }
 }

@@ -1,4 +1,5 @@
 import * as T from 'three'
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js'
 import {loadModel} from './model'
 import {daylight, instanceTrees} from './daylight'
 
@@ -29,6 +30,7 @@ function frame(camera, center, direction, width, height, aspect) {
 }
 
 export function createScene(panel, signal, message, select) {
+  const global=panel.dataset.global==='true'
   const stage=panel.querySelector('.tower-stage'),caption=panel.querySelector('.tower-plan-label')
   const tag=panel.querySelector('header span')
   const renderer=new T.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'})
@@ -40,6 +42,9 @@ export function createScene(panel, signal, message, select) {
   const sky=daylight(renderer);world.environment=sky.texture;lights(world);lights(plan)
   const center=new T.Vector3(),size=new T.Vector3(),planCenter=new T.Vector3(),planSize=new T.Vector3()
   const ray=new T.Raycaster(),pointer=new T.Vector2(),parts=[],cached=new Map()
+  const controls=global?new OrbitControls(cam,renderer.domElement):null
+  controls?.addEventListener('change',queue)
+  let lastAspect=0
   const reduced=matchMedia('(prefers-reduced-motion: reduce)')
   const local=new AbortController()
   let desired=null,shown=null,body=null,activePlan=null,epoch=0,planRequest,timer,raf=0,last=0,amount=0,dead=false
@@ -85,7 +90,11 @@ export function createScene(panel, signal, message, select) {
       part.node.position.y=part.base.y+Math.sign(distance)*(15+Math.abs(distance)*2)*split
       part.node.visible=!(i===index && activePlan && amount>.015)
     }
-    frame(cam,center,streetView,size.x*1.04,size.y*1.05+size.z*.15,w/h)
+    if(!global || lastAspect!==w/h){
+      frame(cam,center,streetView,size.x*1.04,size.y*1.05+size.z*.15,w/h)
+      if(controls){controls.target.copy(center);controls.update()}
+      lastAspect=w/h
+    }
     renderer.setViewport(0,0,w,h);renderer.setScissorTest(false);renderer.autoClear=true
     if(amount<1)renderer.render(world,cam)
     if(activePlan && amount>0){
@@ -182,7 +191,7 @@ export function createScene(panel, signal, message, select) {
     queue()
   }
   function hit(event){
-    if(!body||event.pointerType==='touch')return
+    if(global||!body||event.pointerType==='touch')return
     const r=renderer.domElement.getBoundingClientRect(),y=event.clientY-r.top
     if(amount>.2)return
     pointer.set((event.clientX-r.left)/w*2-1,1-y/h*2)
@@ -214,15 +223,16 @@ export function createScene(panel, signal, message, select) {
     }
     parts.sort((a,b)=>a.base.y-b.base.y)
     const box=new T.Box3().setFromObject(body);box.getCenter(center);box.getSize(size)
-    panel.dataset.model='7-02-1A2FB40';message(desired?'':hint)
+    panel.dataset.model='7-02-1A2FB40';message(global?'拖动旋转 · 滚轮缩放':desired?'':hint)
     if(desired)showPlan(desired,epoch)
-    warmPlans()
+    if(!global)warmPlans()
     queue()
   }
   function dispose() {
     if(dead)return
     dead=true;epoch++;clearTimeout(timer);cancelAnimationFrame(raf);resize.disconnect()
     signal.removeEventListener('abort',abort);local.abort();planRequest?.abort()
+    controls?.dispose()
     if(body)release(body)
     cached.forEach(release);cached.clear();sky.dispose()
     release(wash);labels.remove();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove()

@@ -1,6 +1,7 @@
 import './style.css'
 import {readBytes} from './bytes'
-import {warmFloor} from './warmFloor'
+import {readArchive,warmFloor} from './warmFloor'
+import {installFloorPreviews,primePreviews} from './floorPreviews'
 let warmTimer
 const supported = /^(?:[1-9]F|B[12]|屋面)$/
 let directory, panel, controller, scene, selection, pointerFloor, focusFloor, retry, version = 0
@@ -20,7 +21,7 @@ function dispose() {
   controller?.abort()
   scene?.dispose()
   directory?.querySelectorAll('.dhic-previewing').forEach(el => el.classList.remove('dhic-previewing'))
-  directory?.classList.remove('dhic-has-tower')
+  directory?.classList.remove('dhic-has-tower','dhic-global-directory')
   panel?.remove()
   panel = scene = directory = selection = pointerFloor = focusFloor = null
 }
@@ -50,13 +51,20 @@ async function start() {
     message(e.response?.status === 403 ? '当前账号无权查看楼宇模型' : '三维模型未能打开', start)
   }
 }
-function mount(el) {
+function mount(el,global) {
   directory = el
   controller = new AbortController()
   const options = {signal:controller.signal}
   panel = document.createElement('aside');panel.className = 'dhic-tower';panel.setAttribute('aria-label','整栋建筑三维模型')
   panel.innerHTML = '<header><strong>建筑主体总成</strong><span></span></header><div class="tower-stage"></div><div class="tower-plan-label" hidden></div><div class="tower-status" role="status"></div>'
+  panel.dataset.global=String(global)
+  if(global){
+    directory.classList.add('dhic-global-directory')
+    panel.querySelector('strong').textContent='德汇创新中心 · 全楼三维总览'
+  }
   directory.classList.add('dhic-has-tower');directory.append(panel)
+  primePreviews()
+
   const tile = target => target?.closest?.('.folders .tile')
   directory.addEventListener('pointerover', e => {
     if (e.pointerType === 'touch' || !tile(e.target)) return
@@ -100,14 +108,19 @@ function mount(el) {
 }
 function sync() {
   const el = document.querySelector('section.directory')
-  const matches = location.pathname === '/assets/spaces' && el?.querySelector(':scope > .floor-tools') &&
-    el.querySelector('.directory-head h2')?.textContent.trim() === '德汇创新中心'
-  if (matches && directory === el && panel?.isConnected) return
-  if (directory) dispose()
-  if (matches) mount(el)
+  const title=el?.querySelector('.directory-head h2')?.textContent.trim()
+  const global=title==='楼宇目录' && [...el.querySelectorAll('.folders .tile strong')].some(t=>t.textContent.trim()==='德汇创新中心')
+  const floors=title==='德汇创新中心' && el?.querySelector(':scope > .floor-tools')
+  const matches=location.pathname==='/assets/spaces' && (global||floors)
+  if(matches && directory===el && panel?.isConnected && panel.dataset.global===String(global))return
+  if(directory)dispose()
+  if(matches)mount(el,global)
+
 }
 if (!window.__dhicTowerDirectory && location.hostname === 'wuye.mingda.com.cn') {
   window.__dhicTowerDirectory = true
+  window[Symbol.for('dhic.readArchive')]=readArchive
+  installFloorPreviews()
   new MutationObserver(sync).observe(document.body,{subtree:true,childList:true})
   window.addEventListener('popstate',sync)
   sync()
