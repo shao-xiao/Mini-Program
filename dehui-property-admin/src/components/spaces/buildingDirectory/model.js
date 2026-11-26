@@ -1,22 +1,7 @@
-import request from '../../../utils/request'
-import { inflateSync } from 'three/addons/libs/fflate.module.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import binding from './assembly.json'
-
-export async function loadModel(key, signal, progress) {
-  const [start, length, digest] = binding.ranges[key]
-  const end = start + length - 1
-  const response = await request.get('/files/' + binding.fileId, {
-    responseType: 'arraybuffer', binaryResponse: true, silent: true, timeout: 90000,
-    headers: { Range: 'bytes=' + start + '-' + end }, signal, onDownloadProgress: progress
-  })
-  let bytes = new Uint8Array(response.data)
-  if (response.status === 200) bytes = bytes.subarray(start, end + 1)
-  else if (!response.headers['content-range']?.startsWith('bytes ' + start + '-' + end + '/')) throw Error('模型版本不匹配')
-  if (bytes.length !== length) throw Error('模型读取不完整')
-  const glb = inflateSync(bytes)
-  const sha = new Uint8Array(await crypto.subtle.digest('SHA-256', glb))
-  if (Array.from(sha, n => n.toString(16).padStart(2, '0')).join('') !== digest) throw Error('模型校验失败')
+import {readBytes} from './bytes'
+export async function loadModel(key,signal,progress,pending){
+  const buffer=await (pending || readBytes(key,signal,progress))
   signal.throwIfAborted()
-  return (await new GLTFLoader().parseAsync(glb.buffer, '')).scene
+  return (await new GLTFLoader().parseAsync(buffer,'')).scene
 }

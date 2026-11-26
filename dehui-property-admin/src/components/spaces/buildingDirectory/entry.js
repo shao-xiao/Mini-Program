@@ -1,4 +1,7 @@
 import './style.css'
+import {readBytes} from './bytes'
+import {warmFloor} from './warmFloor'
+let warmTimer
 const supported = /^(?:[1-9]F|B[12]|屋面)$/
 let directory, panel, controller, scene, selection, pointerFloor, focusFloor, retry, version = 0
 const tileName = tile => tile?.querySelector('strong')?.textContent?.trim()
@@ -7,9 +10,12 @@ function select(name) {
   if (selection === name) return
   selection = name
   directory?.querySelectorAll('.folders .tile').forEach(el => el.classList.toggle('dhic-previewing', tileName(el) === name))
+  clearTimeout(warmTimer)
+  if(name)warmTimer=setTimeout(()=>warmFloor(name,controller.signal),700)
   scene?.setFloor(name)
 }
 function dispose() {
+  clearTimeout(warmTimer)
   version++
   controller?.abort()
   scene?.dispose()
@@ -31,11 +37,13 @@ async function start() {
   }
   try {
     message('正在读取建筑主体总成…')
+    const pending=readBytes('tower',controller.signal)
+    pending.catch(()=>{})
     const { createScene } = await import('./scene.js')
     if (v !== version) return
     scene = createScene(panel, controller.signal, message, select)
     scene.setFloor(selection)
-    await scene.open()
+    await scene.open(pending)
   } catch (e) {
     if (v !== version) return
     scene?.dispose(); scene = null
@@ -56,8 +64,35 @@ function mount(el) {
   },options)
   directory.addEventListener('pointerout', e => {
     if (!tile(e.target) || tile(e.target)===tile(e.relatedTarget)) return
-    pointerFloor = tileName(tile(e.relatedTarget));select(pointerFloor || focusFloor)
+    pointerFloor = tileName(tile(e.relatedTarget));focusFloor=null;select(pointerFloor)
   },options)
+  let drag, suppressClick=false
+  directory.addEventListener('wheel', e=>{
+    const card=tile(e.target)
+    if(!card || !scene || e.ctrlKey)return
+    e.preventDefault();select(tileName(card))
+    const unit=e.deltaMode===1?16:e.deltaMode===2?120:1
+    scene.orbit((e.deltaX || e.deltaY)*unit*.007,Math.abs(e.deltaY)*unit*.0018)
+  },{...options,passive:false})
+  directory.addEventListener('pointerdown', e=>{
+    suppressClick=false
+    if(e.button===0 && tile(e.target))drag={card:tile(e.target),x:e.clientX,y:e.clientY,id:e.pointerId}
+  },options)
+  directory.addEventListener('pointermove',e=>{
+    if(!drag || drag.id!==e.pointerId || !e.buttons)return
+    const dx=e.clientX-drag.x,dy=e.clientY-drag.y
+    if(!suppressClick && Math.hypot(dx,dy)<4)return
+    suppressClick=true;drag.card.setPointerCapture(e.pointerId);select(tileName(drag.card))
+    scene?.orbit(dx*.017,dy*.014);drag.x=e.clientX;drag.y=e.clientY
+  },options)
+  directory.addEventListener('pointerup',e=>{
+    if(drag && suppressClick && !drag.card.contains(document.elementFromPoint(e.clientX,e.clientY))){
+      focusFloor=pointerFloor=null;select(null)
+    }
+    drag=null
+  },options)
+  directory.addEventListener('pointercancel',()=>{drag=null;suppressClick=false},options)
+  directory.addEventListener('click',e=>{if(suppressClick && e.detail){e.preventDefault();e.stopImmediatePropagation();suppressClick=false}}, {...options,capture:true})
   directory.addEventListener('focusin', e => {focusFloor=tileName(tile(e.target));select(focusFloor || pointerFloor)},options)
   directory.addEventListener('focusout', e => {focusFloor=tileName(tile(e.relatedTarget));select(focusFloor || pointerFloor)},options)
   directory.addEventListener('keydown', e => {if(e.key === 'Escape'){focusFloor=null;pointerFloor=null;select(null)}},options)

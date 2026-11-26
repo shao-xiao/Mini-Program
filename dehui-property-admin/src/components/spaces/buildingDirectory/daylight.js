@@ -2,7 +2,7 @@ import * as T from 'three'
 // A single linear-radiance sky, horizon and ground in world coordinates.
 // Pre-filter once at startup so orbiting samples the same environment on each frame.
 export function daylight(renderer){
- const w=512,h=256,data=new Float32Array(w*h*4)
+ const w=128,h=64,data=new Float32Array(w*h*4)
  for(let j=0;j<h;j++)for(let i=0;i<w;i++){
   const elev=((j+.5)/h-.5)*Math.PI,az=((i+.5)/w-.5)*2*Math.PI
   const y=Math.sin(elev),haze=Math.exp(-Math.abs(y)*4.1)
