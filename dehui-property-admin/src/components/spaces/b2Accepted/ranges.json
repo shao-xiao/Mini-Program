@@ -1,0 +1,415 @@
+{
+ "hvac/M207-file.pdf": [
+  279,
+  43,
+  1909708,
+  "f06c4b8245ed239f55530761f4962ca5101b829733f919039ea4b31f5b72b9f0",
+  8
+ ],
+ "hvac/M208-file.pdf": [
+  279,
+  1909794,
+  1513298,
+  "5ced29dbe431648942803861877badff3ea882ee66f62c985a885e4017be7936",
+  8
+ ],
+ "hvac/M306-file.pdf": [
+  279,
+  3423135,
+  1800142,
+  "598085c909958327f018abf978034742435a4b0ae63220a46041d85d887ef100",
+  8
+ ],
+ "hvac/M001-file.pdf": [
+  279,
+  5223320,
+  829595,
+  "8b753e25dd03008e6f9e4e3bbf7e85c34908804d3028bdc1b06009cfb58d4d1c",
+  8
+ ],
+ "hvac/M002-file.pdf": [
+  279,
+  6052958,
+  798624,
+  "986deed258b91717e2549864057544046046dcb438632a1ffdac5a61fc76504e",
+  8
+ ],
+ "hvac/A101-file.pdf": [
+  279,
+  6851625,
+  987984,
+  "001bc5df93a31166fa62a5ee8d6223b1ee2ad228b4fe15d6c77bc85e7fc6008e",
+  8
+ ],
+ "hvac/A401-file.pdf": [
+  279,
+  7839652,
+  1305947,
+  "843d3ffe21965d8ec3620d55509b7341065a3d8a048dc5f7f43fa772f7ac0a9a",
+  8
+ ],
+ "hvac/B2-普通通风.glb": [
+  279,
+  9145648,
+  175160,
+  "ce1333f8ff07682feaf76235c185eb8b8eb8dfae5eae54e22fe4a93f0acb12c7",
+  8
+ ],
+ "hvac/B2-防烟与排烟.glb": [
+  279,
+  9320860,
+  145089,
+  "89f70542636cf85faf887f0ef7d0644bd4648a664a957036b98da72ab536d527",
+  8
+ ],
+ "electric/E401-file.pdf": [
+  277,
+  43,
+  1109596,
+  "55b939f10d74f9a9eadff20b3ebc78d54223a699a68a5da374abdb78d8a9f53b",
+  8
+ ],
+ "electric/E401-pickImage.png": [
+  277,
+  1109687,
+  614778,
+  "6f2410065325e7f8ce24e2ed7024371372908366e377635b57d47088a8add6c9",
+  8
+ ],
+ "electric/E207-file.pdf": [
+  277,
+  1724508,
+  1494830,
+  "28613052ce26f38eb93f0b6e2354bb10955e741ea78f75f129e67dc69202f225",
+  8
+ ],
+ "electric/E302-file.pdf": [
+  277,
+  3219381,
+  836591,
+  "064c0e95aae92252455e34ef67837af6f30031c093b45c5957c6fd6e195acfc1",
+  8
+ ],
+ "electric/E302-pickImage.png": [
+  277,
+  4056020,
+  453124,
+  "7af220cd3cdd6130963fa1be4588696402ec5aec745db326933f9b77edb664a6",
+  8
+ ],
+ "electric/E204-file.pdf": [
+  277,
+  4509187,
+  1071335,
+  "07f922917e437ffe37ed25ba001a618fd92539dfe8839559d71aab42b15cd242",
+  8
+ ],
+ "electric/E301-file.pdf": [
+  277,
+  5580565,
+  843893,
+  "c717212dc5cffd62e98d533651b1b9638ccf25f39390660942a8a9d396c662b1",
+  8
+ ],
+ "electric/E301-pickImage.png": [
+  277,
+  6424506,
+  431432,
+  "29e2f3571b3e00c9cd776eb08aeac7661860d0c54461fa8d1831389256aafcf4",
+  8
+ ],
+ "electric/E202-file.pdf": [
+  277,
+  6855981,
+  1227070,
+  "b2d4a4ac81841397ced735abe051f3280c3db532a2ba6cd1142f1c7142231bdb",
+  8
+ ],
+ "electric/A101-file.pdf": [
+  277,
+  8083094,
+  987984,
+  "001bc5df93a31166fa62a5ee8d6223b1ee2ad228b4fe15d6c77bc85e7fc6008e",
+  8
+ ],
+ "electric/A401-file.pdf": [
+  277,
+  9071121,
+  1305947,
+  "843d3ffe21965d8ec3620d55509b7341065a3d8a048dc5f7f43fa772f7ac0a9a",
+  8
+ ],
+ "electric/B2-普通通风.glb": [
+  277,
+  10377117,
+  175160,
+  "ce1333f8ff07682feaf76235c185eb8b8eb8dfae5eae54e22fe4a93f0acb12c7",
+  8
+ ],
+ "fire/E702-file.pdf": [
+  278,
+  43,
+  854136,
+  "370fc6c46ae00aa0c7a283faf007fac43f59fdf9777acf4e9298c182da35d3a0",
+  8
+ ],
+ "fire/E702-image.png": [
+  278,
+  854223,
+  345172,
+  "2650a1eda7b2d92b42de398e9a667282b098b778da77580bcde801eeb152be9a",
+  8
+ ],
+ "fire/E701-file.pdf": [
+  278,
+  1199438,
+  855394,
+  "16d744e156e61998133f1d6a56052544a013651e2bed3c5b1ed209e3d3435bff",
+  8
+ ],
+ "fire/E701-image.png": [
+  278,
+  2054876,
+  309206,
+  "c570c048b24ab531cf84561b14055e19acc3497761462d22fb6c4b01ecc77bf3",
+  8
+ ],
+ "fire/E602-file.pdf": [
+  278,
+  2364125,
+  1051303,
+  "4a5de3222cfcc831599ee6642bdbfa0ac3348be0eaf295f2ce84c4a5b6d09020",
+  8
+ ],
+ "fire/P301-file.pdf": [
+  278,
+  3415471,
+  938931,
+  "405719a0eef316977231e95264bccfb0663bf0a4c0c382df600d33ccccd042e4",
+  8
+ ],
+ "fire/P301-image.png": [
+  278,
+  4354446,
+  389616,
+  "353b239684301ae9ba669f01fb771370fcd4ca02207785ae37f2be31ab52621c",
+  8
+ ],
+ "fire/P204-file.pdf": [
+  278,
+  4744105,
+  783796,
+  "5ea11a8cbb178ce990a2831bace48e7d02cea16b6292313211e710571fab9889",
+  8
+ ],
+ "fire/P401-file.pdf": [
+  278,
+  5527944,
+  1076285,
+  "ad275d1513bf0cbf60ce544b4512bf69f0af0457e73a68d01d8bd8f101c9f622",
+  8
+ ],
+ "fire/P401-image.png": [
+  278,
+  6604273,
+  579044,
+  "c8d6df45f1ba20183c1874b600e24cdcdcb8e686d2804ed136e8b9f9236b41c0",
+  8
+ ],
+ "fire/P206-file.pdf": [
+  278,
+  7183360,
+  825611,
+  "7572ce7c6e91ad7b73f0a7e0ed050ee07e651554da66e776f1b732e0bd11e2c2",
+  8
+ ],
+ "fire/E801-file.pdf": [
+  278,
+  8009014,
+  813338,
+  "20d3f735c27b134cf6ac856290f53b6cdf6c682f2a3ef2fcfd07accd4026deab",
+  8
+ ],
+ "fire/E801-image.png": [
+  278,
+  8822396,
+  266107,
+  "017bf6a55452e480c70b5808c61f48e5c8dc27b2d0af515abc4773cd1183b8b1",
+  8
+ ],
+ "fire/ET008-file.pdf": [
+  278,
+  9088547,
+  987032,
+  "d807375e302caa57a4e40373ab41804fac0f9b8a1643f014544bcb2ed341430c",
+  8
+ ],
+ "fire/A101-file.pdf": [
+  278,
+  10075622,
+  987984,
+  "001bc5df93a31166fa62a5ee8d6223b1ee2ad228b4fe15d6c77bc85e7fc6008e",
+  8
+ ],
+ "fire/A401-file.pdf": [
+  278,
+  11063649,
+  1305947,
+  "843d3ffe21965d8ec3620d55509b7341065a3d8a048dc5f7f43fa772f7ac0a9a",
+  8
+ ],
+ "weak/21-001-file.pdf": [
+  280,
+  45,
+  815051,
+  "0c0cf166f774a0d4d6e55105213f4cabe6a25ac447b0d17265627af6d9c0a5b1",
+  8
+ ],
+ "weak/21-001-image.png": [
+  280,
+  815142,
+  327565,
+  "9257af50b544dac5a9e8a5a2e1c8d3e42f8ff792799781a21b69fd155c865a8f",
+  8
+ ],
+ "weak/10-005-file.pdf": [
+  280,
+  1142752,
+  680051,
+  "5b07ea08fcd5c84a5e281c8a535d866e52bb1667a78602a9115676ed7e71dc3f",
+  8
+ ],
+ "weak/22-001-file.pdf": [
+  280,
+  1822848,
+  796559,
+  "24ae70c474c104db88c3217bb5c278f53fdd7e27224db6ad3f3161205c3f43c8",
+  8
+ ],
+ "weak/22-001-image.png": [
+  280,
+  2619453,
+  306988,
+  "82c86c52de4b3c855b3325a82bb4494a3a0581516deb8fb7f44697fc3985ecf6",
+  8
+ ],
+ "weak/10-001-file.pdf": [
+  280,
+  2926486,
+  733578,
+  "e303709983253c238f0d5b58cb02f35c89b8aa7077493f1d2dd3eba20f8fbfa2",
+  8
+ ],
+ "weak/A101-file.pdf": [
+  280,
+  3660107,
+  987984,
+  "001bc5df93a31166fa62a5ee8d6223b1ee2ad228b4fe15d6c77bc85e7fc6008e",
+  8
+ ],
+ "weak/A401-file.pdf": [
+  280,
+  4648134,
+  1305947,
+  "843d3ffe21965d8ec3620d55509b7341065a3d8a048dc5f7f43fa772f7ac0a9a",
+  8
+ ],
+ "hvac/meta": [
+  281,
+  39,
+  5031,
+  "4af2f546f690a9ef7ac608b6a16430ac234080473ee2815d75e59e0f45c0d4ff",
+  8
+ ],
+ "electric/B2·动力配电": [
+  281,
+  5125,
+  174042,
+  "1282c5592c226e5be6707e3d2442d8defc1a6e6f4f606396c954e09df9a3c1a3",
+  8
+ ],
+ "electric/B2·室内照明与应急": [
+  281,
+  179231,
+  171322,
+  "317e3b8af18bc745891fd26ed7c90213a4637ff2130894f08117e719359281df",
+  8
+ ],
+ "electric/meta": [
+  281,
+  350596,
+  9648,
+  "b4bc79a6b2361db7f59bf97de9be96357b1933588eff5c5a0b468b8b0988c570",
+  8
+ ],
+ "fire/消防报警与联动": [
+  281,
+  360300,
+  392507,
+  "2bf6a0bfb981b3bf25e3b07c097508df56c43942c27e021bb2ff8042210937aa",
+  8
+ ],
+ "fire/消火栓": [
+  281,
+  752851,
+  78448,
+  "69f3abd1d4bd6574ddc4f38c74493b227015c178ca3eff10e0b2ac48d79ebd70",
+  8
+ ],
+ "fire/自动喷淋": [
+  281,
+  831346,
+  850988,
+  "97d0573f188e2dc2d40dfe41a065e0bac8640dd903c636605e641ac1b7db5fdf",
+  8
+ ],
+ "fire/消防物联网": [
+  281,
+  1682384,
+  61311,
+  "33cdfe0bdb17956fde3563f4a5d57074763c7baa1936e779661526d5b724c157",
+  8
+ ],
+ "shared/建筑": [
+  281,
+  1743738,
+  58744,
+  "7cd654b3e01df3ecb727d3a2d7c64c603eefa2b5fc763b954da9da85118cd235",
+  8
+ ],
+ "fire/meta": [
+  281,
+  1802521,
+  4958,
+  "240fcce6f9f39cbb246c2938c7f44d6a93d9fb497e11c4a77668a455273e0d57",
+  8
+ ],
+ "weak/综合弱电": [
+  281,
+  1807526,
+  55046,
+  "b910f6da9758379bcc55f4ccfafed5579f638905f52c6a232abec801c8dd8ac6",
+  8
+ ],
+ "weak/综合安防": [
+  281,
+  1862619,
+  132372,
+  "439770a584a56b404047bcc550d70df7726c20f13572126c59bcd237ae7849ee",
+  8
+ ],
+ "weak/meta": [
+  281,
+  1995030,
+  4628,
+  "4842ad0b340ac13ff2a23048dc64fc5384658fbf6c468ad14f9a7d73a81fc0aa",
+  8
+ ],
+ "previews": [
+  281,
+  1999696,
+  172545,
+  "affbd956949cd767018800dd0afadecfbe4cf84ca78e50da5834645b3ad10dbf",
+  8
+ ]
+}

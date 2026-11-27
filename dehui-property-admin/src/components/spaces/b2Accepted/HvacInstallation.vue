@@ -16,7 +16,7 @@
   </div>
 </template>
 <script setup>
-import {modelAssets} from './assets.js'
+import {modelAssets,glb} from './assets.js'
 
 import {onMounted,onBeforeUnmount,ref,nextTick} from 'vue'
 import * as T from 'three'
@@ -127,7 +127,7 @@ let down
 function pick(e){if(e.button!==0||!down||Math.hypot(e.clientX-down.x,e.clientY-down.y)>5)return;const roomHit=labels?.hit(e.clientX,e.clientY);if(roomHit){select(roomNodes[roomHit.index]);return}const r=renderer.domElement.getBoundingClientRect();ray.setFromCamera({x:2*(e.clientX-r.left)/r.width-1,y:1-2*(e.clientY-r.top)/r.height},camera);const hit=ray.intersectObjects(targets,false)[0];if(hit)select(pickables.get(hit.object),hit.point);else {const rh=ray.intersectObjects(roomMeshes,false)[0];if(rh)select(roomOwners.get(rh.object));else clear()}}
 onMounted(async()=>{
  try{renderer=new T.WebGLRenderer({antialias:true});renderer.localClippingEnabled=true;renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));stage.value.prepend(renderer.domElement);scene.background=new T.Color(0xf1f4f4);scene.add(new T.HemisphereLight(0xffffff,0xc7d2d1,2.25));const sun=new T.DirectionalLight(0xfff6e6,2.4);sun.position.set(30,55,22);scene.add(sun);camera=new T.OrthographicCamera(-60,60,60,-60,.05,400);controls=new OrbitControls(camera,renderer.domElement);controls.minZoom=.4;controls.maxZoom=50;controls.enableRotate=true;controls.mouseButtons.LEFT=T.MOUSE.ROTATE;controls.mouseButtons.RIGHT=T.MOUSE.PAN;controls.touches.ONE=T.TOUCH.ROTATE;controls.touches.TWO=T.TOUCH.DOLLY_PAN;controls.addEventListener('change',cameraChanged);renderer.domElement.onpointerdown=e=>down={x:e.clientX,y:e.clientY};renderer.domElement.onpointerup=pick
- const gltf=await new GLTFLoader().parseAsync(modelAssets.floorBytes('B2-'+props.name+'.glb').buffer,'');gltf.scene.traverse(n=>{if(n.geometry)owned.add(n.geometry);if(n.material)for(const m of [].concat(n.material))owned.add(m)});if(disposed){owned.forEach(x=>x.dispose());return}root=gltf.scene.children[0];scene.add(root);root.updateMatrixWorld(true);box.setFromObject(root);box.getCenter(center)
+ const gltf=await new GLTFLoader().parseAsync((await glb('B2-'+props.name+'.glb')).buffer,'');gltf.scene.traverse(n=>{if(n.geometry)owned.add(n.geometry);if(n.material)for(const m of [].concat(n.material))owned.add(m)});if(disposed){owned.forEach(x=>x.dispose());return}root=gltf.scene.children[0];scene.add(root);root.updateMatrixWorld(true);box.setFromObject(root);box.getCenter(center)
  const base=root.children[0]
  const roomRoots=base.children.filter(n=>n.userData.roomSurvey)
  const roomSet=new Set(roomRoots)

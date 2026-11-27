@@ -1,25 +1,32 @@
-import JSZip from 'jszip'
-import request from '../../../utils/request'
-import { normalizeCustomFieldFiles } from '../../../utils/customFieldValues'
-
-export const modelAssets = {}
+import {authorize,openingParts,readPart} from './ranges'
+export const modelAssets={}
+let activeKey
+export async function glb(name){
+  const bytes=await readPart(name.startsWith('shared/')?name:activeKey+'/'+name)
+  // GLTFLoader checks the viewer realm's ArrayBuffer constructor.
+  return new Uint8Array(bytes)
+}
 export async function loadAssets(key) {
-  const fields = await request.get('/workspaces/floors/records/14/custom-fields', {silent:true})
-  const file = normalizeCustomFieldFiles(fields.custom_b2_model_systems_v2)
-    .find(item => item.name === 'B2-verified-'+key+'-v2.zip')
-  if (!file) throw Error('当前楼层未关联此专业的验收包')
-  const blob = await request.get('/files/'+file.fileId, {responseType:'blob',silent:true,timeout:90000})
-  const archive = await JSZip.loadAsync(await blob.arrayBuffer(), {checkCRC32:true})
-  const data = JSON.parse(await archive.file('model.json').async('string'))
-  const meta = data.floorMeta || data.serviceData || data.electricData
-  await Promise.all(Object.values(meta.sources).flatMap(source =>
-    ['file','image','pickImage'].filter(key => source[key]).map(async field => {
-      const bytes = await archive.file(source[field]).async('uint8array')
-      source[field] = URL.createObjectURL(new Blob([bytes],{type:field==='file'?'application/pdf':'image/png'}))
-    })
-  ))
-  const models = new Map()
-  await Promise.all(archive.file(/\.glb$/).map(async entry => models.set(entry.name,await entry.async('uint8array'))))
-  Object.assign(modelAssets,data,{floorBytes:name => models.get(name)})
+  const names=openingParts(key)
+  const [,bytes]=await Promise.all([authorize(names),readPart(key+'/meta'),...names.slice(1).map(readPart)])
+  activeKey=key
+  const data=JSON.parse(new TextDecoder().decode(bytes))
+  const meta=data.floorMeta||data.serviceData||data.electricData
+  for(const source of Object.values(meta.sources)){
+    source.file='?tab='+encodeURIComponent(new URLSearchParams(location.search).get('tab'))+'&drawing='+encodeURIComponent(source.file)
+  }
+  Object.assign(modelAssets,data)
   return meta
+}
+export async function imageFor(source,field){
+  if(!source?.[field]||source[field].startsWith('blob:'))return
+  const name=activeKey+'/'+source[field]
+  const [,bytes]=await Promise.all([authorize([name]),readPart(name)])
+  source[field]=URL.createObjectURL(new Blob([bytes],{type:'image/png'}))
+}
+export async function openDrawing(key,name){
+  const part=key+'/'+name
+  if(!name.endsWith('.pdf'))throw Error('原图编号无效')
+  const [,bytes]=await Promise.all([authorize([part]),readPart(part)])
+  location.replace(URL.createObjectURL(new Blob([bytes],{type:'application/pdf'})))
 }

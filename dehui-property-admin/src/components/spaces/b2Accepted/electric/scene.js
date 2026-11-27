@@ -1,4 +1,4 @@
-import {modelAssets} from '../assets.js'
+import {modelAssets,glb} from '../assets.js'
 import * as T from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
@@ -94,10 +94,10 @@ export function electricalScene(stage,labelLayer,pin,options) {
   }
   function track(root){root.traverse(n=>{if(n.geometry)own(n.geometry);for(const m of [].concat(n.material||[]))own(m)})}
   async function load(){
-    const bytes=Uint8Array.from(atob(service?modelAssets.serviceModels[mode]:modelAssets.electricModels[power?'B2·动力配电':'B2·室内照明与应急']),c=>c.charCodeAt(0))
     const loader=new GLTFLoader()
-    const floorBuffer=service?Uint8Array.from(atob(modelAssets.serviceBuilding),c=>c.charCodeAt(0)).buffer:modelAssets.floorBytes('B2-普通通风.glb').buffer
-    const [building,discipline]=await Promise.all([loader.parseAsync(floorBuffer,''),loader.parseAsync(bytes.buffer,'')])
+    const parse=async name=>loader.parseAsync((await glb(name)).buffer,'')
+    const disciplineName=service?mode:power?'B2·动力配电':'B2·室内照明与应急'
+    const [building,discipline]=await Promise.all([parse(service?'shared/建筑':'B2-普通通风.glb'),parse(disciplineName)])
     track(building.scene);track(discipline.scene);if(dead){disposeResources();return}
     const floor=service?building.scene.children[0]:building.scene.children[0].children[0];scene.add(floor)
     if(service){

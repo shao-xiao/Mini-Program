@@ -7,6 +7,7 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import 'element-plus/dist/index.css'
 import './styles/dhic-theme.css'
 import './components/spaces/buildingDirectory/entry.js'
+import './components/spaces/b2Accepted/entry.js'
 
 const app = createApp(App)
 
