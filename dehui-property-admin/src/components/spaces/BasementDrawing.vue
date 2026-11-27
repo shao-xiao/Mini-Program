@@ -3,7 +3,8 @@
     <nav aria-label="图纸专业">
       <button v-for="name in tabs" :key="name" type="button" :aria-pressed="tab === name" @click="changeTab(name)">{{ name }}</button>
     </nav>
-    <p v-if="busy" role="status">正在读取楼层图模…</p>
+    <iframe v-if="['暖通','强电','消防','弱电'].includes(tab)" :key="tab" :title="'B2 '+tab+'三维模型'" :src="'/b2-systems-v2/viewer.html?tab='+encodeURIComponent(tab)" allowfullscreen style="display:block;width:100%;height:84vh;min-height:540px;border:0" />
+    <p v-else-if="busy" role="status">正在读取楼层图模…</p>
     <div v-else-if="!model" class="blank">
       <strong>{{ message || '尚未关联竣工图模' }}</strong>
       <button type="button" @click="load">重新读取</button>

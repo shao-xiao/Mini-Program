@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [vue()],
   build: {
     rollupOptions: {
+      input: ['index.html', 'b2-systems-v2/viewer.html'],
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return
